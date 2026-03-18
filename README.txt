@@ -21,6 +21,13 @@ oficiais da NASA, para a localização de Vila Nova de Gaia.
 
 3. O browser abre automaticamente em http://localhost:5000
 
+4. Para parar o servidor, pressione Ctrl+C no terminal.
+
+5. Para atualizar no GitHub:
+   git add .
+   git commit -m "descrição do que foi feito"
+   git push
+
 ------------------------------------------------------------
   ESTRUTURA DE FICHEIROS
 ------------------------------------------------------------
@@ -29,56 +36,67 @@ astroguide/
 │
 ├── server.py              → Ponto de entrada da app web
 │                            Cria o servidor Flask e define
-│                            as rotas da API
+│                            as rotas da API e das páginas.
 │
 ├── sky_engine.py          → Motor de cálculo astronómico
 │                            Usa as efemérides da NASA para
-│                            calcular posições de astros
+│                            calcular posições de astros.
 │
 ├── eventos.py             → Base de dados de eventos
-│                            Chuvas de meteoros e eclipses
+│                            Chuvas de meteoros e eclipses.
 │
 ├── config.py              → Configurações globais
-│                            Localização, nome, versão
+│                            Localização, nome, versão,
+│                            fuso horário e elevação.
 │
 ├── de421.bsp              → Efemérides da NASA
 │                            Ficheiro com posições de todos
-│                            os planetas (descarregado uma
-│                            única vez pelo Skyfield)
+│                            os planetas.
 │
 ├── templates/
-│   └── index.html         → Interface visual da app
-│                            HTML + CSS + JavaScript
-│                            Toda a parte visual está aqui
+│   ├── menu.html          → Menu de entrada (Landing Page)
+│   │                        Com animações espaciais e
+│   │                        configurações de áudio.
+│   │
+│   └── index.html         → Interface principal da app
+│                            Céu Agora e Calendário Lunar.
 │
 └── static/
-    └── musica.mp3         → Música ambiente opcional
+    └── musica.mp3         → Música ambiente relaxante.
 
+
+------------------------------------------------------------
+  ROUTING (ROTAS)
+------------------------------------------------------------
+
+A aplicação usa um sistema de rotas simples:
+  /            → Menu de entrada (Landing Page)
+  /app         → Aplicação principal (Céu Agora)
+  /calendario  → Calendário Lunar (visto de Gaia)
+  /ceu         → Visão direta do Céu Agora
+
+Nota: /app, /calendario e /ceu servem o mesmo ficheiro (index.html),
+mas o JavaScript interno muda o "ecrã" automaticamente.
 
 ------------------------------------------------------------
   LINGUAGENS USADAS
 ------------------------------------------------------------
 
 PYTHON (Backend)
-  O Python corre no servidor e é responsável por todos os
-  cálculos astronómicos. Não é visível para o utilizador.
+  Responsável por todos os cálculos astronómicos.
   Ficheiros: server.py, sky_engine.py, eventos.py, config.py
 
 HTML (Estrutura)
-  Define a estrutura da página — títulos, botões, secções,
-  calendário. É o "esqueleto" da interface.
-  Ficheiro: templates/index.html
+  Define a estrutura das páginas e as secções da app.
+  Ficheiros: menu.html, index.html
 
 CSS (Estilo)
-  Define o aspeto visual — cores, fontes, animações,
-  tamanhos, espaçamentos. Está dentro do index.html
-  na secção <style>.
+  Estilização moderna e "dark mode". Animações de estrelas,
+  cards interativos e layouts responsivos.
 
 JavaScript (Interatividade)
-  Corre no browser do utilizador. Comunica com o servidor
-  Python via pedidos HTTP (fetch), constrói o calendário,
-  atualiza os dados a cada 30 segundos, anima as estrelas
-  de fundo. Está dentro do index.html na secção <script>.
+  Gere o estado da aplicação no browser. Desenha órbitas
+  e constelações no menu usando HTML5 Canvas.
 
 ------------------------------------------------------------
   BIBLIOTECAS PYTHON USADAS
@@ -86,77 +104,49 @@ JavaScript (Interatividade)
 
 skyfield (pip install skyfield)
   Biblioteca científica de astronomia.
-  Usa as efemérides DE421 da NASA para calcular com
-  precisão a posição de qualquer astro em qualquer
-  momento e qualquer lugar da Terra.
-  Usada em: sky_engine.py
+  Usa as efemérides DE421 da NASA para cálculos.
 
 flask (pip install flask)
   Micro-framework web para Python.
-  Cria o servidor HTTP local que serve o HTML ao browser
-  e responde a pedidos de dados em formato JSON.
-  Usada em: server.py
+  Cria o servidor que serve as páginas e a API (JSON).
 
 ------------------------------------------------------------
   CONCEITOS-CHAVE
 ------------------------------------------------------------
 
 Efemérides (de421.bsp)
-  Tabela matemática com as posições de todos os planetas
-  ao longo do tempo. Calculada pela NASA com altíssima
-  precisão. O Skyfield usa este ficheiro para saber onde
-  está cada planeta em cada momento.
+  Posições matemáticas precisas dos planetas no tempo.
 
-API (Application Programming Interface)
-  Canal de comunicação entre o JavaScript (browser) e o
-  Python (servidor). O JavaScript faz um pedido a um URL
-  como /api/ceu e recebe os dados em formato JSON.
-  Ex: fetch("/api/ceu") → {"sol": {...}, "lua": {...}}
+API JSON
+  Comunicação entre Front-end (JS) e Back-end (Python).
 
-JSON (JavaScript Object Notation)
-  Formato de troca de dados entre o Python e o JavaScript.
-  É basicamente um dicionário Python em formato texto.
-  Ex: {"altitude": 36.5, "azimute": 202.1, "visivel": true}
-
-Altitude
-  Ângulo em graus acima do horizonte.
-  0° = horizonte | 90° = zenith (diretamente acima)
-  Negativo = abaixo do horizonte (não visível)
-
-Azimute
-  Direção horizontal em graus a partir do Norte.
-  0° = Norte | 90° = Este | 180° = Sul | 270° = Oeste
-
-UA (Unidade Astronómica)
-  Distância média da Terra ao Sol = 149.597.870 km
-  Usada para medir distâncias no sistema solar.
+Altitude / Azimute
+  Coordenadas horizontais para localizar astros no céu.
 
 ------------------------------------------------------------
   FUNCIONALIDADES IMPLEMENTADAS
 ------------------------------------------------------------
 
+  [x] Landing Page Interativa com menu dinâmico
+  [x] Animações Canvas (Sistema Solar, Fases da Lua)
   [x] Dados em tempo real — Sol, Lua e 7 planetas
   [x] Altitude, azimute e distância de cada astro
   [x] Visibilidade (acima/abaixo do horizonte)
   [x] Fase da Lua em tempo real com emoji
-  [x] Calendário lunar com fases calculadas pela NASA
-  [x] Eventos astronómicos — chuvas de meteoros e eclipses
-  [x] Detalhe do dia — nascer/pôr do sol, fase da lua
-  [x] Atualização automática a cada 30 segundos
-  [x] Relógio em tempo real
-  [x] Estrelas animadas no fundo
-  [x] Música ambiente opcional
-  [x] Design responsivo (funciona em PC e telemóvel)
+  [x] Calendário lunar com fases e eventos (Nasa/Skyfield)
+  [x] Painel de configurações (Volume, Música ambiente)
+  [x] Geoview: Deteta cidade automaticamente na landing page
+  [x] Design Responsivo e interface "Glassmorphism"
 
 ------------------------------------------------------------
   ROADMAP — PRÓXIMAS FUNCIONALIDADES
 ------------------------------------------------------------
 
-  [ ] Menu de entrada com 3 botões (Observatório, Calendário, Céu Agora)
-  [ ] Observatório interativo — mapa do céu clicável
-  [ ] Constelações com estrelas individuais e características
-  [ ] Hosting online (Railway/Render) com URL público
-  [ ] Ligação Arduino para telescópio automatizado (Fase 2)
+  [x] Menu de entrada dinâmico (Concluído)
+  [ ] Observatório — Mapa do céu com estrelas reais
+  [ ] Constelações interativas clicáveis
+  [ ] Hosting online (Publicação Web)
+  [ ] Automatização de telescópio com Arduino
 
 ------------------------------------------------------------
 

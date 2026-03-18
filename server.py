@@ -21,8 +21,22 @@ app = Flask(__name__)                               # cria a aplicação Flask
 # Rotas são URLs — quando o browser acede a um URL, Flask chama a função correspondente
 
 @app.route("/")                                     # rota "/" = página principal (http://localhost:5000/)
-def index():
-    return render_template("index.html")            # serve o ficheiro templates/index.html ao browser
+def menu():
+    return render_template("menu.html")
+
+@app.route("/app")                                   # serve o ficheiro templates/index.html ao browser
+def app_principal():
+    return render_template("index.html")
+
+
+@app.route("/calendario")                           # serve o ficheiro templates/calendario.html ao browser
+def calendario():
+    return render_template("index.html")
+
+
+@app.route("/ceu")                                  # serve o ficheiro templates/mapa.html ao browser
+def ceu():
+    return render_template("index.html")
 
 # ── Rotas da API — devolvem JSON ──────────────────────────────────────────────
 # A API é o canal de comunicação entre o browser (JavaScript) e o Python

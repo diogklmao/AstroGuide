@@ -154,12 +154,17 @@ def get_nascer_por_sol(ano, mes, dia):
 
     resultado = {"nascer": "---", "por": "---"} # valores padrão caso não encontre (ex: sol da meia-noite)
     for t, e in zip(tempos, eventos):           # percorre os momentos encontrados
-        hora_utc   = t.utc_datetime()           # converte para datetime UTC
-        hora_local = hora_utc + datetime.timedelta(hours=1)  # UTC+1 para Lisboa (simplificado)
+        hora_utc   = t.utc_datetime()           # converte para objeto datetime UTC do Python
+        
+        # AJUSTE DE HORA LOCAL:
+        # Por padrão, os cálculos da NASA são em UTC. Portugal está em UTC+0 ou UTC+1 (verão).
+        # Aqui adicionamos 1 hora fixamente para simplificação pedagógica.
+        hora_local = hora_utc + datetime.timedelta(hours=1)
+        
         hora_str   = hora_local.strftime("%H:%M")            # formata como "07:23"
-        if e == 1:                              # evento 1 = nascer do sol
+        if e == 1:                              # evento 1 = sol a cruzar o horizonte subindo (nascer)
             resultado["nascer"] = hora_str
-        else:                                   # evento 0 = pôr do sol
+        else:                                   # evento 0 = sol a cruzar o horizonte descendo (pôr)
             resultado["por"] = hora_str
 
     return resultado
@@ -173,7 +178,9 @@ def get_fases_mes(ano, mes):
     t0 = ts.utc(ano, mes, 1)                    # primeiro dia do mês
     t1 = ts.utc(ano, mes + 1, 1) if mes < 12 else ts.utc(ano + 1, 1, 1)  # primeiro dia do mês seguinte
 
-    tempos, fases = almanac.find_discrete(t0, t1, almanac.moon_phases(eph))  # encontra mudanças de fase no mês
+    # almanac.find_discrete deteta as mudanças de estado (0->1, 1->2, etc.)
+    # Para a Lua, deteta os 4 quartos principais: 0=Nova, 1=Crescente, 2=Cheia, 3=Minguante
+    tempos, fases = almanac.find_discrete(t0, t1, almanac.moon_phases(eph))
 
     nomes = {
         0: ("Lua Nova",         "🌑"),          # fase 0 = lua nova

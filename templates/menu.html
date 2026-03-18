@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstroGuide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #05050f;
+            color: #dce3f0;
+            font-family: 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ── Estrelas de fundo ───────────────────────────────────────────── */
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle var(--dur) infinite ease-in-out;
+        }
+
+        @keyframes twinkle {
+
+            0%,
+            100% {
+                opacity: 0.2;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.4);
+            }
+        }
+
+        /* ── Conteúdo ────────────────────────────────────────────────────── */
+        .conteudo {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            padding: 20px;
+        }
+
+        /* ── Título ──────────────────────────────────────────────────────── */
+        .titulo {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .titulo h1 {
+            font-size: 5rem;
+            font-weight: 700;
+            color: #4f4cf0;
+            letter-spacing: 4px;
+            animation: glow 3s infinite ease-in-out;
+        }
+
+        .titulo p {
+            color: #9879e0;
+            font-size: 0.85rem;
+            margin-top: 9px;
+            letter-spacing: 3px;
+        }
+
+        #lbl-localizacao {
+            color: #334455;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            letter-spacing: 1px;
+        }
+
+        @keyframes glow {
+            /* Efeito de pulsação luminosa suave no título */
+            0%,
+            100% {
+                text-shadow: 0 0 20px rgba(79, 195, 247, 0.4);
+            }
+
+            50% {
+                text-shadow: 0 0 60px rgba(79, 195, 247, 0.9);
+            }
+        }
+
+        /* ── Cards ───────────────────────────────────────────────────────── */
+        .cards {
+            display: flex;
+            gap: 28px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .card {
+            width: 320px;
+            height: 520px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
+            text-decoration: none;
+            animation: entrar 0.6s ease backwards;
+        }
+
+        .card:nth-child(1) {
+            animation-delay: 0.1s;
+        }
+
+        .card:nth-child(2) {
+            animation-delay: 0.25s;
+        }
+
+        .card:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes entrar {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card:hover {
+            transform: translateY(-12px) scale(1.03);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-ceu:hover {
+            box-shadow: 0 20px 60px rgba(79, 195, 247, 0.35);
+        }
+
+        .card-calendario:hover {
+            box-shadow: 0 20px 60px rgba(206, 147, 216, 0.35);
+        }
+
+        .card-observatorio:hover {
+            box-shadow: 0 20px 60px rgba(255, 204, 2, 0.3);
+        }
+
+        /* barra de cor no topo */
+        .card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            z-index: 10;
+            transition: height 0.3s ease;
+        }
+
+        .card:hover::before {
+            height: 5px;
+        }
+
+        .card-ceu::before {
+            background: linear-gradient(to right, #4fc3f7, #0288d1);
+        }
+
+        .card-calendario::before {
+            background: linear-gradient(to right, #ce93d8, #7b1fa2);
+        }
+
+        .card-observatorio::before {
+            background: linear-gradient(to right, #ffcc02, #f57f17);
+        }
+
+        /* gradiente por cima do fundo animado */
+        .card-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60%;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, transparent 100%);
+            z-index: 2;
+        }
+
+        /* texto do card */
+        .card-conteudo {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            z-index: 3;
+        }
+
+        .card-emoji {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .card-titulo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .card-desc {
+            font-size: 0.78rem;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.5;
+        }
+
+        /* badge em breve */
+        .badge {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            background: rgba(255, 204, 2, 0.15);
+            border: 1px solid rgba(255, 204, 2, 0.4);
+            color: #ffcc02;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 20px;
+            letter-spacing: 1px;
+            z-index: 10;
+        }
+
+        /* ── Canvas dos fundos animados ──────────────────────────────────── */
+        .card-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* ── Botão de configurações ──────────────────────────────────────── */
+        #btn-config {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 48px;
+            height: 48px;
+            background: #0a0a20;
+            border: 1px solid #1a1a3e;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.3rem;
+            z-index: 100;
+            transition: all 0.3s;
+        }
+
+        #btn-config:hover {
+            border-color: #4fc3f7;
+            box-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
+        }
+
+        /* painel de configurações */
+        #painel-config {
+            position: fixed;
+            bottom: 84px;
+            right: 40px;
+            background: #0a0a20;
+            border: 1px solid #1a1a3e;
+            border-radius: 16px;
+            padding: 20px;
+            width: 350px;
+            z-index: 100;
+            display: none;
+            animation: fadeUp 0.2s ease;
+        }
+
+        #painel-config.visivel {
+            display: block;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .config-titulo {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #4fc3f7;
+            margin-bottom: 14px;
+            letter-spacing: 1px;
+        }
+
+        .config-linha {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .config-linha label {
+            font-size: 0.8rem;
+            color: #556070;
+            flex: 1;
+        }
+
+        input[type="range"] {
+            flex: 2;
+            accent-color: #4fc3f7;
+            cursor: pointer;
+        }
+
+        .config-linha span {
+            font-size: 0.75rem;
+            color: #4fc3f7;
+            width: 30px;
+            text-align: right;
+        }
+
+        .btn-musica {
+            width: 100%;
+            padding: 8px;
+            background: #111130;
+            border: 1px solid #1a1a3e;
+            border-radius: 8px;
+            color: #dce3f0;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 4px;
+        }
+
+        .btn-musica:hover {
+            border-color: #4fc3f7;
+            color: #4fc3f7;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="stars" id="stars"></div>
+
+    <div class="conteudo">
+        <div class="titulo">
+            <h1>✦ AstroGuide</h1>
+            <p>EXPLORA O UNIVERSO</p>
+            <div id="lbl-localizacao">📍 A detetar localização...</div>
+        </div>
+
+        <div class="cards">
+
+            <!-- Céu Agora -->
+            <a class="card card-ceu" href="/ceu">
+                <canvas class="card-canvas" id="canvas-ceu"></canvas>
+                <div class="card-overlay"></div>
+                <div class="card-conteudo">
+                    <span class="card-emoji">🌌</span>
+                    <div class="card-titulo">Céu Agora</div>
+                    <div class="card-desc">Posição em tempo real do Sol, Lua e planetas visíveis</div>
+                </div>
+            </a>
+
+            <!-- Calendário Lunar -->
+            <a class="card card-calendario" href="/calendario">
+                <canvas class="card-canvas" id="canvas-calendario"></canvas>
+                <div class="card-overlay"></div>
+                <div class="card-conteudo">
+                    <span class="card-emoji">📅</span>
+                    <div class="card-titulo">Calendário Lunar</div>
+                    <div class="card-desc">Fases da Lua, eclipses e chuvas de meteoros</div>
+                </div>
+            </a>
+
+            <!-- Observatório -->
+            <a class="card card-observatorio" href="#">
+                <div class="badge">EM BREVE</div>
+                <canvas class="card-canvas" id="canvas-observatorio"></canvas>
+                <div class="card-overlay"></div>
+                <div class="card-conteudo">
+                    <span class="card-emoji">🔭</span>
+                    <div class="card-titulo">Observatório</div>
+                    <div class="card-desc">Céu interativo com constelações e estrelas clicáveis</div>
+                </div>
+            </a>
+
+        </div>
+    </div>
+
+    <!-- Botão configurações -->
+    <div id="btn-config" onclick="toggleConfig()">⚙️</div>
+
+    <!-- Painel configurações -->
+    <div id="painel-config">
+        <div class="config-titulo">⚙ CONFIGURAÇÕES</div>
+        <div class="config-linha">
+            <label>🔊 Volume</label>
+            <input type="range" id="volume" min="0" max="100" value="40" oninput="mudarVolume(this.value)">
+            <span id="lbl-volume">40%</span>
+        </div>
+        <button class="btn-musica" onclick="toggleMusica()">▶ Ativar Música</button>
+    </div>
+
+    <!-- Música -->
+    <audio id="musica" loop>
+        <source src="/static/musica.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // ── Estrelas ──────────────────────────────────────────────────────────────────
+        function criarEstrelas() {
+            const container = document.getElementById("stars");
+            for (let i = 0; i < 180; i++) {
+                const star = document.createElement("div");
+                star.className = "star";
+                const size = Math.random() * 2.5 + 0.5;
+                star.style.cssText = `
+            width:${size}px; height:${size}px;
+            left:${Math.random() * 100}%; top:${Math.random() * 100}%;
+            --dur:${Math.random() * 4 + 2}s;
+            animation-delay:${Math.random() * 4}s;
+        `;
+                container.appendChild(star);
+            }
+        }
+
+        // ── Localização ───────────────────────────────────────────────────────────────
+        // Tenta detetar a localização real do utilizador para personalizar a experiência do menu.
+        function detetarLocalizacao() {
+            // tenta obter a localização pelo browser
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        // usa API de geocoding reverso para obter o nome da cidade
+                        fetch(`https://geocoding-api.open-meteo.com/v1/search?name=&latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}`)
+                            .catch(() => { });
+                        // fallback — mostra as coordenadas
+                        const lat = pos.coords.latitude.toFixed(2);
+                        const lon = pos.coords.longitude.toFixed(2);
+                        document.getElementById("lbl-localizacao").textContent = `📍 ${lat}°N, ${Math.abs(lon)}°W`;
+                    },
+                    () => {
+                        // se recusar a permissão mostra a localização padrão do config
+                        document.getElementById("lbl-localizacao").textContent = "📍 Vila Nova de Gaia, Portugal";
+                    }
+                );
+            } else {
+                document.getElementById("lbl-localizacao").textContent = "📍 Vila Nova de Gaia, Portugal";
+            }
+        }
+
+        // ── Música ────────────────────────────────────────────────────────────────────
+        let musicaAtiva = false;
+
+        function toggleMusica() {
+            const audio = document.getElementById("musica");
+            const btn = document.querySelector(".btn-musica");
+            if (musicaAtiva) {
+                audio.pause();
+                btn.textContent = "▶ Ativar Música";
+                musicaAtiva = false;
+            } else {
+                audio.play();
+                btn.textContent = "⏸ Pausar Música";
+                musicaAtiva = true;
+            }
+        }
+
+        function mudarVolume(val) {
+            document.getElementById("musica").volume = val / 100;   // volume entre 0.0 e 1.0
+            document.getElementById("lbl-volume").textContent = val + "%";
+        }
+
+        function toggleConfig() {
+            document.getElementById("painel-config").classList.toggle("visivel");
+        }
+
+        // ── Animação: Céu Agora (Mini Sistema Solar) ──────────────────────────────────
+        // Desenha uma animação simplificada de planetas a orbitar o Sol num Canvas 2D.
+        function animarCeu() {
+            const canvas = document.getElementById("canvas-ceu");
+            const ctx = canvas.getContext("2d");
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            // planetas com órbitas
+            const planetas = [
+                { raio: 6, orbita: 55, vel: 0.008, ang: 0, cor: "#b0bec5" },   // mercúrio
+                { raio: 9, orbita: 85, vel: 0.005, ang: 1.5, cor: "#ffcc80" },   // vénus
+                { raio: 10, orbita: 120, vel: 0.003, ang: 3.0, cor: "#4fc3f7" },   // terra
+                { raio: 7, orbita: 155, vel: 0.002, ang: 4.5, cor: "#ef5350" },   // marte
+            ];
+
+            // mini estrelas de fundo no canvas
+            const estrelas = Array.from({ length: 60 }, () => ({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                r: Math.random() * 1.2 + 0.3,
+                op: Math.random()
+            }));
+
+            let frame = 0;
+            function desenhar() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // fundo escuro
+                ctx.fillStyle = "#03030d";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // estrelas de fundo
+                estrelas.forEach(s => {
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.4 * Math.sin(frame * 0.02 + s.op * 10)})`;
+                    ctx.fill();
+                });
+
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2 + 30;    // centro ligeiramente abaixo
+
+                // sol
+                const grdSol = ctx.createRadialGradient(cx, cy, 0, cx, cy, 22);
+                grdSol.addColorStop(0, "#fff9c4");
+                grdSol.addColorStop(0.4, "#ff8f00");
+                grdSol.addColorStop(1, "transparent");
+                ctx.beginPath();
+                ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+                ctx.fillStyle = grdSol;
+                ctx.fill();
+
+                // corona do sol (brilho)
+                ctx.beginPath();
+                ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255,143,0,0.08)";
+                ctx.fill();
+
+                // órbitas e planetas
+                planetas.forEach(p => {
+                    p.ang += p.vel;
+
+                    // órbita
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, p.orbita, 0, Math.PI * 2);
+                    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // planeta
+                    const px = cx + Math.cos(p.ang) * p.orbita;
+                    const py = cy + Math.sin(p.ang) * p.orbita;
+
+                    const grd = ctx.createRadialGradient(px, py, 0, px, py, p.raio);
+                    grd.addColorStop(0, "#ffffff");
+                    grd.addColorStop(0.3, p.cor);
+                    grd.addColorStop(1, "transparent");
+
+                    ctx.beginPath();
+                    ctx.arc(px, py, p.raio, 0, Math.PI * 2);
+                    ctx.fillStyle = grd;
+                    ctx.fill();
+                });
+
+                frame++;
+                requestAnimationFrame(desenhar);    // chama-se a si própria — cria o loop de animação
+            }
+            desenhar();
+        }
+
+        // ── Animação: Calendário Lunar ────────────────────────────────────────────────
+        function animarCalendario() {
+            const canvas = document.getElementById("canvas-calendario");
+            const ctx = canvas.getContext("2d");
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            const estrelas = Array.from({ length: 50 }, () => ({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                r: Math.random() * 1.2 + 0.2,
+                op: Math.random() * Math.PI * 2
+            }));
+
+            // estrela cadente
+            let sc = { x: -50, y: 30, vel: 4.5, ativa: false, timer: 0 };
+
+            let frame = 0;
+            function desenhar() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // fundo
+                ctx.fillStyle = "#03030d";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // estrelas de fundo
+                estrelas.forEach(s => {
+                    const op = 0.3 + 0.4 * Math.sin(frame * 0.025 + s.op);
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255,255,255,${op})`;
+                    ctx.fill();
+                });
+
+                // lua
+                const lx = canvas.width / 2;
+                const ly = canvas.height / 2;
+                const lr = 55;
+                const fase = (frame * 0.005) % (Math.PI * 2);  // fase vai de 0 a 2π continuamente
+
+                // corpo da lua
+                ctx.beginPath();
+                ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+                ctx.fillStyle = "#c8c8d8";
+                ctx.fill();
+
+                // sombra da fase
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+                ctx.clip();
+                const offset = Math.cos(fase) * lr;             // sombra muda de posição consoante a fase
+                const grdSombra = ctx.createRadialGradient(lx + offset, ly, 0, lx + offset, ly, lr * 1.5);
+                grdSombra.addColorStop(0, "rgba(3,3,13,0.97)");
+                grdSombra.addColorStop(1, "rgba(3,3,13,0)");
+                ctx.fillStyle = grdSombra;
+                ctx.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
+                ctx.restore();
+
+                // brilho da lua
+                const grdLua = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
+                grdLua.addColorStop(0, "rgba(255,255,255,0.15)");
+                grdLua.addColorStop(1, "transparent");
+                ctx.beginPath();
+                ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+                ctx.fillStyle = grdLua;
+                ctx.fill();
+
+                // estrela cadente — aparece de 150 em 150 frames
+                sc.timer++;
+                if (sc.timer > 150) { sc.x = -20; sc.y = Math.random() * 80 + 10; sc.ativa = true; sc.timer = 0; }
+                if (sc.ativa) {
+                    ctx.beginPath();
+                    ctx.moveTo(sc.x, sc.y);
+                    ctx.lineTo(sc.x - 40, sc.y - 8);           // cauda da estrela cadente
+                    const grdSC = ctx.createLinearGradient(sc.x, sc.y, sc.x - 40, sc.y - 8);
+                    grdSC.addColorStop(0, "rgba(255,255,255,0.9)");
+                    grdSC.addColorStop(1, "transparent");
+                    ctx.strokeStyle = grdSC;
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    sc.x += sc.vel;
+                    if (sc.x > canvas.width + 20) sc.ativa = false;
+                }
+
+                frame++;
+                requestAnimationFrame(desenhar);
+            }
+            desenhar();
+        }
+
+        // ── Animação: Observatório ────────────────────────────────────────────────────
+        function animarObservatorio() {
+            const canvas = document.getElementById("canvas-observatorio");
+            const ctx = canvas.getContext("2d");
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            // constelação de Orion — coordenadas relativas ao centro do canvas
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2 - 20;
+            const orion = {
+                estrelas: [
+                    { x: cx - 50, y: cy - 80, r: 3.5, nome: "Betelgeuse", cor: "#ff8a65" },   // ombro esquerdo
+                    { x: cx + 45, y: cy - 70, r: 3, nome: "Bellatrix", cor: "#b3e5fc" },   // ombro direito
+                    { x: cx - 10, y: cy - 10, r: 2.5, nome: "δ", cor: "#e0e0e0" },   // cinto
+                    { x: cx + 10, y: cy + 5, r: 2.5, nome: "ε", cor: "#e0e0e0" },   // cinto
+                    { x: cx + 30, y: cy + 20, r: 2.5, nome: "ζ", cor: "#e0e0e0" },   // cinto
+                    { x: cx - 40, y: cy + 70, r: 3, nome: "Saiph", cor: "#b3e5fc" },   // joelho esquerdo
+                    { x: cx + 55, y: cy + 80, r: 3.5, nome: "Rigel", cor: "#e3f2fd" },   // joelho direito
+                ],
+                linhas: [[0, 2], [1, 2], [2, 3], [3, 4], [0, 5], [1, 6], [5, 6]]   // ligações entre estrelas
+            };
+
+            const estrelasFundo = Array.from({ length: 45 }, () => ({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                r: Math.random() * 1 + 0.2,
+                op: Math.random() * Math.PI * 2
+            }));
+
+            let frame = 0;
+            function desenhar() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = "#03030d";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // estrelas de fundo
+                estrelasFundo.forEach(s => {
+                    const op = 0.2 + 0.3 * Math.sin(frame * 0.02 + s.op);
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255,255,255,${op})`;
+                    ctx.fill();
+                });
+
+                // linhas da constelação
+                const pulso = 0.4 + 0.3 * Math.sin(frame * 0.02);   // opacidade a pulsar
+                orion.linhas.forEach(([a, b]) => {
+                    const ea = orion.estrelas[a];
+                    const eb = orion.estrelas[b];
+                    ctx.beginPath();
+                    ctx.moveTo(ea.x, ea.y);
+                    ctx.lineTo(eb.x, eb.y);
+                    ctx.strokeStyle = `rgba(79,195,247,${pulso * 0.5})`;
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+                });
+
+                // estrelas da constelação
+                orion.estrelas.forEach(e => {
+                    const brilho = 0.7 + 0.3 * Math.sin(frame * 0.03 + e.x);
+                    const grd = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 3);
+                    grd.addColorStop(0, e.cor);
+                    grd.addColorStop(0.4, e.cor);
+                    grd.addColorStop(1, "transparent");
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, e.r * brilho, 0, Math.PI * 2);
+                    ctx.fillStyle = grd;
+                    ctx.fill();
+                });
+
+                // texto "ORION" subtil
+                ctx.fillStyle = `rgba(79,195,247,${0.15 + 0.1 * Math.sin(frame * 0.015)})`;
+                ctx.font = "bold 11px 'Segoe UI'";
+                ctx.letterSpacing = "4px";
+                ctx.textAlign = "center";
+                ctx.fillText("ORION", cx, cy + 130);
+
+                frame++;
+                requestAnimationFrame(desenhar);
+            }
+            desenhar();
+        }
+
+        // ── Inicialização ─────────────────────────────────────────────────────────────
+        criarEstrelas();
+        detetarLocalizacao();
+
+        // espera os canvas estarem no DOM antes de animar
+        setTimeout(() => {
+            animarCeu();
+            animarCalendario();
+            animarObservatorio();
+        }, 100);
+
+        // volume inicial
+        document.getElementById("musica").volume = 0.4;
+    </script>
+</body>
+
+</html>

@@ -129,15 +129,21 @@ EVENTOS = [
 ]
 
 def get_eventos_do_dia(mes, dia):
-    # Filtra e devolve apenas os eventos de um dia específico.
-    # Usa list comprehension para percorrer EVENTOS e filtrar por mês e dia.
+    """
+    Filtra a lista global EVENTOS e devolve apenas os que ocorrem na data pedida.
+    Usado no painel 'Detalhe do Dia' do calendário.
+    """
     return [e for e in EVENTOS if e["mes"] == mes and e["dia"] == dia]
 
 def get_eventos_do_mes(mes):
-    # Devolve todos os eventos de um mês inteiro.
+    """
+    Devolve todos os eventos de um mês específico (ex: todos os de Agosto).
+    Ajudar a API do calendário a saber onde colocar ícones de aviso.
+    """
     return [e for e in EVENTOS if e["mes"] == mes]
 
 def tem_evento(mes, dia):
-    # Devolve True se existir pelo menos um evento nesse dia.
-    # Usado pelo calendário para decidir se coloca o ícone ⚡.
+    """
+    Verificação rápida (True/False) se um dia tem algum evento registado.
+    """
     return len(get_eventos_do_dia(mes, dia)) > 0
