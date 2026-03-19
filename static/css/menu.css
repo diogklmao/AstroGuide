@@ -1,0 +1,363 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #05050f;
+    color: #dce3f0;
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Estrelas de fundo ───────────────────────────────────────────── */
+.stars {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle var(--dur) infinite ease-in-out;
+}
+
+@keyframes twinkle {
+
+    0%,
+    100% {
+        opacity: 0.2;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.4);
+    }
+}
+
+/* ── Conteúdo ────────────────────────────────────────────────────── */
+.conteudo {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    padding: 20px;
+}
+
+/* ── Título ──────────────────────────────────────────────────────── */
+.titulo {
+    text-align: center;
+    margin-bottom: 60px;
+}
+
+.titulo h1 {
+    font-size: 5rem;
+    font-weight: 700;
+    color: #4f4cf0;
+    letter-spacing: 4px;
+    animation: glow 3s infinite ease-in-out;
+}
+
+.titulo p {
+    color: #9879e0;
+    font-size: 0.85rem;
+    margin-top: 9px;
+    letter-spacing: 3px;
+}
+
+#lbl-localizacao {
+    color: #334455;
+    font-size: 0.8rem;
+    margin-top: 10px;
+    letter-spacing: 1px;
+}
+
+@keyframes glow {
+    /* Efeito de pulsação luminosa suave no título */
+    0%,
+    100% {
+        text-shadow: 0 0 20px rgba(79, 195, 247, 0.4);
+    }
+
+    50% {
+        text-shadow: 0 0 60px rgba(79, 195, 247, 0.9);
+    }
+}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.cards {
+    display: flex;
+    gap: 28px;
+    justify-content: center;
+    align-items: center;
+}
+
+.card {
+    width: 320px;
+    height: 520px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
+    text-decoration: none;
+    animation: entrar 0.6s ease backwards;
+}
+
+.card:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.card:nth-child(2) {
+    animation-delay: 0.25s;
+}
+
+.card:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes entrar {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card:hover {
+    transform: translateY(-12px) scale(1.03);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.card-ceu:hover {
+    box-shadow: 0 20px 60px rgba(79, 195, 247, 0.35);
+}
+
+.card-calendario:hover {
+    box-shadow: 0 20px 60px rgba(206, 147, 216, 0.35);
+}
+
+.card-observatorio:hover {
+    box-shadow: 0 20px 60px rgba(255, 204, 2, 0.3);
+}
+
+/* barra de cor no topo */
+.card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    z-index: 10;
+    transition: height 0.3s ease;
+}
+
+.card:hover::before {
+    height: 5px;
+}
+
+.card-ceu::before {
+    background: linear-gradient(to right, #4fc3f7, #0288d1);
+}
+
+.card-calendario::before {
+    background: linear-gradient(to right, #ce93d8, #7b1fa2);
+}
+
+.card-observatorio::before {
+    background: linear-gradient(to right, #ffcc02, #f57f17);
+}
+
+/* gradiente por cima do fundo animado */
+.card-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 60%;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, transparent 100%);
+    z-index: 2;
+}
+
+/* texto do card */
+.card-conteudo {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 20px;
+    z-index: 3;
+}
+
+.card-emoji {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.card-titulo {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+}
+
+.card-desc {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.5;
+}
+
+/* badge em breve */
+.badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: rgba(255, 204, 2, 0.15);
+    border: 1px solid rgba(255, 204, 2, 0.4);
+    color: #ffcc02;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    z-index: 10;
+}
+
+/* ── Canvas dos fundos animados ──────────────────────────────────── */
+.card-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* ── Botão de configurações ──────────────────────────────────────── */
+#btn-config {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.3rem;
+    z-index: 100;
+    transition: all 0.3s;
+}
+
+#btn-config:hover {
+    border-color: #4fc3f7;
+    box-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
+}
+
+/* painel de configurações */
+#painel-config {
+    position: fixed;
+    bottom: 84px;
+    right: 40px;
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    border-radius: 16px;
+    padding: 20px;
+    width: 350px;
+    z-index: 100;
+    display: none;
+    animation: fadeUp 0.2s ease;
+}
+
+#painel-config.visivel {
+    display: block;
+}
+
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.config-titulo {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #4fc3f7;
+    margin-bottom: 14px;
+    letter-spacing: 1px;
+}
+
+.config-linha {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.config-linha label {
+    font-size: 0.8rem;
+    color: #556070;
+    flex: 1;
+}
+
+input[type="range"] {
+    flex: 2;
+    accent-color: #4fc3f7;
+    cursor: pointer;
+}
+
+.config-linha span {
+    font-size: 0.75rem;
+    color: #4fc3f7;
+    width: 30px;
+    text-align: right;
+}
+
+.btn-musica {
+    width: 100%;
+    padding: 8px;
+    background: #111130;
+    border: 1px solid #1a1a3e;
+    border-radius: 8px;
+    color: #dce3f0;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 4px;
+}
+
+.btn-musica:hover {
+    border-color: #4fc3f7;
+    color: #4fc3f7;
+}

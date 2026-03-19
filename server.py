@@ -58,7 +58,7 @@ def api_calendario(ano, mes):
     # Devolve fases da lua e eventos de um mês específico.
     # <int:ano> e <int:mes> são parâmetros passados pelo JavaScript.
     fases   = get_fases_mes(ano, mes)               # luas novas, cheias, quartos do mês
-    eventos = get_eventos_do_mes(mes)               # chuvas de meteoros e eclipses do mês
+    eventos = get_eventos_do_mes(ano, mes)         # chuvas de meteoros e eclipses filtrados por ano
     return jsonify({
         "fases":   fases,
         "eventos": eventos,
@@ -69,7 +69,7 @@ def api_dia(ano, mes, dia):
     # Devolve detalhes de um dia específico para o painel do calendário.
     sol     = get_nascer_por_sol(ano, mes, dia)     # horas de nascer e pôr do sol
     fase    = get_fase_lua_dia(ano, mes, dia)        # fase da lua nesse dia
-    eventos = get_eventos_do_dia(mes, dia)           # eventos astronómicos nesse dia
+    eventos = get_eventos_do_dia(ano, mes, dia)     # eventos astronómicos nesse dia (filtrado por ano para eclipses)
     return jsonify({
         "sol":     sol,
         "fase":    fase,

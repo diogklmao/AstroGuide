@@ -108,6 +108,7 @@ EVENTOS = [
         "nome":      "Eclipse Solar Total",
         "tipo":      "eclipse_solar",
         "emoji":     "🌑",
+        "ano":       2026,
         "mes":       8,                         # agosto
         "dia":       12,
         "hora_ini":  "17:00",
@@ -119,6 +120,7 @@ EVENTOS = [
         "nome":      "Eclipse Lunar Penumbral",
         "tipo":      "eclipse_lunar",
         "emoji":     "🌕",
+        "ano":       2026,
         "mes":       3,                         # março
         "dia":       3,
         "hora_ini":  "22:00",
@@ -128,22 +130,35 @@ EVENTOS = [
     },
 ]
 
-def get_eventos_do_dia(mes, dia):
+def get_eventos_do_dia(ano, mes, dia):
     """
     Filtra a lista global EVENTOS e devolve apenas os que ocorrem na data pedida.
     Usado no painel 'Detalhe do Dia' do calendário.
     """
-    return [e for e in EVENTOS if e["mes"] == mes and e["dia"] == dia]
+    return [
+        e for e in EVENTOS
+        if e["mes"] == mes
+        and e["dia"] == dia
+        # Meteoros não têm campo "ano" (aparecem todos os anos);
+        # eclipses têm "ano" específico.
+        and ("ano" not in e or e["ano"] == ano)
+    ]
 
-def get_eventos_do_mes(mes):
+def get_eventos_do_mes(ano, mes):
     """
     Devolve todos os eventos de um mês específico (ex: todos os de Agosto).
     Ajudar a API do calendário a saber onde colocar ícones de aviso.
     """
-    return [e for e in EVENTOS if e["mes"] == mes]
+    return [
+        e for e in EVENTOS
+        if e["mes"] == mes
+        # Meteoros não têm campo "ano" (aparecem todos os anos);
+        # eclipses têm "ano" específico.
+        and ("ano" not in e or e["ano"] == ano)
+    ]
 
-def tem_evento(mes, dia):
+def tem_evento(ano, mes, dia):
     """
     Verificação rápida (True/False) se um dia tem algum evento registado.
     """
-    return len(get_eventos_do_dia(mes, dia)) > 0
+    return len(get_eventos_do_dia(ano, mes, dia)) > 0

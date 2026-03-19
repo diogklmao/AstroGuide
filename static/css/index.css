@@ -1,0 +1,635 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #05050f;
+    color: #dce3f0;
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ── Estrelas de fundo ───────────────────────────────────────────── */
+.stars {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle var(--dur) infinite ease-in-out;
+}
+
+@keyframes twinkle {
+
+    0%,
+    100% {
+        opacity: 0.2;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.4);
+    }
+}
+
+/* ── Layout principal ───────────────────────────────────────────── */
+.app {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+}
+
+/* ── Cabeçalho ──────────────────────────────────────────────────── */
+header {
+    text-align: center;
+    padding: 60px 0 20px;
+}
+
+header h1 {
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: #4fc3f7;
+    letter-spacing: 2px;
+    animation: glow 3s infinite ease-in-out;
+}
+
+@keyframes glow {
+
+    0%,
+    100% {
+        text-shadow: 0 0 20px rgba(79, 195, 247, 0.4);
+    }
+
+    50% {
+        text-shadow: 0 0 50px rgba(79, 195, 247, 0.9);
+    }
+}
+
+header .subtitulo {
+    color: #556070;
+    font-size: 0.95rem;
+    margin-top: 6px;
+}
+
+#relogio {
+    font-family: 'Courier New', monospace;
+    color: #334455;
+    font-size: 0.85rem;
+    margin-top: 4px;
+}
+
+/* ── Botão voltar ────────────────────────────────────────────────── */
+#btn-voltar {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    border-radius: 10px;
+    color: #4fc3f7;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 8px 16px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+#btn-voltar:hover {
+    border-color: #4fc3f7;
+    box-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
+}
+
+/* ── Navegação ──────────────────────────────────────────────────── */
+nav {
+    display: flex;
+    gap: 4px;
+    background: #0a0a20;
+    border-radius: 12px;
+    padding: 6px;
+    margin: 20px 0;
+    border: 1px solid #1a1a3e;
+}
+
+nav button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #556070;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+nav button.ativo {
+    background: #1a1a4e;
+    color: #4fc3f7;
+    box-shadow: 0 0 20px rgba(79, 195, 247, 0.15);
+}
+
+nav button:hover:not(.ativo) {
+    color: #aaaacc;
+    background: #111128;
+}
+
+/* ── Ecrãs ──────────────────────────────────────────────────────── */
+.ecra {
+    display: none;
+}
+
+.ecra.ativo {
+    display: block;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.card {
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 16px;
+    transition: border-color 0.3s;
+}
+
+.card:hover {
+    border-color: #2a2a5e;
+}
+
+.card-titulo {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ── Grelha de dados ─────────────────────────────────────────────── */
+.dados-grelha {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.dado {
+    background: #0d0d26;
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid #15153a;
+}
+
+.dado-label {
+    color: #556070;
+    font-size: 0.85rem;
+}
+
+.dado-valor {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: #dce3f0;
+    font-weight: 600;
+}
+
+.visivel-sim {
+    color: #4caf50;
+}
+
+.visivel-nao {
+    color: #ef5350;
+}
+
+/* ── Planetas ────────────────────────────────────────────────────── */
+.planetas-grelha {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.planeta-card {
+    background: #0d0d26;
+    border: 1px solid #15153a;
+    border-radius: 10px;
+    padding: 14px;
+    transition: all 0.3s ease;
+}
+
+.planeta-card:hover {
+    border-color: #ffcc02;
+    box-shadow: 0 0 15px rgba(255, 204, 2, 0.1);
+    transform: translateY(-2px);
+}
+
+.planeta-card.invisivel {
+    opacity: 0.35;
+}
+
+.planeta-nome {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+    color: #ffcc02;
+}
+
+.planeta-card.invisivel .planeta-nome {
+    color: #445566;
+}
+
+.planeta-info {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: #556070;
+    line-height: 1.6;
+}
+
+/* ── Calendário ──────────────────────────────────────────────────── */
+.cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.cal-nav h2 {
+    font-size: 1.4rem;
+    color: #4fc3f7;
+}
+
+.cal-nav button {
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    color: #4fc3f7;
+    font-size: 1.2rem;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cal-nav button:hover {
+    background: #1a1a4e;
+}
+
+.cal-cabecalho {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 4px;
+}
+
+.cal-cabecalho div {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #334455;
+    padding: 8px 0;
+}
+
+.cal-cabecalho div:nth-child(6),
+.cal-cabecalho div:nth-child(7) {
+    color: #5a3030;
+}
+
+.cal-grelha {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+}
+
+.cal-dia {
+    aspect-ratio: 1;
+    background: #0a0a20;
+    border: 1px solid #111128;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 52px;
+}
+
+.cal-dia:hover {
+    border-color: #4fc3f7;
+    background: #0f0f2e;
+    transform: scale(1.05);
+    z-index: 2;
+}
+
+.cal-dia.hoje {
+    border-color: #4fc3f7;
+    background: #0f1a30;
+    box-shadow: 0 0 12px rgba(79, 195, 247, 0.2);
+}
+
+.cal-dia.tem-evento {
+    border-color: #ff8f00;
+}
+
+.cal-dia.selecionado {
+    border-color: #ce93d8;
+    background: #1a0a2e;
+    box-shadow: 0 0 15px rgba(206, 147, 216, 0.3);
+}
+
+.cal-dia.selecionado .cal-dia-num {
+    color: #ce93d8;
+}
+
+.cal-dia-num {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #dce3f0;
+    line-height: 1;
+}
+
+.cal-dia.hoje .cal-dia-num {
+    color: #4fc3f7;
+}
+
+.cal-dia.tem-evento .cal-dia-num {
+    color: #ff8f00;
+}
+
+.cal-dia-emoji {
+    font-size: 0.85rem;
+    line-height: 1;
+    margin-top: 3px;
+}
+
+.cal-dia-ponto {
+    font-size: 0.65rem;
+    margin-top: 1px;
+}
+
+.cal-vazio {
+    background: transparent;
+    border-color: transparent;
+    cursor: default;
+}
+
+.cal-vazio:hover {
+    transform: none;
+    border-color: transparent;
+}
+
+.cal-legenda {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 16px;
+    font-size: 0.8rem;
+    color: #445566;
+}
+
+/* ── Detalhe do dia ──────────────────────────────────────────────── */
+#detalhe-dia {
+    margin-top: 16px;
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    border-radius: 16px;
+    padding: 24px;
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+#detalhe-dia.visivel {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.detalhe-titulo {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #4fc3f7;
+    margin-bottom: 16px;
+}
+
+.detalhe-linha {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #111128;
+}
+
+.detalhe-linha:last-child {
+    border-bottom: none;
+}
+
+.detalhe-icon {
+    font-size: 1.2rem;
+    width: 28px;
+    text-align: center;
+}
+
+.detalhe-label {
+    color: #556070;
+    font-size: 0.85rem;
+    width: 140px;
+    flex-shrink: 0;
+}
+
+.detalhe-valor {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* ── Evento ──────────────────────────────────────────────────────── */
+.evento-card {
+    background: #120900;
+    border: 1px solid #ff8f00;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 12px;
+}
+
+.evento-topo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.evento-badge {
+    background: #ff8f00;
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+}
+
+.evento-nome {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #fff;
+}
+
+.evento-desc {
+    color: #aaa;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.evento-horario {
+    color: #ff8f00;
+    font-size: 0.8rem;
+    font-family: 'Courier New', monospace;
+}
+
+/* ── Loading ─────────────────────────────────────────────────────── */
+.loading {
+    text-align: center;
+    color: #334455;
+    padding: 40px;
+    font-size: 0.9rem;
+}
+
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #1a1a3e;
+    border-top-color: #4fc3f7;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Configurações ───────────────────────────────────────────────── */
+#btn-config {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.3rem;
+    z-index: 9999;
+    transition: all 0.3s;
+}
+
+#btn-config:hover {
+    border-color: #4fc3f7;
+    box-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
+}
+
+/* painel de configurações */
+#painel-config {
+    position: fixed;
+    bottom: 84px;
+    right: 40px;
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    border-radius: 16px;
+    padding: 20px;
+    width: 350px;
+    z-index: 100;
+    display: none;
+    animation: fadeUp 0.2s ease;
+}
+
+#painel-config.visivel {
+    display: block;
+}
+
+.config-titulo {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #4fc3f7;
+    margin-bottom: 14px;
+    letter-spacing: 1px;
+}
+
+.config-linha {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.config-linha label {
+    font-size: 0.8rem;
+    color: #556070;
+    white-space: nowrap;
+}
+
+.config-linha input[type="range"] {
+    width: 300px;
+    accent-color: #4fc3f7;
+    cursor: pointer;
+}
+
+.config-linha span {
+    font-size: 0.75rem;
+    color: #4fc3f7;
+    width: 50px;
+    text-align: right;
+}
+
+.btn-musica {
+    width: 100%;
+    padding: 8px;
+    background: #111130;
+    border: 1px solid #1a1a3e;
+    border-radius: 8px;
+    color: #dce3f0;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-musica:hover {
+    border-color: #4fc3f7;
+    color: #4fc3f7;
+}

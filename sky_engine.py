@@ -132,6 +132,7 @@ def get_nascer_por_sol(ano, mes, dia):
     # Calcula o nascer e pôr do sol para um dia específico.
     # Devolve dicionário com as horas em hora local de Lisboa.
     import datetime
+    from zoneinfo import ZoneInfo
     from skyfield import almanac
 
     t0 = ts.utc(ano, mes, dia, 0)               # início do dia (meia-noite UTC)
@@ -153,15 +154,15 @@ def get_nascer_por_sol(ano, mes, dia):
     tempos, eventos = almanac.find_discrete(t0, t1, f)  # encontra os momentos exatos dentro do intervalo
 
     resultado = {"nascer": "---", "por": "---"} # valores padrão caso não encontre (ex: sol da meia-noite)
+    # Converter para hora local usando timezone real (inclui hora de verão).
+    local_tz = ZoneInfo(LOCATION["timezone"])
     for t, e in zip(tempos, eventos):           # percorre os momentos encontrados
-        hora_utc   = t.utc_datetime()           # converte para objeto datetime UTC do Python
-        
-        # AJUSTE DE HORA LOCAL:
-        # Por padrão, os cálculos da NASA são em UTC. Portugal está em UTC+0 ou UTC+1 (verão).
-        # Aqui adicionamos 1 hora fixamente para simplificação pedagógica.
-        hora_local = hora_utc + datetime.timedelta(hours=1)
-        
-        hora_str   = hora_local.strftime("%H:%M")            # formata como "07:23"
+        hora_utc = t.utc_datetime()           # converte para objeto datetime UTC do Python
+        if hora_utc.tzinfo is None:
+            hora_utc = hora_utc.replace(tzinfo=datetime.timezone.utc)
+        hora_local = hora_utc.astimezone(local_tz)
+
+        hora_str = hora_local.strftime("%H:%M")            # formata como "07:23"
         if e == 1:                              # evento 1 = sol a cruzar o horizonte subindo (nascer)
             resultado["nascer"] = hora_str
         else:                                   # evento 0 = sol a cruzar o horizonte descendo (pôr)
@@ -173,6 +174,7 @@ def get_fases_mes(ano, mes):
     # Calcula todas as fases principais da Lua num mês inteiro.
     # Devolve lista com lua nova, quarto crescente, lua cheia e quarto minguante.
     import datetime
+    from zoneinfo import ZoneInfo
     from skyfield import almanac
 
     t0 = ts.utc(ano, mes, 1)                    # primeiro dia do mês
@@ -190,9 +192,12 @@ def get_fases_mes(ano, mes):
     }
 
     resultado = []
+    local_tz = ZoneInfo(LOCATION["timezone"])
     for t, fase in zip(tempos, fases):          # percorre cada fase encontrada
-        hora_utc   = t.utc_datetime()
-        hora_local = hora_utc + datetime.timedelta(hours=1)     # converte para hora local Lisboa
+        hora_utc = t.utc_datetime()
+        if hora_utc.tzinfo is None:
+            hora_utc = hora_utc.replace(tzinfo=datetime.timezone.utc)
+        hora_local = hora_utc.astimezone(local_tz)             # converte para hora local Lisboa
         nome, emoji = nomes[fase]
         resultado.append({
             "dia":   hora_local.day,            # dia do mês em que ocorre a fase
