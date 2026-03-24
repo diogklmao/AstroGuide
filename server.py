@@ -5,11 +5,15 @@
 #  Para correr: py server.py
 # ============================================================
 
-from flask import Flask, jsonify, render_template    # Flask = framework web | jsonify = converte dict para JSON | render_template = serve HTML
-from sky_engine import (                             # importa todas as funções de cálculo astronómico
+from flask import Flask, jsonify, render_template   # Flask = framework web | jsonify = converte dict para JSON | render_template = serve HTML
+from skyfield.api import load                       # descarrega as efemérides automaticamente se não existirem
+load('de421.bsp')                                   # garante que o ficheiro existe antes de qualquer cálculo
+
+from sky_engine import (                            # importa todas as funções de cálculo astronómico
     get_sol, get_lua, get_todos_planetas,
     get_fase_lua_dia, get_nascer_por_sol, get_fases_mes
 )
+
 from eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
 from config import LOCATION                                  # importa localização
 import datetime                                              # para obter a hora atual
