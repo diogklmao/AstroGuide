@@ -1,59 +1,28 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+/* ═══════════════════════════════════════════════════════════════════
+   index.css
+   Estilos específicos da página principal do AstroGuide (index.html).
+   Requer shared-ui-controls.css carregado antes deste ficheiro.
+   ═══════════════════════════════════════════════════════════════════ */
 
+
+/* ── Comportamento específico do body nesta página ────────────────── */
 body {
-    background: #05050f;
-    color: #dce3f0;
-    font-family: 'Segoe UI', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
+    overflow-x: hidden; /* evita scroll horizontal causado por elementos animados */
 }
 
-/* ── Estrelas de fundo ───────────────────────────────────────────── */
-.stars {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 0;
-}
 
-.star {
-    position: absolute;
-    background: white;
-    border-radius: 50%;
-    animation: twinkle var(--dur) infinite ease-in-out;
-}
-
-@keyframes twinkle {
-
-    0%,
-    100% {
-        opacity: 0.2;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 1;
-        transform: scale(1.4);
-    }
-}
-
-/* ── Layout principal ───────────────────────────────────────────── */
+/* ── Layout principal ─────────────────────────────────────────────── */
+/* Contentor central que limita a largura e centra o conteúdo         */
 .app {
     position: relative;
-    z-index: 1;
+    z-index: 1;             /* fica por cima das estrelas (z-index: 0) */
     max-width: 1000px;
-    margin: 0 auto;
+    margin: 0 auto;         /* centra horizontalmente */
     padding: 0 20px 40px;
 }
 
-/* ── Cabeçalho ──────────────────────────────────────────────────── */
+
+/* ── Cabeçalho ────────────────────────────────────────────────────── */
 header {
     text-align: center;
     padding: 60px 0 20px;
@@ -64,35 +33,26 @@ header h1 {
     font-weight: 700;
     color: #4fc3f7;
     letter-spacing: 2px;
-    animation: glow 3s infinite ease-in-out;
+    animation: glow 3s infinite ease-in-out; /* animação definida no shared */
 }
 
-@keyframes glow {
-
-    0%,
-    100% {
-        text-shadow: 0 0 20px rgba(79, 195, 247, 0.4);
-    }
-
-    50% {
-        text-shadow: 0 0 50px rgba(79, 195, 247, 0.9);
-    }
-}
-
+/* Texto secundário abaixo do título */
 header .subtitulo {
     color: #556070;
     font-size: 0.95rem;
     margin-top: 6px;
 }
 
+/* Relógio em tempo real no cabeçalho */
 #relogio {
-    font-family: 'Courier New', monospace;
+    font-family: 'Courier New', monospace; /* fonte monospace para os números não saltarem */
     color: #334455;
     font-size: 0.85rem;
     margin-top: 4px;
 }
 
-/* ── Botão voltar ────────────────────────────────────────────────── */
+
+/* ── Botão voltar (canto superior esquerdo) ───────────────────────── */
 #btn-voltar {
     position: fixed;
     top: 20px;
@@ -117,7 +77,8 @@ header .subtitulo {
     box-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
 }
 
-/* ── Navegação ──────────────────────────────────────────────────── */
+
+/* ── Navegação por tabs ───────────────────────────────────────────── */
 nav {
     display: flex;
     gap: 4px;
@@ -141,27 +102,33 @@ nav button {
     transition: all 0.3s ease;
 }
 
+/* Tab selecionada */
 nav button.ativo {
     background: #1a1a4e;
     color: #4fc3f7;
     box-shadow: 0 0 20px rgba(79, 195, 247, 0.15);
 }
 
+/* Tab em hover (mas não ativa) */
 nav button:hover:not(.ativo) {
     color: #aaaacc;
     background: #111128;
 }
 
-/* ── Ecrãs ──────────────────────────────────────────────────────── */
+
+/* ── Ecrãs (painéis de conteúdo) ─────────────────────────────────── */
+/* Cada ecrã está escondido por defeito */
 .ecra {
     display: none;
 }
 
+/* O JavaScript adiciona esta classe ao ecrã ativo */
 .ecra.ativo {
     display: block;
 }
 
-/* ── Cards ──────────────────────────────────────────────────────── */
+
+/* ── Cards de dados ───────────────────────────────────────────────── */
 .card {
     background: #0a0a20;
     border: 1px solid #1a1a3e;
@@ -184,13 +151,16 @@ nav button:hover:not(.ativo) {
     gap: 10px;
 }
 
-/* ── Grelha de dados ─────────────────────────────────────────────── */
+
+/* ── Grelha de dados (Sol, Lua) ───────────────────────────────────── */
+/* Divide os dados em duas colunas */
 .dados-grelha {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
 
+/* Célula individual de dado */
 .dado {
     background: #0d0d26;
     border-radius: 10px;
@@ -213,21 +183,25 @@ nav button:hover:not(.ativo) {
     font-weight: 600;
 }
 
+/* Cores de visibilidade dos corpos celestes */
 .visivel-sim {
-    color: #4caf50;
+    color: #4caf50; /* verde = visível */
 }
 
 .visivel-nao {
-    color: #ef5350;
+    color: #ef5350; /* vermelho = não visível */
 }
 
-/* ── Planetas ────────────────────────────────────────────────────── */
+
+/* ── Grelha de planetas ───────────────────────────────────────────── */
+/* Layout responsivo: adapta o número de colunas ao espaço disponível */
 .planetas-grelha {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 10px;
 }
 
+/* Card individual de planeta */
 .planeta-card {
     background: #0d0d26;
     border: 1px solid #15153a;
@@ -239,9 +213,10 @@ nav button:hover:not(.ativo) {
 .planeta-card:hover {
     border-color: #ffcc02;
     box-shadow: 0 0 15px rgba(255, 204, 2, 0.1);
-    transform: translateY(-2px);
+    transform: translateY(-2px); /* sobe ligeiramente ao hover */
 }
 
+/* Planeta abaixo do horizonte (não visível) */
 .planeta-card.invisivel {
     opacity: 0.35;
 }
@@ -250,9 +225,10 @@ nav button:hover:not(.ativo) {
     font-weight: 700;
     font-size: 0.95rem;
     margin-bottom: 6px;
-    color: #ffcc02;
+    color: #ffcc02; /* dourado para planetas visíveis */
 }
 
+/* Nome do planeta quando invisível */
 .planeta-card.invisivel .planeta-nome {
     color: #445566;
 }
@@ -264,7 +240,8 @@ nav button:hover:not(.ativo) {
     line-height: 1.6;
 }
 
-/* ── Calendário ──────────────────────────────────────────────────── */
+
+/* ── Navegação do calendário ──────────────────────────────────────── */
 .cal-nav {
     display: flex;
     align-items: center;
@@ -277,6 +254,7 @@ nav button:hover:not(.ativo) {
     color: #4fc3f7;
 }
 
+/* Botões de mês anterior/seguinte */
 .cal-nav button {
     background: #0a0a20;
     border: 1px solid #1a1a3e;
@@ -293,6 +271,7 @@ nav button:hover:not(.ativo) {
     background: #1a1a4e;
 }
 
+/* Cabeçalho com os dias da semana */
 .cal-cabecalho {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -308,19 +287,22 @@ nav button:hover:not(.ativo) {
     padding: 8px 0;
 }
 
+/* Fim de semana em cor diferente */
 .cal-cabecalho div:nth-child(6),
 .cal-cabecalho div:nth-child(7) {
     color: #5a3030;
 }
 
+/* Grelha de dias do mês */
 .cal-grelha {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 3px;
 }
 
+/* Célula de cada dia */
 .cal-dia {
-    aspect-ratio: 1;
+    aspect-ratio: 1;        /* mantém forma quadrada */
     background: #0a0a20;
     border: 1px solid #111128;
     border-radius: 8px;
@@ -337,19 +319,22 @@ nav button:hover:not(.ativo) {
     border-color: #4fc3f7;
     background: #0f0f2e;
     transform: scale(1.05);
-    z-index: 2;
+    z-index: 2; /* fica por cima dos dias vizinhos ao fazer hover */
 }
 
+/* Dia atual */
 .cal-dia.hoje {
     border-color: #4fc3f7;
     background: #0f1a30;
     box-shadow: 0 0 12px rgba(79, 195, 247, 0.2);
 }
 
+/* Dia com evento astronómico */
 .cal-dia.tem-evento {
     border-color: #ff8f00;
 }
 
+/* Dia selecionado pelo utilizador */
 .cal-dia.selecionado {
     border-color: #ce93d8;
     background: #1a0a2e;
@@ -360,6 +345,7 @@ nav button:hover:not(.ativo) {
     color: #ce93d8;
 }
 
+/* Número do dia dentro da célula */
 .cal-dia-num {
     font-size: 0.9rem;
     font-weight: 600;
@@ -375,17 +361,20 @@ nav button:hover:not(.ativo) {
     color: #ff8f00;
 }
 
+/* Emoji da fase lunar dentro da célula */
 .cal-dia-emoji {
     font-size: 0.85rem;
     line-height: 1;
     margin-top: 3px;
 }
 
+/* Ponto indicador de evento */
 .cal-dia-ponto {
     font-size: 0.65rem;
     margin-top: 1px;
 }
 
+/* Células vazias (dias antes do dia 1 do mês) */
 .cal-vazio {
     background: transparent;
     border-color: transparent;
@@ -397,6 +386,7 @@ nav button:hover:not(.ativo) {
     border-color: transparent;
 }
 
+/* Legenda abaixo do calendário */
 .cal-legenda {
     display: flex;
     gap: 20px;
@@ -405,27 +395,29 @@ nav button:hover:not(.ativo) {
     color: #445566;
 }
 
-/* ── Detalhe do dia ──────────────────────────────────────────────── */
+
+/* ── Painel de detalhe do dia selecionado ─────────────────────────── */
 #detalhe-dia {
     margin-top: 16px;
     background: #0a0a20;
     border: 1px solid #1a1a3e;
     border-radius: 16px;
     padding: 24px;
-    display: none;
+    display: none;          /* escondido até o utilizador clicar num dia */
     animation: fadeIn 0.3s ease;
 }
 
+/* Classe adicionada pelo JavaScript para mostrar o painel */
 #detalhe-dia.visivel {
     display: block;
 }
 
+/* Animação de entrada do painel de detalhe */
 @keyframes fadeIn {
     from {
         opacity: 0;
         transform: translateY(8px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);
@@ -439,6 +431,7 @@ nav button:hover:not(.ativo) {
     margin-bottom: 16px;
 }
 
+/* Linha de informação dentro do painel de detalhe */
 .detalhe-linha {
     display: flex;
     align-items: center;
@@ -448,7 +441,7 @@ nav button:hover:not(.ativo) {
 }
 
 .detalhe-linha:last-child {
-    border-bottom: none;
+    border-bottom: none; /* remove linha do último item */
 }
 
 .detalhe-icon {
@@ -461,7 +454,7 @@ nav button:hover:not(.ativo) {
     color: #556070;
     font-size: 0.85rem;
     width: 140px;
-    flex-shrink: 0;
+    flex-shrink: 0; /* não encolhe mesmo com pouco espaço */
 }
 
 .detalhe-valor {
@@ -469,7 +462,8 @@ nav button:hover:not(.ativo) {
     font-size: 0.95rem;
 }
 
-/* ── Evento ──────────────────────────────────────────────────────── */
+
+/* ── Card de evento astronómico ───────────────────────────────────── */
 .evento-card {
     background: #120900;
     border: 1px solid #ff8f00;
@@ -485,6 +479,7 @@ nav button:hover:not(.ativo) {
     margin-bottom: 8px;
 }
 
+/* Badge "EVENTO" dentro do card */
 .evento-badge {
     background: #ff8f00;
     color: #000;
@@ -514,7 +509,8 @@ nav button:hover:not(.ativo) {
     font-family: 'Courier New', monospace;
 }
 
-/* ── Loading ─────────────────────────────────────────────────────── */
+
+/* ── Estado de carregamento ───────────────────────────────────────── */
 .loading {
     text-align: center;
     color: #334455;
@@ -522,12 +518,13 @@ nav button:hover:not(.ativo) {
     font-size: 0.9rem;
 }
 
+/* Spinner circular animado */
 .spinner {
     display: inline-block;
     width: 20px;
     height: 20px;
     border: 2px solid #1a1a3e;
-    border-top-color: #4fc3f7;
+    border-top-color: #4fc3f7; /* só o topo tem cor — cria o efeito de rotação */
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     margin-right: 10px;
@@ -538,98 +535,4 @@ nav button:hover:not(.ativo) {
     to {
         transform: rotate(360deg);
     }
-}
-
-/* ── Configurações ───────────────────────────────────────────────── */
-#btn-config {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    width: 48px;
-    height: 48px;
-    background: #0a0a20;
-    border: 1px solid #1a1a3e;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1.3rem;
-    z-index: 9999;
-    transition: all 0.3s;
-}
-
-#btn-config:hover {
-    border-color: #4fc3f7;
-    box-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
-}
-
-/* painel de configurações */
-#painel-config {
-    position: fixed;
-    bottom: 84px;
-    right: 40px;
-    background: #0a0a20;
-    border: 1px solid #1a1a3e;
-    border-radius: 16px;
-    padding: 20px;
-    width: 350px;
-    z-index: 100;
-    display: none;
-    animation: fadeUp 0.2s ease;
-}
-
-#painel-config.visivel {
-    display: block;
-}
-
-.config-titulo {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #4fc3f7;
-    margin-bottom: 14px;
-    letter-spacing: 1px;
-}
-
-.config-linha {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.config-linha label {
-    font-size: 0.8rem;
-    color: #556070;
-    white-space: nowrap;
-}
-
-.config-linha input[type="range"] {
-    width: 300px;
-    accent-color: #4fc3f7;
-    cursor: pointer;
-}
-
-.config-linha span {
-    font-size: 0.75rem;
-    color: #4fc3f7;
-    width: 50px;
-    text-align: right;
-}
-
-.btn-musica {
-    width: 100%;
-    padding: 8px;
-    background: #111130;
-    border: 1px solid #1a1a3e;
-    border-radius: 8px;
-    color: #dce3f0;
-    font-size: 0.82rem;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-musica:hover {
-    border-color: #4fc3f7;
-    color: #4fc3f7;
 }

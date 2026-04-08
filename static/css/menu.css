@@ -1,57 +1,29 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+/* ═══════════════════════════════════════════════════════════════════
+   menu.css
+   Estilos específicos da página de menu do AstroGuide (menu.html).
+   Requer shared-ui-controls.css carregado antes deste ficheiro.
+   ═══════════════════════════════════════════════════════════════════ */
 
+
+/* ── Comportamento específico do body nesta página ────────────────── */
+/* Centra os cards vertical e horizontalmente no ecrã                 */
 body {
-    background: #05050f;
-    color: #dce3f0;
-    font-family: 'Segoe UI', sans-serif;
-    min-height: 100vh;
-    overflow: hidden;
+    overflow: hidden;           /* sem scroll — tudo cabe no ecrã */
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: center;    /* centra verticalmente */
+    background-image: url("/static/images/618.jpg");
+    backdrop-filter: blur(5px);
+    background-size: cover;       /* cobre todo o ecrã sem distorcer */
+    background-position: center;  /* centra o buraco negro no ecrã */
+    background-repeat: no-repeat; /* não repete a imagem */
 }
 
-/* ── Estrelas de fundo ───────────────────────────────────────────── */
-.stars {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 0;
-}
-
-.star {
-    position: absolute;
-    background: white;
-    border-radius: 50%;
-    animation: twinkle var(--dur) infinite ease-in-out;
-}
-
-@keyframes twinkle {
-
-    0%,
-    100% {
-        opacity: 0.2;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 1;
-        transform: scale(1.4);
-    }
-}
-
-/* ── Conteúdo ────────────────────────────────────────────────────── */
+/* ── Contentor do conteúdo principal ─────────────────────────────── */
 .conteudo {
     position: relative;
-    z-index: 1;
+    z-index: 1;             /* fica por cima das estrelas (z-index: 0) */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -59,47 +31,62 @@ body {
     padding: 20px;
 }
 
-/* ── Título ──────────────────────────────────────────────────────── */
+
+/* ── Título principal da aplicação ───────────────────────────────── */
 .titulo {
     text-align: center;
     margin-bottom: 60px;
 }
 
-.titulo h1 {
-    font-size: 5rem;
-    font-weight: 700;
-    color: #4f4cf0;
-    letter-spacing: 4px;
-    animation: glow 3s infinite ease-in-out;
+/* Cartão de vidro fosco que envolve o título */
+.frosted-card {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-top: 1px solid rgba(255, 255, 255, 0.22); /* reflexo de luz no topo */
+    border-radius: 20px;
+    padding: 1.5rem 2.5rem;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px); /* suporte Safari */
+    display: inline-block;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 40px rgba(60, 120, 255, 0.15);
 }
 
-.titulo p {
-    color: #9879e0;
-    font-size: 0.85rem;
-    margin-top: 9px;
-    letter-spacing: 3px;
+/* Título principal dentro do cartão */
+.frosted-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(3.5rem, 8vw, 6rem);
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 0.15em;
+    text-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.3),
+        0 0 20px rgba(160, 210, 255, 0.6);
+    line-height: 1;
+    margin-bottom: 0.3em;
 }
 
+/* Subtítulo decorativo */
+.frosted-sub {
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 300;
+    letter-spacing: 0.5em;
+    color: rgba(255, 255, 255, 0.3);
+    text-transform: uppercase;
+}
+
+/* Label com a localização do utilizador */
 #lbl-localizacao {
-    color: #334455;
-    font-size: 0.8rem;
-    margin-top: 10px;
+    color: rgba(255, 255, 255, 0.35);  
     letter-spacing: 1px;
+    margin-top: 0;
+    margin-bottom: 20px;                /* espaço antes dos cards */
 }
 
-@keyframes glow {
-    /* Efeito de pulsação luminosa suave no título */
-    0%,
-    100% {
-        text-shadow: 0 0 20px rgba(79, 195, 247, 0.4);
-    }
-
-    50% {
-        text-shadow: 0 0 60px rgba(79, 195, 247, 0.9);
-    }
-}
-
-/* ── Cards ───────────────────────────────────────────────────────── */
+/* ── Grelha de cards de navegação ────────────────────────────────── */
 .cards {
     display: flex;
     gap: 28px;
@@ -107,6 +94,7 @@ body {
     align-items: center;
 }
 
+/* Card individual (cada secção da app) */
 .card {
     width: 320px;
     height: 520px;
@@ -114,54 +102,51 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.08);
     cursor: pointer;
     position: relative;
-    overflow: hidden;
+    overflow: hidden;       /* o canvas animado não ultrapassa as bordas */
     transition: transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
-    text-decoration: none;
-    animation: entrar 0.6s ease backwards;
+    text-decoration: none;  /* remove sublinhado do link */
+    animation: entrar 0.6s ease backwards; /* animação de entrada ao carregar */
 }
 
-.card:nth-child(1) {
-    animation-delay: 0.1s;
-}
+/* Atrasos escalonados para cada card entrar em sequência */
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.25s; }
+.card:nth-child(3) { animation-delay: 0.4s; }
 
-.card:nth-child(2) {
-    animation-delay: 0.25s;
-}
-
-.card:nth-child(3) {
-    animation-delay: 0.4s;
-}
-
+/* Animação de entrada dos cards (sobem do baixo) */
 @keyframes entrar {
     from {
         opacity: 0;
         transform: translateY(30px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);
     }
 }
 
+/* Hover geral dos cards */
 .card:hover {
-    transform: translateY(-12px) scale(1.03);
+    transform: translateY(-12px) scale(1.03); /* sobe e aumenta ligeiramente */
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+/* Sombra colorida específica de cada card ao hover */
 .card-ceu:hover {
-    box-shadow: 0 20px 60px rgba(79, 195, 247, 0.35);
+    box-shadow: 0 20px 60px rgb(0, 0, 0);   /* azul — Céu */
 }
 
 .card-calendario:hover {
-    box-shadow: 0 20px 60px rgba(206, 147, 216, 0.35);
+    box-shadow: 0 20px 60px rgb(0, 0, 0);  /* roxo — Calendário */
 }
 
 .card-observatorio:hover {
-    box-shadow: 0 20px 60px rgba(255, 204, 2, 0.3);
+    box-shadow: 0 20px 60px rgb(0, 0, 0);     /* dourado — Observatório */
 }
 
-/* barra de cor no topo */
+
+/* ── Barra colorida no topo de cada card ─────────────────────────── */
+/* Criada com pseudo-elemento ::before para não ocupar HTML           */
 .card::before {
     content: "";
     position: absolute;
@@ -173,23 +158,27 @@ body {
     transition: height 0.3s ease;
 }
 
+/* A barra fica mais alta ao hover */
 .card:hover::before {
     height: 5px;
 }
 
+/* Cor da barra por tipo de card */
 .card-ceu::before {
-    background: linear-gradient(to right, #4fc3f7, #0288d1);
+    background: linear-gradient(to right,rgb(247, 79, 115),rgba(209, 2, 2, 0.3));
 }
 
 .card-calendario::before {
-    background: linear-gradient(to right, #ce93d8, #7b1fa2);
+    background: linear-gradient(to right,rgb(241, 212, 247), #7b1fa2);
 }
 
 .card-observatorio::before {
-    background: linear-gradient(to right, #ffcc02, #f57f17);
+    background: linear-gradient(to right,rgb(19, 2, 255),rgb(108, 23, 245));
 }
 
-/* gradiente por cima do fundo animado */
+
+/* ── Gradiente sobre o fundo animado dos cards ────────────────────── */
+/* Escurece a parte inferior para o texto ficar legível               */
 .card-overlay {
     position: absolute;
     bottom: 0;
@@ -200,16 +189,18 @@ body {
     z-index: 2;
 }
 
-/* texto do card */
+
+/* ── Texto de cada card ───────────────────────────────────────────── */
 .card-conteudo {
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
     padding: 20px;
-    z-index: 3;
+    z-index: 3; /* fica por cima do overlay e do canvas */
 }
 
+/* Emoji decorativo no topo do texto */
 .card-emoji {
     font-size: 2rem;
     display: block;
@@ -229,135 +220,23 @@ body {
     line-height: 1.5;
 }
 
-/* badge em breve */
-.badge {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    background: rgba(255, 204, 2, 0.15);
-    border: 1px solid rgba(255, 204, 2, 0.4);
-    color: #ffcc02;
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 3px 9px;
-    border-radius: 20px;
-    letter-spacing: 1px;
-    z-index: 10;
+/* ── Imagem de fundo dos cards ────────────────────────────────────── */
+/* Ocupa todo o card e fica por baixo do overlay (z-index:2)          */
+/* e do texto (z-index:3), tal como o canvas fazia anteriormente      */
+.card-imagem {
+    position: absolute;   /* sai do fluxo normal do documento */
+    top: 0;               /* cola no topo do card */
+    left: 0;              /* cola na esquerda do card */
+    width: 100%;          /* ocupa toda a largura do card */
+    height: 100%;         /* ocupa toda a altura do card */
+    object-fit: cover;    /* escala a imagem cobrindo tudo sem distorcer */
+    z-index: 1;           /* abaixo do overlay (z:2) e do texto (z:3) */
+    animation: respirar 8s ease-in-out infinite;
+    transform-origin: center center;
 }
 
-/* ── Canvas dos fundos animados ──────────────────────────────────── */
-.card-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-}
-
-/* ── Botão de configurações ──────────────────────────────────────── */
-#btn-config {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    width: 48px;
-    height: 48px;
-    background: #0a0a20;
-    border: 1px solid #1a1a3e;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1.3rem;
-    z-index: 100;
-    transition: all 0.3s;
-}
-
-#btn-config:hover {
-    border-color: #4fc3f7;
-    box-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
-}
-
-/* painel de configurações */
-#painel-config {
-    position: fixed;
-    bottom: 84px;
-    right: 40px;
-    background: #0a0a20;
-    border: 1px solid #1a1a3e;
-    border-radius: 16px;
-    padding: 20px;
-    width: 350px;
-    z-index: 100;
-    display: none;
-    animation: fadeUp 0.2s ease;
-}
-
-#painel-config.visivel {
-    display: block;
-}
-
-@keyframes fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.config-titulo {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #4fc3f7;
-    margin-bottom: 14px;
-    letter-spacing: 1px;
-}
-
-.config-linha {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-
-.config-linha label {
-    font-size: 0.8rem;
-    color: #556070;
-    flex: 1;
-}
-
-input[type="range"] {
-    flex: 2;
-    accent-color: #4fc3f7;
-    cursor: pointer;
-}
-
-.config-linha span {
-    font-size: 0.75rem;
-    color: #4fc3f7;
-    width: 30px;
-    text-align: right;
-}
-
-.btn-musica {
-    width: 100%;
-    padding: 8px;
-    background: #111130;
-    border: 1px solid #1a1a3e;
-    border-radius: 8px;
-    color: #dce3f0;
-    font-size: 0.82rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-top: 4px;
-}
-
-.btn-musica:hover {
-    border-color: #4fc3f7;
-    color: #4fc3f7;
+@keyframes respirar {
+    0%   { transform: scale(1);    }
+    50%  { transform: scale(1.05); }
+    100% { transform: scale(1);    }
 }

@@ -1,0 +1,185 @@
+/* ═══════════════════════════════════════════════════════════════════
+   shared-ui-controls.css
+   Estilos partilhados entre todas as páginas do AstroGuide.
+   Carrega sempre ANTES dos CSS específicos de cada página.
+   ═══════════════════════════════════════════════════════════════════ */
+
+
+/* ── Reset global ─────────────────────────────────────────────────── */
+/* Remove margens e padding padrão do browser em todos os elementos   */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box; /* padding e border não aumentam o tamanho do elemento */
+}
+
+
+/* ── Estilos base do body (partilhados entre páginas) ─────────────── */
+/* Cada página pode adicionar as suas próprias propriedades de layout  */
+body {
+    background: #05050f;                    /* fundo quase preto com tom azulado */
+    color: #dce3f0;                         /* cor de texto padrão (branco acinzentado) */
+    font-family: 'Segoe UI', sans-serif;    /* fonte padrão da aplicação */
+    min-height: 100vh;                      /* ocupa pelo menos a altura total do ecrã */
+}
+
+
+/* ── Fundo de estrelas ────────────────────────────────────────────── */
+/* Contentor fixo que cobre o ecrã todo por baixo do conteúdo         */
+.stars {
+    position: fixed;        /* fica fixo mesmo ao fazer scroll */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;   /* cliques passam através deste elemento */
+    z-index: 0;             /* fica por baixo de todo o conteúdo */
+}
+
+/* Cada estrela individual gerada pelo JavaScript */
+.star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;                             /* forma circular */
+    animation: twinkle var(--dur) infinite ease-in-out; /* duração vem do JS via CSS variable */
+}
+
+/* Animação de brilho das estrelas */
+@keyframes twinkle {
+    0%, 100% {
+        opacity: 0.2;           /* quase invisível no início e fim */
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;             /* totalmente visível a meio da animação */
+        transform: scale(1.4);  /* ligeiramente maior a meio */
+    }
+}
+
+
+/* ── Animação de brilho (usada nos títulos das páginas) ───────────── */
+@keyframes glow {
+    0%, 100% {
+        text-shadow: 0 0 20px rgba(79, 195, 247, 0.4); /* brilho suave */
+    }
+    50% {
+        text-shadow: 0 0 60px rgba(79, 195, 247, 0.9); /* brilho intenso a meio */
+    }
+}
+
+
+/* ── Botão de configurações (canto inferior direito) ──────────────── */
+#btn-config {
+    position: fixed;        /* sempre visível, independente do scroll */
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    border-radius: 50%;     /* forma circular */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.3rem;
+    z-index: 9999;          /* fica por cima de tudo */
+    transition: all 0.3s;
+}
+
+#btn-config:hover {
+    border-color: #4fc3f7;
+    box-shadow: 0 0 15px rgba(79, 195, 247, 0.2); /* brilho azul ao passar o rato */
+}
+
+
+/* ── Painel de configurações ──────────────────────────────────────── */
+/* Aparece por cima do botão de config quando clicado                 */
+#painel-config {
+    position: fixed;
+    bottom: 84px;           /* 84px = altura do botão (48) + margem (24) + folga */
+    right: 40px;
+    background: #0a0a20;
+    border: 1px solid #1a1a3e;
+    border-radius: 16px;
+    padding: 20px;
+    width: 350px;
+    z-index: 9999;
+    display: none;          /* escondido por defeito */
+    animation: fadeUp 0.2s ease;
+}
+
+/* Classe adicionada pelo JavaScript para mostrar o painel */
+#painel-config.visivel {
+    display: block;
+}
+
+/* Animação de entrada do painel (sobe suavemente) */
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px); /* começa 10px abaixo */
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Título dentro do painel de configurações */
+.config-titulo {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #4fc3f7;
+    margin-bottom: 14px;
+    letter-spacing: 1px;
+}
+
+/* Linha de controlo dentro do painel (label + input + valor) */
+.config-linha {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.config-linha label {
+    font-size: 0.8rem;
+    color: #556070;
+    flex: 1; /* ocupa o espaço disponível */
+}
+
+/* Slider de volume */
+input[type="range"] {
+    flex: 2;
+    accent-color: #4fc3f7; /* cor do indicador do slider */
+    cursor: pointer;
+}
+
+/* Valor numérico à direita do slider (ex: "75%") */
+.config-linha span {
+    font-size: 0.75rem;
+    color: #4fc3f7;
+    width: 30px;
+    text-align: right;
+}
+
+
+/* ── Botão de música (dentro do painel de configurações) ──────────── */
+.btn-musica {
+    width: 100%;
+    padding: 8px;
+    background: #111130;
+    border: 1px solid #1a1a3e;
+    border-radius: 8px;
+    color: #dce3f0;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 4px;
+}
+
+.btn-musica:hover {
+    border-color: #4fc3f7;
+    color: #4fc3f7;
+}

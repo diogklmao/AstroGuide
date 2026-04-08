@@ -1,21 +1,29 @@
 <!DOCTYPE html>
 <html lang="pt">
 
+<!-- Importa as fontes do Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300&display=swap" rel="stylesheet">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AstroGuide</title>
-    <link rel="stylesheet" href="/static/css/menu.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared-ui-controls.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu.css') }}">
 </head>
 
 <body>
 
     <div class="stars" id="stars"></div>
 
-    <div class="conteudo">
-        <div class="titulo">
-            <h1>✦ AstroGuide</h1>
-            <p>EXPLORA O UNIVERSO</p>
+    <div class="titulo">
+        <div class="frosted-card">
+            <div class="frosted-title">AstroGuide</div>
+            <div class="frosted-sub">Observatório Digital</div>
+        </div>
+    </div>
             <div id="lbl-localizacao">📍 A detetar localização...</div>
         </div>
 
@@ -23,7 +31,7 @@
 
             <!-- Céu Agora -->
             <a class="card card-ceu" href="/ceu">
-                <canvas class="card-canvas" id="canvas-ceu"></canvas>
+                <img class="card-imagem" src="{{ url_for('static', filename='images/SolarSystem.jpg') }}" alt="Céu estrelado">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
                     <span class="card-emoji">🌌</span>
@@ -34,7 +42,7 @@
 
             <!-- Calendário Lunar -->
             <a class="card card-calendario" href="/calendario">
-                <canvas class="card-canvas" id="canvas-calendario"></canvas>
+                <img class="card-imagem" src="{{ url_for('static', filename='images/Moon.jpg') }}" alt="Lua cheia">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
                     <span class="card-emoji">📅</span>
@@ -45,8 +53,7 @@
 
             <!-- Observatório -->
             <a class="card card-observatorio" href="#">
-                <div class="badge">EM BREVE</div>
-                <canvas class="card-canvas" id="canvas-observatorio"></canvas>
+                <img class="card-imagem" src="{{ url_for('static', filename='images/Sky.jpg') }}" alt="Telescópio">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
                     <span class="card-emoji">🔭</span>
