@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstroGuide - Calendario Lunar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Raleway:wght@200;300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           CSS - Calendario Lunar (Novo Design)
+           ═══════════════════════════════════════════════════════════════════ */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(180deg, #0a0a1a 0%, #0d1025 30%, #151530 100%);
+            color: #e8eaf6;
+            font-family: 'Raleway', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Fundo Espacial com Estrelas ────────────────────────────────── */
+        .space-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(ellipse at 30% 10%, rgba(100, 120, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 90%, rgba(150, 100, 255, 0.06) 0%, transparent 50%),
+                linear-gradient(180deg, #0a0a1a 0%, #0d1025 30%, #151530 100%);
+            z-index: 0;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle var(--dur) infinite ease-in-out;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.15; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.2); }
+        }
+
+        /* ── Layout Principal ───────────────────────────────────────────── */
+        .app {
+            position: relative;
+            z-index: 2;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 30px 60px;
+        }
+
+        /* ── Header/Titulo ──────────────────────────────────────────────── */
+        .page-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .main-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 400;
+            color: #e8eaf6;
+            letter-spacing: 3px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 0.7rem;
+            font-weight: 300;
+            letter-spacing: 4px;
+            color: rgba(255, 255, 255, 0.35);
+            text-transform: uppercase;
+        }
+
+        /* ── Navegacao do Mes ───────────────────────────────────────────── */
+        .month-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .month-nav button {
+            background: transparent;
+            border: none;
+            color: #6b7db3;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            padding: 8px;
+        }
+
+        .month-nav button:hover {
+            color: #a0b0ff;
+            transform: scale(1.2);
+        }
+
+        .month-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            font-weight: 400;
+            color: #a0b0ff;
+            letter-spacing: 2px;
+        }
+
+        /* ── Grelha do Calendario ───────────────────────────────────────── */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-bottom: 40px;
+        }
+
+        /* ── Celula de Dia ──────────────────────────────────────────────── */
+        .day-cell {
+            aspect-ratio: 1;
+            background: linear-gradient(145deg, rgba(25, 30, 55, 0.7) 0%, rgba(20, 25, 45, 0.9) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            padding: 8px;
+        }
+
+        .day-cell:hover {
+            border-color: rgba(160, 176, 255, 0.3);
+            transform: scale(1.03);
+            box-shadow: 0 8px 30px rgba(100, 120, 200, 0.15);
+            z-index: 5;
+        }
+
+        .day-cell.empty {
+            background: transparent;
+            border-color: transparent;
+            cursor: default;
+        }
+
+        .day-cell.empty:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .day-cell.today {
+            border-color: #4fc3f7;
+            background: linear-gradient(145deg, rgba(40, 60, 100, 0.6) 0%, rgba(30, 45, 80, 0.8) 100%);
+            box-shadow: 0 0 20px rgba(79, 195, 247, 0.2);
+        }
+
+        .day-cell.has-event {
+            border: 2px solid;
+            border-image: linear-gradient(135deg, #ff6b9d, #c850c0, #4158d0) 1;
+            border-radius: 16px;
+        }
+
+        .day-cell.has-event::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 107, 157, 0.1), rgba(200, 80, 192, 0.1), rgba(65, 88, 208, 0.1));
+            border-radius: 14px;
+            pointer-events: none;
+        }
+
+        .day-cell.selected {
+            border-color: #ce93d8;
+            background: linear-gradient(145deg, rgba(60, 40, 80, 0.6) 0%, rgba(45, 30, 60, 0.8) 100%);
+            box-shadow: 0 0 25px rgba(206, 147, 216, 0.3);
+        }
+
+        .day-number {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 4px;
+            position: absolute;
+            top: 8px;
+            left: 10px;
+        }
+
+        .day-cell.today .day-number {
+            color: #4fc3f7;
+        }
+
+        .day-cell.has-event .day-number {
+            color: #ff6b9d;
+        }
+
+        /* ── Imagem da Fase da Lua ──────────────────────────────────────── */
+        .moon-phase-img {
+            width: 60%;
+            max-width: 70px;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            object-fit: cover;
+            opacity: 0.9;
+            transition: all 0.3s;
+        }
+
+        .day-cell:hover .moon-phase-img {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+
+        /* ── Indicador de Evento no Dia ─────────────────────────────────── */
+        .event-indicator {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            font-size: 0.85rem;
+        }
+
+        .event-label {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            right: 8px;
+            font-size: 0.6rem;
+            color: #ff6b9d;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Card de Proximo Evento ─────────────────────────────────────── */
+        .next-event-card {
+            background: linear-gradient(145deg, rgba(30, 40, 70, 0.7) 0%, rgba(25, 35, 60, 0.9) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-left: 4px solid;
+            border-image: linear-gradient(180deg, #ff6b9d, #c850c0, #4158d0) 1;
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            gap: 24px;
+            align-items: stretch;
+            backdrop-filter: blur(10px);
+        }
+
+        .event-image-container {
+            flex-shrink: 0;
+            width: 200px;
+        }
+
+        .event-image {
+            width: 100%;
+            height: 150px;
+            border-radius: 12px;
+            object-fit: cover;
+        }
+
+        .event-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .event-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .event-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #f7931e;
+            letter-spacing: 1px;
+        }
+
+        .event-edit-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .event-edit-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .event-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #e8eaf6;
+            margin-bottom: 16px;
+        }
+
+        .event-details {
+            font-size: 0.9rem;
+            color: #a0a8c0;
+            line-height: 1.8;
+        }
+
+        .event-details strong {
+            color: #e8eaf6;
+        }
+
+        .event-tags {
+            display: flex;
+            gap: 12px;
+            margin-top: auto;
+            padding-top: 16px;
+        }
+
+        .event-tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: #6b7db3;
+            background: rgba(100, 120, 200, 0.15);
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
+
+        /* ── Botao Voltar ───────────────────────────────────────────────── */
+        #btn-voltar {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 32, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: #a0b0ff;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 10px 18px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        #btn-voltar:hover {
+            border-color: #a0b0ff;
+            box-shadow: 0 0 20px rgba(160, 176, 255, 0.2);
+        }
+
+        /* ── Botao Configuracoes ────────────────────────────────────────── */
+        #btn-config {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 50px;
+            height: 50px;
+            background: rgba(10, 10, 32, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.3rem;
+            z-index: 9999;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        #btn-config:hover {
+            border-color: #a0b0ff;
+            box-shadow: 0 0 20px rgba(160, 176, 255, 0.2);
+        }
+
+        /* ── Painel Configuracoes ───────────────────────────────────────── */
+        #painel-config {
+            position: fixed;
+            bottom: 84px;
+            right: 24px;
+            background: rgba(10, 10, 32, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            width: 320px;
+            z-index: 9999;
+            display: none;
+            backdrop-filter: blur(20px);
+        }
+
+        #painel-config.visivel {
+            display: block;
+            animation: fadeUp 0.3s ease;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .config-titulo {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #a0b0ff;
+            margin-bottom: 16px;
+            letter-spacing: 1px;
+        }
+
+        .config-linha {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .config-linha label {
+            font-size: 0.85rem;
+            color: #8890a0;
+            flex: 1;
+        }
+
+        input[type="range"] {
+            flex: 2;
+            accent-color: #a0b0ff;
+            cursor: pointer;
+        }
+
+        .config-linha span {
+            font-size: 0.8rem;
+            color: #a0b0ff;
+            width: 35px;
+            text-align: right;
+        }
+
+        .btn-musica {
+            width: 100%;
+            padding: 10px;
+            background: rgba(160, 176, 255, 0.1);
+            border: 1px solid rgba(160, 176, 255, 0.3);
+            border-radius: 10px;
+            color: #a0b0ff;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 6px;
+        }
+
+        .btn-musica:hover {
+            background: rgba(160, 176, 255, 0.2);
+            border-color: #a0b0ff;
+        }
+
+        /* ── Painel Detalhe do Dia ──────────────────────────────────────── */
+        #detalhe-dia {
+            margin-top: 24px;
+            background: linear-gradient(145deg, rgba(30, 40, 70, 0.6) 0%, rgba(25, 35, 60, 0.8) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 28px;
+            display: none;
+            backdrop-filter: blur(10px);
+        }
+
+        #detalhe-dia.visivel {
+            display: block;
+            animation: fadeUp 0.3s ease;
+        }
+
+        .detalhe-titulo {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            font-weight: 400;
+            color: #a0b0ff;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+
+        .detalhe-linha {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .detalhe-linha:last-child {
+            border-bottom: none;
+        }
+
+        .detalhe-icon {
+            font-size: 1.3rem;
+            width: 32px;
+            text-align: center;
+        }
+
+        .detalhe-label {
+            color: #8890a0;
+            font-size: 0.9rem;
+            width: 140px;
+            flex-shrink: 0;
+        }
+
+        .detalhe-valor {
+            font-weight: 500;
+            font-size: 1rem;
+            color: #e8eaf6;
+        }
+
+        /* ── Card de Evento no Detalhe ──────────────────────────────────── */
+        .evento-card {
+            background: linear-gradient(145deg, rgba(50, 30, 60, 0.5) 0%, rgba(40, 25, 50, 0.7) 100%);
+            border: 1px solid rgba(206, 147, 216, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+
+        .evento-topo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .evento-badge {
+            background: linear-gradient(135deg, #ff6b9d, #c850c0);
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            letter-spacing: 1px;
+        }
+
+        .evento-nome {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #e8eaf6;
+        }
+
+        .evento-desc {
+            color: #a0a8c0;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+
+        .evento-horario {
+            color: #ce93d8;
+            font-size: 0.85rem;
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* ── Loading State ──────────────────────────────────────────────── */
+        .loading {
+            text-align: center;
+            color: #556070;
+            padding: 60px;
+            font-size: 1rem;
+            grid-column: span 7;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #a0b0ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── Responsivo ─────────────────────────────────────────────────── */
+        @media (max-width: 800px) {
+            .calendar-grid {
+                gap: 6px;
+            }
+
+            .moon-phase-img {
+                width: 50%;
+                max-width: 50px;
+            }
+
+            .day-number {
+                font-size: 0.75rem;
+            }
+
+            .next-event-card {
+                flex-direction: column;
+            }
+
+            .event-image-container {
+                width: 100%;
+            }
+
+            .event-image {
+                height: 120px;
+            }
+        }
+
+        @media (max-width: 500px) {
+            .calendar-grid {
+                gap: 4px;
+            }
+
+            .day-cell {
+                border-radius: 10px;
+            }
+
+            .moon-phase-img {
+                width: 45%;
+                max-width: 40px;
+            }
+
+            .event-label {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Fundo espacial -->
+    <div class="space-bg"></div>
+    <div class="stars" id="stars"></div>
+
+    <!-- Botao voltar ao menu -->
+    <a id="btn-voltar" href="/">&#9664; Menu</a>
+
+    <div class="app">
+
+        <!-- Header -->
+        <header class="page-header">
+            <h1 class="main-title">AstroGuide Lunar Calendar &amp; Events</h1>
+            <p class="subtitle">Observatorio Digital</p>
+        </header>
+
+        <!-- Navegacao do Mes -->
+        <nav class="month-nav">
+            <button onclick="mesAnterior()">&#10094;</button>
+            <h2 class="month-title" id="cal-titulo">---</h2>
+            <button onclick="mesSeguinte()">&#10095;</button>
+        </nav>
+
+        <!-- Grelha do Calendario -->
+        <div class="calendar-grid" id="cal-grelha">
+            <div class="loading"><span class="spinner"></span>A calcular fases da lua...</div>
+        </div>
+
+        <!-- Card Proximo Evento -->
+        <div id="proximo-evento"></div>
+
+        <!-- Detalhe do Dia -->
+        <div id="detalhe-dia"></div>
+
+    </div>
+
+    <!-- Botao configuracoes -->
+    <div id="btn-config" onclick="toggleConfig()">&#9881;</div>
+
+    <!-- Painel configuracoes -->
+    <div id="painel-config">
+        <div class="config-titulo">CONFIGURACOES</div>
+        <div class="config-linha">
+            <label>Volume</label>
+            <input type="range" id="volume" min="0" max="100" value="40" oninput="mudarVolume(this.value)">
+            <span id="lbl-volume">40%</span>
+        </div>
+        <button class="btn-musica" onclick="toggleMusica()">&#9654; Ativar Musica</button>
+    </div>
+
+    <!-- Musica -->
+    <audio id="musica" loop>
+        <source src="/static/audio/musica.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // ── Variaveis globais ─────────────────────────────────────────────
+        let calAno = new Date().getFullYear();
+        let calMes = new Date().getMonth() + 1;
+        let eventosDoMes = [];
+
+        const MESES_PT = ["", "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+        const DIAS_PT = ["Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado", "Domingo"];
+
+        // ── Mapeamento de fases da lua para imagens ───────────────────────
+        // Ajuste os caminhos conforme suas imagens reais
+        function getMoonPhaseImage(fase) {
+            const fases = {
+                'Lua Nova': '/static/images/moon-phases/new-moon.png',
+                'Lua Crescente': '/static/images/moon-phases/waxing-crescent.png',
+                'Quarto Crescente': '/static/images/moon-phases/first-quarter.png',
+                'Gibosa Crescente': '/static/images/moon-phases/waxing-gibbous.png',
+                'Lua Cheia': '/static/images/moon-phases/full-moon.png',
+                'Gibosa Minguante': '/static/images/moon-phases/waning-gibbous.png',
+                'Quarto Minguante': '/static/images/moon-phases/last-quarter.png',
+                'Lua Minguante': '/static/images/moon-phases/waning-crescent.png'
+            };
+            // Fallback generico baseado na iluminacao
+            return fases[fase] || '/static/images/Moon.jpg';
+        }
+
+        // ── Estrelas ──────────────────────────────────────────────────────
+        function criarEstrelas() {
+            const container = document.getElementById("stars");
+            for (let i = 0; i < 250; i++) {
+                const star = document.createElement("div");
+                star.className = "star";
+                const size = Math.random() * 2 + 0.5;
+                star.style.cssText = `width:${size}px;height:${size}px;left:${Math.random() * 100}%;top:${Math.random() * 100}%;--dur:${Math.random() * 5 + 2}s;animation-delay:${Math.random() * 5}s;`;
+                container.appendChild(star);
+            }
+        }
+
+        // ── Configuracoes ─────────────────────────────────────────────────
+        function toggleConfig() {
+            document.getElementById("painel-config").classList.toggle("visivel");
+        }
+
+        function mudarVolume(v) {
+            document.getElementById("lbl-volume").textContent = v + "%";
+            document.getElementById("musica").volume = v / 100;
+        }
+
+        function toggleMusica() {
+            const audio = document.getElementById("musica");
+            const btn = document.querySelector(".btn-musica");
+            if (audio.paused) {
+                audio.play();
+                btn.innerHTML = "&#9208; Pausar Musica";
+            } else {
+                audio.pause();
+                btn.innerHTML = "&#9654; Ativar Musica";
+            }
+        }
+
+        // ── Calendario Lunar ──────────────────────────────────────────────
+        async function carregarCalendario() {
+            document.getElementById("cal-titulo").textContent = MESES_PT[calMes] + " " + calAno;
+            document.getElementById("cal-grelha").innerHTML = '<div class="loading"><span class="spinner"></span>A calcular fases da lua...</div>';
+            document.getElementById("detalhe-dia").innerHTML = "";
+            document.getElementById("detalhe-dia").classList.remove("visivel");
+            document.getElementById("proximo-evento").innerHTML = "";
+
+            try {
+                const res = await fetch(`/api/calendario/${calAno}/${calMes}`);
+                const data = await res.json();
+
+                const fasesPorDia = {};
+                const eventosPorDia = {};
+                eventosDoMes = data.eventos || [];
+                
+                data.fases.forEach(f => fasesPorDia[f.dia] = f);
+                data.eventos.forEach(e => {
+                    if (!eventosPorDia[e.dia]) eventosPorDia[e.dia] = [];
+                    eventosPorDia[e.dia].push(e);
+                });
+
+                const hoje = new Date();
+                const hojeAno = hoje.getFullYear();
+                const hojesMes = hoje.getMonth() + 1;
+                const hojesDia = hoje.getDate();
+                const primeiroDia = new Date(calAno, calMes - 1, 1).getDay();
+                const offset = (primeiroDia === 0) ? 6 : primeiroDia - 1;
+                const totalDias = new Date(calAno, calMes, 0).getDate();
+
+                let html = "";
+                for (let i = 0; i < offset; i++) {
+                    html += '<div class="day-cell empty"></div>';
+                }
+
+                for (let dia = 1; dia <= totalDias; dia++) {
+                    const eHoje = (dia === hojesDia && calMes === hojesMes && calAno === hojeAno);
+                    const eventos = eventosPorDia[dia] || [];
+                    const temEv = eventos.length > 0;
+                    const fase = fasesPorDia[dia];
+
+                    let classes = "day-cell";
+                    if (eHoje) classes += " today";
+                    if (temEv) classes += " has-event";
+
+                    const moonImg = fase ? getMoonPhaseImage(fase.nome) : '/static/images/Moon.jpg';
+                    const eventoNome = temEv ? eventos[0].nome : '';
+
+                    html += `
+                        <div class="${classes}" onclick="verDia(${dia}, this)" data-dia="${dia}">
+                            <span class="day-number">${dia}</span>
+                            <img src="${moonImg}" alt="${fase ? fase.nome : 'Lua'}" class="moon-phase-img" 
+                                onerror="this.src='/static/images/Moon.jpg';">
+                            ${temEv ? `<span class="event-indicator">&#9889;</span>` : ''}
+                            ${temEv ? `<span class="event-label">${eventoNome}</span>` : ''}
+                        </div>
+                    `;
+                }
+
+                document.getElementById("cal-grelha").innerHTML = html;
+
+                // Mostrar proximo evento
+                mostrarProximoEvento(data.eventos);
+
+            } catch (err) {
+                document.getElementById("cal-grelha").innerHTML = '<div class="loading">&#10060; Erro ao carregar calendario</div>';
+            }
+        }
+
+        function mostrarProximoEvento(eventos) {
+            if (!eventos || eventos.length === 0) {
+                document.getElementById("proximo-evento").innerHTML = '';
+                return;
+            }
+
+            const hoje = new Date();
+            const hojesDia = hoje.getDate();
+            
+            // Encontrar proximo evento (hoje ou futuro)
+            const proximoEvento = eventos.find(e => e.dia >= hojesDia) || eventos[0];
+            
+            if (!proximoEvento) return;
+
+            document.getElementById("proximo-evento").innerHTML = `
+                <div class="next-event-card">
+                    <div class="event-image-container">
+                        <img src="/static/images/meteor-shower.jpg" alt="${proximoEvento.nome}" class="event-image"
+                            onerror="this.style.background='linear-gradient(135deg, #1a1a4e, #2d1b4e)';this.src='';">
+                    </div>
+                    <div class="event-content">
+                        <div class="event-header">
+                            <span class="event-badge">Proximo Evento</span>
+                        </div>
+                        <h3 class="event-title">${proximoEvento.emoji || ''} ${proximoEvento.nome}</h3>
+                        <div class="event-details">
+                            <p><strong>Data:</strong> ${proximoEvento.dia} de ${MESES_PT[calMes]} de ${calAno}</p>
+                            <p><strong>Horario de Pico:</strong> ${proximoEvento.hora_pico || 'N/A'}</p>
+                            <p><strong>Intensidade:</strong> ${proximoEvento.intensidade || 'Moderada'}</p>
+                            <p><strong>Dicas de Observacao:</strong> ${proximoEvento.descricao || 'Encontre um local escuro, olhe para o leste apos a meia-noite.'}</p>
+                        </div>
+                        <div class="event-tags">
+                            <span class="event-tag">&#9201; Horarios</span>
+                            <span class="event-tag">&#128205; Localizacao</span>
+                            <span class="event-tag">&#128736; Equipamento</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function verDia(dia, celula) {
+            document.querySelectorAll(".day-cell.selected").forEach(d => d.classList.remove("selected"));
+            if (celula) celula.classList.add("selected");
+
+            const painel = document.getElementById("detalhe-dia");
+            painel.innerHTML = '<div class="loading"><span class="spinner"></span>A carregar...</div>';
+            painel.classList.add("visivel");
+
+            try {
+                const res = await fetch(`/api/dia/${calAno}/${calMes}/${dia}`);
+                const data = await res.json();
+
+                const dataObj = new Date(calAno, calMes - 1, dia);
+                const nomeDia = DIAS_PT[dataObj.getDay() === 0 ? 6 : dataObj.getDay() - 1];
+
+                let eventosHTML = data.eventos.length > 0
+                    ? data.eventos.map(ev => `
+                        <div class="evento-card">
+                            <div class="evento-topo">
+                                <span class="evento-badge">&#9889; EVENTO</span>
+                                <span class="evento-nome">${ev.emoji || ''} ${ev.nome}</span>
+                            </div>
+                            <div class="evento-desc">${ev.descricao || ''}</div>
+                            <div class="evento-horario">&#128337; ${ev.hora_ini || '--:--'} - ${ev.hora_fim || '--:--'} | Pico: ${ev.hora_pico || '--:--'}</div>
+                        </div>`).join("")
+                    : '<p style="color:#556070;font-size:0.9rem;margin-top:16px">Sem eventos astronomicos neste dia.</p>';
+
+                painel.innerHTML = `
+                    <div class="detalhe-titulo">&#128197; ${nomeDia}, ${dia} de ${MESES_PT[calMes]} de ${calAno}</div>
+                    <div class="detalhe-linha">
+                        <span class="detalhe-icon">&#127749;</span>
+                        <span class="detalhe-label">Nascer do Sol</span>
+                        <span class="detalhe-valor" style="color:#ffcc80">${data.sol.nascer || '--:--'}</span>
+                    </div>
+                    <div class="detalhe-linha">
+                        <span class="detalhe-icon">&#127751;</span>
+                        <span class="detalhe-label">Por do Sol</span>
+                        <span class="detalhe-valor" style="color:#ff8a65">${data.sol.por || '--:--'}</span>
+                    </div>
+                    <div class="detalhe-linha">
+                        <span class="detalhe-icon">${data.fase.emoji || '&#127769;'}</span>
+                        <span class="detalhe-label">Fase da Lua</span>
+                        <span class="detalhe-valor" style="color:#ce93d8">${data.fase.nome || 'N/A'} (${data.fase.percentagem || 0}%)</span>
+                    </div>
+                    ${eventosHTML}
+                `;
+            } catch (err) {
+                painel.innerHTML = '<div class="loading">&#10060; Erro ao carregar detalhes</div>';
+            }
+        }
+
+        function mesAnterior() {
+            if (calMes === 1) { calMes = 12; calAno--; } else calMes--;
+            carregarCalendario();
+        }
+
+        function mesSeguinte() {
+            if (calMes === 12) { calMes = 1; calAno++; } else calMes++;
+            carregarCalendario();
+        }
+
+        // ── Inicializacao ─────────────────────────────────────────────────
+        criarEstrelas();
+        carregarCalendario();
+        document.getElementById("musica").volume = 0.4;
+    </script>
+</body>
+
+</html>

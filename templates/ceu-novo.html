@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstroGuide - Céu Agora</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           CSS - Céu Agora (Novo Design)
+           ═══════════════════════════════════════════════════════════════════ */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1020 50%, #0f0a15 100%);
+            color: #e8eaf6;
+            font-family: 'Raleway', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Fundo Espacial ─────────────────────────────────────────────── */
+        .space-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(255, 100, 50, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(100, 50, 255, 0.08) 0%, transparent 50%),
+                linear-gradient(135deg, #0a0a1a 0%, #1a1020 50%, #0f0a15 100%);
+            z-index: 0;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle var(--dur) infinite ease-in-out;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.3); }
+        }
+
+        /* ── Layout Principal ───────────────────────────────────────────── */
+        .app {
+            position: relative;
+            z-index: 2;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px 30px 40px;
+        }
+
+        /* ── Header ─────────────────────────────────────────────────────── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            font-weight: 300;
+            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 2px;
+        }
+
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .location, .datetime {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: #b0b8c8;
+        }
+
+        .location-icon, .calendar-icon {
+            width: 18px;
+            height: 18px;
+            opacity: 0.8;
+        }
+
+        /* ── Secção Título ──────────────────────────────────────────────── */
+        .section-title {
+            font-family: 'Raleway', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 300;
+            color: #e8eaf6;
+            margin-bottom: 24px;
+            letter-spacing: 1px;
+        }
+
+        /* ── Cards Sol e Lua ────────────────────────────────────────────── */
+        .celestial-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .celestial-card {
+            background: linear-gradient(145deg, rgba(30, 30, 50, 0.6) 0%, rgba(20, 20, 35, 0.8) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .celestial-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .celestial-card.sun::before {
+            background: linear-gradient(90deg, #ff6b35 0%, #f7931e 50%, #ffcc02 100%);
+        }
+
+        .celestial-card.moon::before {
+            background: linear-gradient(90deg, #00d4ff 0%, #7c4dff 100%);
+        }
+
+        .celestial-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .celestial-icon {
+            font-size: 1.2rem;
+        }
+
+        .celestial-name {
+            font-size: 1.4rem;
+            font-weight: 500;
+        }
+
+        .celestial-name.sun { color: #ff6b35; }
+        .celestial-name.moon { color: #00d4ff; }
+
+        .celestial-content {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .celestial-image {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            box-shadow: 0 0 40px rgba(255, 107, 53, 0.3);
+        }
+
+        .celestial-image.moon {
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.3);
+        }
+
+        .celestial-data {
+            flex: 1;
+        }
+
+        /* ── Gauges Circulares ──────────────────────────────────────────── */
+        .gauges-row {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 20px;
+        }
+
+        .gauge-container {
+            text-align: center;
+        }
+
+        .gauge {
+            width: 90px;
+            height: 90px;
+            position: relative;
+        }
+
+        .gauge svg {
+            transform: rotate(-90deg);
+        }
+
+        .gauge-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-width: 8;
+        }
+
+        .gauge-fill {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s ease;
+        }
+
+        .gauge-fill.sun { stroke: url(#sunGradient); }
+        .gauge-fill.moon { stroke: url(#moonGradient); }
+
+        .gauge-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Space Mono', monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .gauge-label {
+            font-size: 0.75rem;
+            color: #8890a0;
+            margin-top: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Info Extra ─────────────────────────────────────────────────── */
+        .celestial-info {
+            font-size: 0.85rem;
+            color: #8890a0;
+            line-height: 1.8;
+        }
+
+        .celestial-info .highlight {
+            color: #e8eaf6;
+            font-weight: 500;
+        }
+
+        .celestial-info .sun-highlight { color: #ff6b35; }
+        .celestial-info .moon-highlight { color: #00d4ff; }
+
+        .visibility {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .visibility.visible { color: #4caf50; }
+        .visibility.not-visible { color: #ef5350; }
+
+        .visibility-check {
+            font-size: 1rem;
+        }
+
+        /* ── Secção Planetas ────────────────────────────────────────────── */
+        .planets-section {
+            margin-top: 40px;
+        }
+
+        .planets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .planet-card {
+            background: linear-gradient(145deg, rgba(30, 30, 50, 0.5) 0%, rgba(20, 20, 35, 0.7) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .planet-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, #ff6b35 0%, #f7931e 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .planet-card:hover {
+            border-color: rgba(255, 107, 53, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .planet-card:hover::before {
+            opacity: 1;
+        }
+
+        .planet-card.invisible {
+            opacity: 0.4;
+        }
+
+        .planet-rank {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            color: #8890a0;
+        }
+
+        .planet-image {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            object-fit: cover;
+            box-shadow: 0 0 20px rgba(255, 107, 53, 0.2);
+        }
+
+        .planet-info {
+            flex: 1;
+        }
+
+        .planet-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #e8eaf6;
+            margin-bottom: 8px;
+        }
+
+        .planet-data {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            color: #8890a0;
+            line-height: 1.6;
+        }
+
+        .planet-visibility {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+            font-size: 0.85rem;
+        }
+
+        .planet-visibility.visible {
+            color: #4caf50;
+        }
+
+        .planet-visibility.not-visible {
+            color: #ef5350;
+        }
+
+        /* ── Botão Voltar ───────────────────────────────────────────────── */
+        #btn-voltar {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 32, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: #ff6b35;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 10px 18px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        #btn-voltar:hover {
+            border-color: #ff6b35;
+            box-shadow: 0 0 20px rgba(255, 107, 53, 0.2);
+        }
+
+        /* ── Botão Configurações ────────────────────────────────────────── */
+        #btn-config {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 50px;
+            height: 50px;
+            background: rgba(10, 10, 32, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.3rem;
+            z-index: 9999;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        #btn-config:hover {
+            border-color: #ff6b35;
+            box-shadow: 0 0 20px rgba(255, 107, 53, 0.2);
+        }
+
+        /* ── Painel Configurações ───────────────────────────────────────── */
+        #painel-config {
+            position: fixed;
+            bottom: 84px;
+            right: 24px;
+            background: rgba(10, 10, 32, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            width: 320px;
+            z-index: 9999;
+            display: none;
+            backdrop-filter: blur(20px);
+        }
+
+        #painel-config.visivel {
+            display: block;
+            animation: fadeUp 0.3s ease;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .config-titulo {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #ff6b35;
+            margin-bottom: 16px;
+            letter-spacing: 1px;
+        }
+
+        .config-linha {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .config-linha label {
+            font-size: 0.85rem;
+            color: #8890a0;
+            flex: 1;
+        }
+
+        input[type="range"] {
+            flex: 2;
+            accent-color: #ff6b35;
+            cursor: pointer;
+        }
+
+        .config-linha span {
+            font-size: 0.8rem;
+            color: #ff6b35;
+            width: 35px;
+            text-align: right;
+        }
+
+        .btn-musica {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 107, 53, 0.1);
+            border: 1px solid rgba(255, 107, 53, 0.3);
+            border-radius: 10px;
+            color: #ff6b35;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 6px;
+        }
+
+        .btn-musica:hover {
+            background: rgba(255, 107, 53, 0.2);
+            border-color: #ff6b35;
+        }
+
+        /* ── Loading State ──────────────────────────────────────────────── */
+        .loading {
+            text-align: center;
+            color: #556070;
+            padding: 60px;
+            font-size: 1rem;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #ff6b35;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── Responsivo ─────────────────────────────────────────────────── */
+        @media (max-width: 900px) {
+            .celestial-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .header-info {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .celestial-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .gauges-row {
+                justify-content: center;
+            }
+
+            .planets-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Fundo espacial -->
+    <div class="space-bg"></div>
+    <div class="stars" id="stars"></div>
+
+    <!-- SVG Gradients para os Gauges -->
+    <svg width="0" height="0">
+        <defs>
+            <linearGradient id="sunGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#ff6b35" />
+                <stop offset="50%" stop-color="#f7931e" />
+                <stop offset="100%" stop-color="#ffcc02" />
+            </linearGradient>
+            <linearGradient id="moonGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00d4ff" />
+                <stop offset="100%" stop-color="#7c4dff" />
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <!-- Botão voltar ao menu -->
+    <a id="btn-voltar" href="/">&#9664; Menu</a>
+
+    <div class="app">
+
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">AstroGuide</div>
+            <div class="header-info">
+                <div class="location">
+                    <svg class="location-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                    <span id="localizacao">A carregar...</span>
+                </div>
+                <div class="datetime">
+                    <svg class="calendar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span id="relogio">--/--/---- --:--:--</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Conteúdo Principal -->
+        <main id="ceu-conteudo">
+            <div class="loading"><span class="spinner"></span>A carregar dados da NASA...</div>
+        </main>
+
+    </div>
+
+    <!-- Botão configurações -->
+    <div id="btn-config" onclick="toggleConfig()">&#9881;</div>
+
+    <!-- Painel configurações -->
+    <div id="painel-config">
+        <div class="config-titulo">CONFIGURACOES</div>
+        <div class="config-linha">
+            <label>Volume</label>
+            <input type="range" id="volume" min="0" max="100" value="40" oninput="mudarVolume(this.value)">
+            <span id="lbl-volume">40%</span>
+        </div>
+        <button class="btn-musica" onclick="toggleMusica()">&#9654; Ativar Musica</button>
+    </div>
+
+    <!-- Música -->
+    <audio id="musica" loop>
+        <source src="/static/audio/musica.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // ── Estrelas ──────────────────────────────────────────────────────
+        function criarEstrelas() {
+            const container = document.getElementById("stars");
+            for (let i = 0; i < 200; i++) {
+                const star = document.createElement("div");
+                star.className = "star";
+                const size = Math.random() * 2.5 + 0.5;
+                star.style.cssText = `width:${size}px;height:${size}px;left:${Math.random() * 100}%;top:${Math.random() * 100}%;--dur:${Math.random() * 4 + 2}s;animation-delay:${Math.random() * 4}s;`;
+                container.appendChild(star);
+            }
+        }
+
+        // ── Relógio ───────────────────────────────────────────────────────
+        function atualizarRelogio() {
+            const agora = new Date();
+            document.getElementById("relogio").textContent = agora.toLocaleDateString("pt-PT") + " " + agora.toLocaleTimeString("pt-PT");
+        }
+
+        // ── Configurações ─────────────────────────────────────────────────
+        function toggleConfig() {
+            document.getElementById("painel-config").classList.toggle("visivel");
+        }
+
+        function mudarVolume(v) {
+            document.getElementById("lbl-volume").textContent = v + "%";
+            document.getElementById("musica").volume = v / 100;
+        }
+
+        function toggleMusica() {
+            const audio = document.getElementById("musica");
+            const btn = document.querySelector(".btn-musica");
+            if (audio.paused) {
+                audio.play();
+                btn.textContent = "⏸ Pausar Música";
+            } else {
+                audio.pause();
+                btn.textContent = "▶ Ativar Música";
+            }
+        }
+
+        // ── Criar Gauge SVG ───────────────────────────────────────────────
+        function criarGauge(valor, max, tipo) {
+            const radius = 36;
+            const circumference = 2 * Math.PI * radius;
+            const percentage = Math.min(Math.abs(valor) / max, 1);
+            const offset = circumference * (1 - percentage);
+
+            return `
+                <div class="gauge">
+                    <svg width="90" height="90" viewBox="0 0 90 90">
+                        <circle class="gauge-bg" cx="45" cy="45" r="${radius}"></circle>
+                        <circle class="gauge-fill ${tipo}" cx="45" cy="45" r="${radius}" 
+                            stroke-dasharray="${circumference}" 
+                            stroke-dashoffset="${offset}">
+                        </circle>
+                    </svg>
+                    <div class="gauge-value">${valor}°</div>
+                </div>
+            `;
+        }
+
+        // ── Céu Agora ─────────────────────────────────────────────────────
+        async function carregarCeu() {
+            try {
+                const res = await fetch("/api/ceu");
+                const data = await res.json();
+                
+                document.getElementById("localizacao").textContent = data.location;
+
+                document.getElementById("ceu-conteudo").innerHTML = `
+                    <h2 class="section-title">Ceu Agora</h2>
+                    
+                    <div class="celestial-row">
+                        <!-- Sol -->
+                        <div class="celestial-card sun">
+                            <div class="celestial-header">
+                                <span class="celestial-icon">&#9788;</span>
+                                <span class="celestial-name sun">Sol</span>
+                            </div>
+                            <div class="celestial-content">
+                                <img src="/static/images/sun.jpg" alt="Sol" class="celestial-image" 
+                                    onerror="this.style.background='radial-gradient(circle, #ff6b35, #f7931e)';this.src='';">
+                                <div class="celestial-data">
+                                    <div class="gauges-row">
+                                        <div class="gauge-container">
+                                            ${criarGauge(data.sol.altitude, 90, 'sun')}
+                                            <div class="gauge-label">Altitude</div>
+                                        </div>
+                                        <div class="gauge-container">
+                                            ${criarGauge(data.sol.azimute, 360, 'sun')}
+                                            <div class="gauge-label">Azimute</div>
+                                        </div>
+                                    </div>
+                                    <div class="celestial-info">
+                                        <div>Distancia: <span class="highlight sun-highlight">${data.sol.distancia}</span></div>
+                                        <div class="visibility ${data.sol.visivel ? 'visible' : 'not-visible'}">
+                                            Visivel: ${data.sol.visivel ? 'Sim' : 'Nao'} 
+                                            <span class="visibility-check">${data.sol.visivel ? '&#10003;' : '&#10007;'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lua -->
+                        <div class="celestial-card moon">
+                            <div class="celestial-header">
+                                <span class="celestial-icon">&#9790;</span>
+                                <span class="celestial-name moon">Lua</span>
+                            </div>
+                            <div class="celestial-content">
+                                <img src="/static/images/Moon.jpg" alt="Lua" class="celestial-image moon">
+                                <div class="celestial-data">
+                                    <div class="gauges-row">
+                                        <div class="gauge-container">
+                                            ${criarGauge(data.lua.altitude, 90, 'moon')}
+                                            <div class="gauge-label">Altitude</div>
+                                        </div>
+                                        <div class="gauge-container">
+                                            ${criarGauge(data.lua.azimute, 360, 'moon')}
+                                            <div class="gauge-label">Azimute</div>
+                                        </div>
+                                    </div>
+                                    <div class="celestial-info">
+                                        <div>Distancia: <span class="highlight moon-highlight">${data.lua.distancia}</span></div>
+                                        <div class="visibility ${data.lua.visivel ? 'visible' : 'not-visible'}">
+                                            Visivel: ${data.lua.visivel ? 'Sim' : 'Nao'} 
+                                            <span class="visibility-check">${data.lua.visivel ? '&#10003;' : '&#10007;'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Planetas -->
+                    <section class="planets-section">
+                        <h2 class="section-title">Planetas</h2>
+                        <div class="planets-grid">
+                            ${data.planetas.map((p, index) => `
+                                <div class="planet-card ${p.visivel ? '' : 'invisible'}">
+                                    <div class="planet-rank">${index + 1}</div>
+                                    <img src="/static/images/planets/${p.nome.toLowerCase()}.jpg" alt="${p.nome}" class="planet-image"
+                                        onerror="this.style.background='radial-gradient(circle, #444, #222)';this.src='';">
+                                    <div class="planet-info">
+                                        <div class="planet-name">${p.nome}</div>
+                                        <div class="planet-data">
+                                            Alt: ${p.altitude}°<br>
+                                            Az: ${p.azimute}°
+                                        </div>
+                                        <div class="planet-visibility ${p.visivel ? 'visible' : 'not-visible'}">
+                                            ${p.visivel ? '&#10003; Visivel' : '&#10007; Nao visivel'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </section>
+                `;
+            } catch (err) {
+                document.getElementById("ceu-conteudo").innerHTML = '<div class="loading">&#10060; Erro ao carregar dados</div>';
+            }
+        }
+
+        // ── Auto-refresh ──────────────────────────────────────────────────
+        function autoRefresh() {
+            carregarCeu();
+            setTimeout(autoRefresh, 30000);
+        }
+
+        // ── Inicialização ─────────────────────────────────────────────────
+        criarEstrelas();
+        atualizarRelogio();
+        setInterval(atualizarRelogio, 1000);
+        carregarCeu();
+        setTimeout(autoRefresh, 30000);
+        document.getElementById("musica").volume = 0.4;
+    </script>
+</body>
+
+</html>
