@@ -113,35 +113,28 @@ def get_lua():
 # ── Funções de calendário ─────────────────────────────────────────────────────
 
 def get_fase_lua_dia(ano, mes, dia):
-    # Calcula a fase da Lua para um dia específico.
-    # Devolve dicionário com percentagem, nome e emoji.
+    import math
 
-    t = ts.utc(ano, mes, dia, 12)                   # usa o meio-dia como referência
-    fase_graus = almanac.moon_phase(eph, t).degrees  # fase em graus de 0 a 360
-    fase = fase_graus / 360.0                        # normaliza para 0.0 a 1.0
+    t = ts.utc(ano, mes, dia, 12)
+    fase_graus = almanac.moon_phase(eph, t).degrees
+    fase_norm  = fase_graus / 360.0
 
-    # determina nome e emoji consoante o ângulo de fase
-    if fase < 0.0625 or fase >= 0.9375:
-        nome, emoji = "Lua Nova", "🌑"
-    elif fase < 0.1875:
-        nome, emoji = "Crescente", "🌒"
-    elif fase < 0.3125:
-        nome, emoji = "Quarto Crescente", "🌓"
-    elif fase < 0.4375:
-        nome, emoji = "Gibosa Crescente", "🌔"
-    elif fase < 0.5625:
-        nome, emoji = "Lua Cheia", "🌕"
-    elif fase < 0.6875:
-        nome, emoji = "Gibosa Minguante", "🌖"
-    elif fase < 0.8125:
-        nome, emoji = "Quarto Minguante", "🌗"
-    else:
-        nome, emoji = "Minguante", "🌘"
+    # Iluminação real do disco 
+    iluminacao = round((1 - math.cos(math.radians(fase_graus))) / 2 * 100, 1)
+
+    if   fase_norm < 0.0625 or fase_norm >= 0.9375: nome, emoji = "Lua Nova",         "🌑"
+    elif fase_norm < 0.1875:                         nome, emoji = "Crescente",         "🌒"
+    elif fase_norm < 0.3125:                         nome, emoji = "Quarto Crescente",  "🌓"
+    elif fase_norm < 0.4375:                         nome, emoji = "Gibosa Crescente",  "🌔"
+    elif fase_norm < 0.5625:                         nome, emoji = "Lua Cheia",         "🌕"
+    elif fase_norm < 0.6875:                         nome, emoji = "Gibosa Minguante",  "🌖"
+    elif fase_norm < 0.8125:                         nome, emoji = "Quarto Minguante",  "🌗"
+    else:                                            nome, emoji = "Minguante",         "🌘"
 
     return {
-        "percentagem": round(fase * 100, 1),    # ex: 73.2% — percentagem de iluminação
-        "nome": nome,                           # ex: "Lua Cheia"
-        "emoji": emoji,                         # ex: "🌕"
+        "iluminacao": iluminacao,  # % real do disco iluminado
+        "nome":       nome,
+        "emoji":      emoji,
     }
 
 def get_nascer_por_sol(ano, mes, dia):

@@ -1,4 +1,5 @@
 # ============================================================
+
   ASTROGUIDE — Documentação do Projeto
   PAP 12.º Ano | Curso de Programação
 
@@ -8,7 +9,7 @@ oficiais da NASA, para a localização de Vila Nova de Gaia.
 
 ---
 
-##   COMO CORRER A APLICAÇÃO
+## COMO CORRER A APLICAÇÃO
 
 1. Instalar as dependências (só é necessário fazer uma vez):
   py -m pip install -r requirements.txt
@@ -17,13 +18,13 @@ oficiais da NASA, para a localização de Vila Nova de Gaia.
 3. O browser abre automaticamente em [http://localhost:5000](http://localhost:5000)
 4. Para parar o servidor, pressione Ctrl+C no terminal.
 5. Para atualizar no GitHub:
-   git add .  
+  git add .  
    git commit -m "descrição do que foi feito"  
    git push
 
 ---
 
-##   ESTRUTURA DE FICHEIROS
+## ESTRUTURA DE FICHEIROS
 
 astroguide/
 │
@@ -76,7 +77,7 @@ astroguide/
 
 ---
 
-##   ROUTING (ROTAS)
+## ROUTING (ROTAS)
 
 A aplicação usa um sistema de rotas simples:
   /            → Menu de entrada (Landing Page)
@@ -90,7 +91,7 @@ Rotas da API (devolvem JSON para o JavaScript):
 
 ---
 
-##   LINGUAGENS USADAS
+## LINGUAGENS USADAS
 
 PYTHON (Backend)
   Responsável por todos os cálculos astronómicos e pelo
@@ -115,7 +116,7 @@ JavaScript (Interatividade)
 
 ---
 
-##   BIBLIOTECAS PYTHON USADAS
+## BIBLIOTECAS PYTHON USADAS
 
 skyfield (pip install skyfield)
   Biblioteca científica de astronomia.
@@ -135,7 +136,7 @@ tzdata (pip install tzdata)
 
 ---
 
-##   CONCEITOS-CHAVE
+## CONCEITOS-CHAVE
 
 Efemérides (de421.bsp)
   Tabela matemática com as posições de todos os planetas
@@ -175,7 +176,7 @@ DRY (Don't Repeat Yourself)
 
 ---
 
-##   FUNCIONALIDADES IMPLEMENTADAS
+## FUNCIONALIDADES IMPLEMENTADAS
 
   [x] Landing Page interativa com menu dinâmico
   [x] Animações Canvas — Sistema Solar em órbita
@@ -200,7 +201,7 @@ DRY (Don't Repeat Yourself)
 
 ---
 
-##   ROADMAP — PRÓXIMAS FUNCIONALIDADES
+## ROADMAP — PRÓXIMAS FUNCIONALIDADES
 
   [ ] Observatório — Mapa do céu interativo com estrelas reais
   [ ] Catálogo de estrelas (Hipparcos — 117k estrelas)
@@ -211,14 +212,12 @@ DRY (Don't Repeat Yourself)
 
 ---
 
-##   FERRAMENTAS USADAS NO DESENVOLVIMENTO
+## FERRAMENTAS USADAS NO DESENVOLVIMENTO
 
-  Claude (claude.ai)       → Assistente de aprendizagem e desenvolvimento
-  Cursor                   → Editor de código com IA integrada
-  GitHub                   → Controlo de versões e repositório
-  Brave                    → Browser de desenvolvimento
-  Postman                  → Teste das rotas da API
-  Notion                   → Organização e notas do projeto
+  Claude (claude.ai)   → Assistente de aprendizagem e desenvolvimento  
+  Cursor                   → Editor de código com IA integrada  
+  GitHub                   → Controlo de versões e repositório  
+o
 
 ---
 
