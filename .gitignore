@@ -1,0 +1,45 @@
+# ============================================================
+# .gitignore — AstroGuide
+# Ficheiros que nunca devem entrar no repositório.
+# ============================================================
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Ambientes virtuais ────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Variáveis de ambiente (segredos) ─────────────────────
+.env
+.env.local
+.env.production
+
+# ── Efemérides NASA (ficheiros grandes, descarregados auto) ──
+# O sky_engine.py descarrega este ficheiro automaticamente
+# na primeira execução — não precisa de estar no git.
+de421.bsp
+*.bsp
+
+# ── Editores e IDEs ───────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user
+.cursor/
+
+# ── Sistema operativo ────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs e temporários ───────────────────────────────────
+*.log
+*.tmp
+*.swp
