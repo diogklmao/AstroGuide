@@ -34,7 +34,7 @@
                 <img class="card-imagem" src="{{ url_for('static', filename='images/SolarSystem.jpg') }}" alt="Céu estrelado">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
-                    <span class="card-emoji">🌌</span>
+                    <canvas id="ic-ceu" width="36" height="36" class="card-emoji"></canvas>
                     <div class="card-titulo">Céu Agora</div>
                     <div class="card-desc">Posição em tempo real do Sol, Lua e planetas visíveis</div>
                 </div>
@@ -45,7 +45,7 @@
                 <img class="card-imagem" src="{{ url_for('static', filename='images/Moon.jpg') }}" alt="Lua cheia">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
-                    <span class="card-emoji">📅</span>
+                    <canvas id="ic-cal" width="36" height="36" class="card-emoji"></canvas>
                     <div class="card-titulo">Calendário Lunar</div>
                     <div class="card-desc">Fases da Lua, eclipses e chuvas de meteoros</div>
                 </div>
@@ -56,7 +56,7 @@
                 <img class="card-imagem" src="{{ url_for('static', filename='images/Sky.jpg') }}" alt="Telescópio">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
-                    <span class="card-emoji">🔭</span>
+                    <canvas id="ic-obs" width="36" height="36" class="card-emoji"></canvas>
                     <div class="card-titulo">Observatório</div>
                     <div class="card-desc">Céu interativo com constelações e estrelas clicáveis</div>
                 </div>

@@ -1,0 +1,14 @@
+# AstroGuide - Dependências do Projeto
+
+# pip install -r requirements.txt - Para instalar todas as dependências
+
+# Servidor web – recebe pedidos do browser e devolve respostas
+flask==3.1.1
+ 
+# Motor astronómico – calcula posições de planetas, lua, sol
+# usa as efemérides da NASA (de421.bsp)
+skyfield==1.48
+ 
+# Base de dados de fusos horários – necessário para skyfield
+# calcular horas locais corretamente em qualquer país
+tzdata==2025.2

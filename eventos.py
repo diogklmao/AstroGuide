@@ -65,7 +65,7 @@ EVENTOS = [
         "hora_ini":  "23:00",
         "hora_fim":  "04:00",
         "hora_pico": "02:00",
-        "descricao": "Também detritos do cometa Halley. Até 20 meteoros/hora.",
+        "descricao": "Detritos do cometa Halley. Até 20 meteoros/hora.",
     },
     {
         "nome":      "Leônidas",

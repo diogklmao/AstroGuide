@@ -1,36 +1,29 @@
-============================================================
+# ============================================================
   ASTROGUIDE — Documentação do Projeto
   PAP 12.º Ano | Curso de Programação
-============================================================
 
 O AstroGuide é uma aplicação web de astronomia que mostra
 dados reais do céu em tempo real, calculados com efemérides
 oficiais da NASA, para a localização de Vila Nova de Gaia.
 
-------------------------------------------------------------
-  COMO CORRER A APLICAÇÃO
-------------------------------------------------------------
+---
+
+##   COMO CORRER A APLICAÇÃO
 
 1. Instalar as dependências (só é necessário fazer uma vez):
-
-   py -m pip install -r requirements.txt
-
+  py -m pip install -r requirements.txt
 2. Correr o servidor:
-
-   py server.py
-
-3. O browser abre automaticamente em http://localhost:5000
-
+  py server.py
+3. O browser abre automaticamente em [http://localhost:5000](http://localhost:5000)
 4. Para parar o servidor, pressione Ctrl+C no terminal.
-
 5. Para atualizar no GitHub:
-   git add .
-   git commit -m "descrição do que foi feito"
+   git add .  
+   git commit -m "descrição do que foi feito"  
    git push
 
-------------------------------------------------------------
-  ESTRUTURA DE FICHEIROS
-------------------------------------------------------------
+---
+
+##   ESTRUTURA DE FICHEIROS
 
 astroguide/
 │
@@ -81,10 +74,9 @@ astroguide/
     └── audio/
         └── musica.mp3     → Música ambiente relaxante
 
+---
 
-------------------------------------------------------------
-  ROUTING (ROTAS)
-------------------------------------------------------------
+##   ROUTING (ROTAS)
 
 A aplicação usa um sistema de rotas simples:
   /            → Menu de entrada (Landing Page)
@@ -96,9 +88,9 @@ Rotas da API (devolvem JSON para o JavaScript):
   /api/calendario/ano/mes     → Fases da lua e eventos do mês
   /api/dia/ano/mes/dia        → Detalhes de um dia específico
 
-------------------------------------------------------------
-  LINGUAGENS USADAS
-------------------------------------------------------------
+---
+
+##   LINGUAGENS USADAS
 
 PYTHON (Backend)
   Responsável por todos os cálculos astronómicos e pelo
@@ -121,9 +113,9 @@ JavaScript (Interatividade)
   Ficheiros: static/js/menu.js, static/js/index.js,
              static/js/shared-ui-controls.js
 
-------------------------------------------------------------
-  BIBLIOTECAS PYTHON USADAS
-------------------------------------------------------------
+---
+
+##   BIBLIOTECAS PYTHON USADAS
 
 skyfield (pip install skyfield)
   Biblioteca científica de astronomia.
@@ -141,9 +133,9 @@ tzdata (pip install tzdata)
   para hora local (Europe/Lisbon).
   Incluído no requirements.txt.
 
-------------------------------------------------------------
-  CONCEITOS-CHAVE
-------------------------------------------------------------
+---
+
+##   CONCEITOS-CHAVE
 
 Efemérides (de421.bsp)
   Tabela matemática com as posições de todos os planetas
@@ -181,9 +173,9 @@ DRY (Don't Repeat Yourself)
   funções partilhadas entre páginas estão em
   shared-ui-controls.js em vez de repetidas em cada ficheiro.
 
-------------------------------------------------------------
-  FUNCIONALIDADES IMPLEMENTADAS
-------------------------------------------------------------
+---
+
+##   FUNCIONALIDADES IMPLEMENTADAS
 
   [x] Landing Page interativa com menu dinâmico
   [x] Animações Canvas — Sistema Solar em órbita
@@ -206,9 +198,9 @@ DRY (Don't Repeat Yourself)
   [x] Código partilhado em shared-ui-controls.js (DRY)
   [x] Repositório no GitHub com historial de commits
 
-------------------------------------------------------------
-  ROADMAP — PRÓXIMAS FUNCIONALIDADES
-------------------------------------------------------------
+---
+
+##   ROADMAP — PRÓXIMAS FUNCIONALIDADES
 
   [ ] Observatório — Mapa do céu interativo com estrelas reais
   [ ] Catálogo de estrelas (Hipparcos — 117k estrelas)
@@ -217,9 +209,9 @@ DRY (Don't Repeat Yourself)
   [ ] Versão mobile (React Native ou Capacitor)
   [ ] Ligação a telescópio via Arduino (Fase 2)
 
-------------------------------------------------------------
-  FERRAMENTAS USADAS NO DESENVOLVIMENTO
-------------------------------------------------------------
+---
+
+##   FERRAMENTAS USADAS NO DESENVOLVIMENTO
 
   Claude (claude.ai)       → Assistente de aprendizagem e desenvolvimento
   Cursor                   → Editor de código com IA integrada
@@ -228,7 +220,7 @@ DRY (Don't Repeat Yourself)
   Postman                  → Teste das rotas da API
   Notion                   → Organização e notas do projeto
 
-------------------------------------------------------------
+---
 
   Desenvolvido por: Diogo Vedor Peres Pinho
   Escola: Escola Profissional de Gaia
