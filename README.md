@@ -15,12 +15,12 @@ oficiais da NASA, para a localização de Vila Nova de Gaia.
   py -m pip install -r requirements.txt
 2. Correr o servidor:
   py server.py
-3. O browser abre automaticamente em [http://localhost:5000](http://localhost:5000)
+3. O browser abre automaticamente em http://localhost:5000
 4. Para parar o servidor, pressione Ctrl+C no terminal.
 5. Para atualizar no GitHub:
-  git add .  
-   git commit -m "descrição do que foi feito"  
-   git push
+  git add .
+  git commit -m "descrição do que foi feito"
+  git push
 
 ---
 
@@ -63,17 +63,41 @@ astroguide/
 │
 └── static/
     ├── css/
-    │   ├── menu.css       → Estilos do menu de entrada
+    │   ├── shared-ui-controls.css → Reset global e estilos
+    │   │                            partilhados entre páginas.
+    │   │
+    │   ├── glass.css      → Design system de glassmorphism.
+    │   │                    Variáveis CSS, painéis glass,
+    │   │                    animações shimmer e borderGlow.
+    │   │
+    │   ├── menu.css       → Estilos exclusivos do menu
+    │   │                    (foto de fundo, cards, título).
+    │   │
     │   └── index.css      → Estilos da app principal
+    │                        (céu agora, calendário, dados).
     │
     ├── js/
-    │   ├── menu.js        → Lógica do menu (animações Canvas)
-    │   ├── index.js       → Lógica da app (céu, calendário)
-    │   └── shared-ui-controls.js → Funções partilhadas
-    │                               (música, volume, config)
+    │   ├── three-bg.js    → Fundo 3D partilhado (Three.js)
+    │   │                    Campo de estrelas, planetas em
+    │   │                    órbita e parallax com o rato.
+    │   │                    Usado no menu e na app.
+    │   │
+    │   ├── shared-ui-controls.js → Funções partilhadas
+    │   │                    (música, volume, configurações).
+    │   │
+    │   ├── menu.js        → Lógica do menu: deteção de
+    │   │                    localização e ícones Canvas
+    │   │                    desenhados à mão (estrela,
+    │   │                    lua crescente, telescópio).
+    │   │
+    │   └── index.js       → Lógica da app: navegação SPA,
+    │                        dados do céu, calendário lunar
+    │                        e auto-refresh a cada 30s.
     │
-    └── audio/
-        └── musica.mp3     → Música ambiente relaxante
+    ├── audio/
+    │   └── musica.mp3     → Música ambiente relaxante
+    │
+    └── favicon.svg        → Ícone da aplicação (estrela SVG)
 
 ---
 
@@ -103,16 +127,17 @@ HTML (Estrutura)
   Ficheiros: templates/menu.html, templates/index.html
 
 CSS (Estilo)
-  Estilização moderna com tema escuro. Animações de estrelas,
-  cards interativos, layouts responsivos e efeitos de brilho.
-  Ficheiros: static/css/menu.css, static/css/index.css
+  Design system com glassmorphism e tema escuro.
+  Animações de entrada, hover, shimmer e borderGlow.
+  Ficheiros: shared-ui-controls.css, glass.css,
+             menu.css, index.css
 
 JavaScript (Interatividade)
   Gere o estado da aplicação no browser. Comunica com o
-  Python via API (fetch). Desenha órbitas planetárias e
-  constelações usando HTML5 Canvas.
-  Ficheiros: static/js/menu.js, static/js/index.js,
-             static/js/shared-ui-controls.js
+  Python via API (fetch). Desenha estrelas e ícones usando
+  Canvas API. Renderiza o fundo 3D com Three.js.
+  Ficheiros: three-bg.js, shared-ui-controls.js,
+             menu.js, index.js
 
 ---
 
@@ -134,6 +159,15 @@ tzdata (pip install tzdata)
   para hora local (Europe/Lisbon).
   Incluído no requirements.txt.
 
+## BIBLIOTECAS JAVASCRIPT USADAS
+
+Three.js (via CDN)
+  Biblioteca de gráficos 3D baseada em WebGL.
+  Usada para o fundo animado partilhado entre páginas:
+  campo de 3500 estrelas coloridas, 3 planetas em órbita
+  com parallax suave controlado pelo movimento do rato.
+  Versão: r160 — cdn.jsdelivr.net/npm/three@0.160.0
+
 ---
 
 ## CONCEITOS-CHAVE
@@ -153,6 +187,17 @@ JSON (JavaScript Object Notation)
   Formato de troca de dados entre Python e JavaScript.
   Ex: {"altitude": 36.5, "azimute": 202.1, "visivel": true}
 
+SPA (Single Page Application)
+  Técnica onde a navegação entre ecrãs acontece no browser
+  sem recarregar a página. O JavaScript mostra e esconde
+  secções conforme o ecrã ativo, tornando a app mais rápida.
+
+Glassmorphism
+  Estilo visual de painéis translúcidos com desfoque de
+  fundo (backdrop-filter: blur). Cria profundidade e
+  elegância mantendo o conteúdo legível sobre fundos
+  complexos como o starfield Three.js.
+
 Altitude
   Ângulo em graus acima do horizonte.
   0° = horizonte | 90° = zenith | Negativo = não visível
@@ -165,23 +210,26 @@ UA (Unidade Astronómica)
   Distância média da Terra ao Sol = 149.597.870 km
 
 sessionStorage
-  Memória temporária do browser usada para manter a
-  música ativa ao navegar entre páginas. Apaga quando
+  Memória temporária do browser usada para manter o
+  estado da música ao navegar entre páginas. Apaga quando
   o browser é fechado.
 
 DRY (Don't Repeat Yourself)
-  Princípio de programação aplicado no projeto —
-  funções partilhadas entre páginas estão em
-  shared-ui-controls.js em vez de repetidas em cada ficheiro.
+  Princípio de programação aplicado no projeto:
+  glass.css centraliza o design system, three-bg.js é
+  partilhado entre páginas, shared-ui-controls.js evita
+  repetição de lógica de música e configurações.
 
 ---
 
 ## FUNCIONALIDADES IMPLEMENTADAS
 
   [x] Landing Page interativa com menu dinâmico
-  [x] Animações Canvas — Sistema Solar em órbita
-  [x] Animações Canvas — Lua com crateras e fase dinâmica
-  [x] Animações Canvas — Constelação de Orion com brilho
+  [x] Fundo 3D com Three.js — estrelas, planetas, parallax
+  [x] Fundo Three.js partilhado entre menu e app
+  [x] Design system glassmorphism (glass.css)
+  [x] Animações Canvas — ícones desenhados à mão no menu
+  [x] Favicon SVG personalizado
   [x] Dados em tempo real — Sol, Lua e 7 planetas
   [x] Altitude, azimute e distância de cada astro
   [x] Visibilidade (acima/abaixo do horizonte)
@@ -192,21 +240,22 @@ DRY (Don't Repeat Yourself)
   [x] Painel de configurações com controlo de volume
   [x] Música ambiente com persistência entre páginas
   [x] Deteção automática de localização no menu
+  [x] Navegação SPA — ambos os ecrãs sempre acessíveis
   [x] Atualização automática dos dados a cada 30 segundos
   [x] Relógio em tempo real
   [x] Botão ◀ Menu em todas as páginas
   [x] Separação de responsabilidades HTML / CSS / JS
-  [x] Código partilhado em shared-ui-controls.js (DRY)
+  [x] Código partilhado (DRY) em ficheiros shared
   [x] Repositório no GitHub com historial de commits
 
 ---
 
 ## ROADMAP — PRÓXIMAS FUNCIONALIDADES
 
-  [ ] Observatório — Mapa do céu interativo com estrelas reais
-  [ ] Catálogo de estrelas (Hipparcos — 117k estrelas)
+  [ ] Observatório — Mapa do céu interativo com Canvas
+  [ ] Catálogo de estrelas reais (Hipparcos — 117k estrelas)
   [ ] Constelações clicáveis com informação de cada estrela
-  [ ] Hosting online no Railway com URL público
+  [ ] Hosting online com URL público
   [ ] Versão mobile (React Native ou Capacitor)
   [ ] Ligação a telescópio via Arduino (Fase 2)
 
@@ -214,10 +263,12 @@ DRY (Don't Repeat Yourself)
 
 ## FERRAMENTAS USADAS NO DESENVOLVIMENTO
 
-  Claude (claude.ai)   → Assistente de aprendizagem e desenvolvimento  
-  Cursor                   → Editor de código com IA integrada  
-  GitHub                   → Controlo de versões e repositório  
-o
+  Claude (claude.ai)   → Assistente de aprendizagem e desenvolvimento
+  Cursor               → Editor de código com IA integrada
+  GitHub               → Controlo de versões e repositório
+  Postman              → Teste das rotas da API
+  Brave                → Browser de desenvolvimento
+  Notion               → Organização e notas do projeto
 
 ---
 
@@ -226,4 +277,4 @@ o
   Curso: Programador de Informática
   Ano: 2025/2026
 
-============================================================
+# ============================================================
