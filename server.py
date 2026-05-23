@@ -7,13 +7,15 @@
 
 from flask import Flask, jsonify, render_template, send_from_directory
 import os
-from skyfield.api import load                       # descarrega as efemérides automaticamente se não existirem
-load('de421.bsp')                                   # garante que o ficheiro existe antes de qualquer cálculo
 
-from sky_engine import (                            # importa todas as funções de cálculo astronómico
+from sky_engine import (
     get_sol, get_lua, get_todos_planetas,
     get_fase_lua_dia, get_nascer_por_sol, get_fases_mes
 )
+
+from eventos import get_eventos_do_dia, get_eventos_do_mes
+from config import LOCATION
+import datetime
 
 from eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
 from config import LOCATION                                  # importa localização

@@ -32,12 +32,18 @@ function atualizarRelogio() {
 
 // ── Navegação: SPA (Single Page Application) ──────────────────────────────────
 function mudarEcra(nome) {
+    // Remove a classe "ativo" de todos os ecrãs e botões
     document.querySelectorAll(".ecra").forEach(e => e.classList.remove("ativo"));
     document.querySelectorAll("nav button").forEach(b => b.classList.remove("ativo"));
+
+    // Ativa o ecrã e o botão pedido
     document.getElementById("ecra-" + nome).classList.add("ativo");
     const btn = document.getElementById("btn-" + nome);
     if (btn) btn.classList.add("ativo");
+
+    // Carrega os dados do ecrã que ficou ativo
     if (nome === "calendario") carregarCalendario();
+    if (nome === "ceu") carregarCeu();
 }
 
 // ── Céu Agora ─────────────────────────────────────────────────────
@@ -180,26 +186,25 @@ function mesSeguinte() {
     carregarCalendario();
 }
 
-// ── Auto-refresh ──────────────────────────────────────────────────
+ // ── Auto-refresh ──────────────────────────────────────────────────
+// Só atualiza dados se o ecrã do Céu Agora estiver visível.
+// Chamado via setTimeout — nunca imediatamente no arranque.
 function autoRefresh() {
-    if (document.getElementById("ecra-ceu").classList.contains("ativo")) carregarCeu();
+    if (document.getElementById("ecra-ceu").classList.contains("ativo")) {
+        carregarCeu();
+    }
     setTimeout(autoRefresh, 30000);
-}
-
-// ── Detetar página e mostrar ecrã correto ─────────────────────────
-const pagina = window.location.pathname;
-if (pagina === "/calendario") {
-    document.getElementById("btn-ceu").style.display = "none";
-    mudarEcra("calendario");
-} else {
-    document.getElementById("btn-calendario").style.display = "none";
-    mudarEcra("ceu");
 }
 
 // ── Inicialização ─────────────────────────────────────────────────
 criarEstrelas();
 atualizarRelogio();
 setInterval(atualizarRelogio, 1000);
-carregarCeu();
-autoRefresh();
+
+// mudarEcra deteta o URL, mostra o ecrã correto E carrega os dados.
+// Nenhum botão é escondido — o utilizador pode navegar livremente.
+const pagina = window.location.pathname;
+mudarEcra(pagina === "/calendario" ? "calendario" : "ceu");
+
+setTimeout(autoRefresh, 30000);
 document.getElementById("musica").volume = 0.4;
