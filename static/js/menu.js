@@ -2,6 +2,13 @@
 // Cria estrelas aleatórias no fundo da página (elemento #stars no HTML)
 function criarEstrelas() {
     const container = document.getElementById("stars");
+    if (!container) return;
+    const threeAtivo = document.getElementById("three-bg") &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (threeAtivo) {
+        container.classList.add("stars--hidden");
+        return;
+    }
     for (let i = 0; i < 180; i++) {
         const star = document.createElement("div");    // cria um div por estrela
         star.className = "star";                       // aplica o estilo .star do CSS

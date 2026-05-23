@@ -123,7 +123,7 @@ body {
 .config-titulo {
     font-size: 0.8rem;
     font-weight: 700;
-    color: #4fc3f7;
+    color: #6eb8ff;
     margin-bottom: 14px;
     letter-spacing: 1px;
 }
@@ -145,14 +145,14 @@ body {
 /* Slider de volume */
 input[type="range"] {
     flex: 2;
-    accent-color: #4fc3f7; /* cor do indicador do slider */
+    accent-color: #6eb8ff;
     cursor: pointer;
 }
 
 /* Valor numérico à direita do slider (ex: "75%") */
 .config-linha span {
     font-size: 0.75rem;
-    color: #4fc3f7;
+    color: #6eb8ff;
     width: 30px;
     text-align: right;
 }
@@ -173,6 +173,6 @@ input[type="range"] {
 }
 
 .btn-musica:hover {
-    border-color: #4fc3f7;
-    color: #4fc3f7;
+    border-color: #6eb8ff;
+    color: #6eb8ff;
 }

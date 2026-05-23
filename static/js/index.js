@@ -8,6 +8,13 @@ const DIAS_PT = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "D
 // ── Estrelas ──────────────────────────────────────────────────────
 function criarEstrelas() {
     const container = document.getElementById("stars");
+    if (!container) return;
+    const threeAtivo = document.getElementById("three-bg") &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (threeAtivo) {
+        container.classList.add("stars--hidden");
+        return;
+    }
     for (let i = 0; i < 150; i++) {
         const star = document.createElement("div");
         star.className = "star";
@@ -40,7 +47,7 @@ async function carregarCeu() {
         const data = await res.json();
         document.getElementById("localizacao").textContent = "📍 " + data.location;
         document.getElementById("ceu-conteudo").innerHTML = `
-            <div class="card">
+            <div class="card glass-panel">
                 <div class="card-titulo" style="color:#ff8f00">☀ Sol</div>
                 <div class="dados-grelha">
                     ${dadoHTML("Altitude", data.sol.altitude + "°")}
@@ -49,7 +56,7 @@ async function carregarCeu() {
                     ${dadoVisivel(data.sol.visivel)}
                 </div>
             </div>
-            <div class="card">
+            <div class="card glass-panel">
                 <div class="card-titulo" style="color:#b0bec5">🌙 Lua</div>
                 <div class="dados-grelha">
                     ${dadoHTML("Altitude", data.lua.altitude + "°")}
@@ -58,7 +65,7 @@ async function carregarCeu() {
                     ${dadoVisivel(data.lua.visivel)}
                 </div>
             </div>
-            <div class="card">
+            <div class="card glass-panel">
                 <div class="card-titulo" style="color:#ffcc02">🪐 Planetas</div>
                 <div class="planetas-grelha">${data.planetas.map(planetaHTML).join("")}</div>
             </div>`;
@@ -120,6 +127,9 @@ async function carregarCalendario() {
             </div>`;
         }
         document.getElementById("cal-grelha").innerHTML = html;
+        document.querySelectorAll(".cal-dia:not(.cal-vazio)").forEach((el, i) => {
+            el.style.animationDelay = `${Math.min(i * 0.012, 0.35)}s`;
+        });
     } catch (err) {
         document.getElementById("cal-grelha").innerHTML = '<div class="loading" style="grid-column:span 7">❌ Erro ao carregar</div>';
     }
@@ -142,7 +152,7 @@ async function verDia(dia, celula) {
 
     let eventosHTML = data.eventos.length > 0
         ? data.eventos.map(ev => `
-            <div class="evento-card">
+            <div class="evento-card glass-panel">
                 <div class="evento-topo">
                     <span class="evento-badge">⚡ EVENTO</span>
                     <span class="evento-nome">${ev.emoji} ${ev.nome}</span>

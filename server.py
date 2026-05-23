@@ -5,7 +5,8 @@
 #  Para correr: py server.py
 # ============================================================
 
-from flask import Flask, jsonify, render_template   # Flask = framework web | jsonify = converte dict para JSON | render_template = serve HTML
+from flask import Flask, jsonify, render_template, send_from_directory
+import os
 from skyfield.api import load                       # descarrega as efemérides automaticamente se não existirem
 load('de421.bsp')                                   # garante que o ficheiro existe antes de qualquer cálculo
 
@@ -20,6 +21,15 @@ import datetime                                              # para obter a hora
 
 app = Flask(__name__)                               # cria a aplicação Flask
                                                     # __name__ diz ao Flask onde está a pasta do projeto
+
+@app.route("/favicon.ico")
+def favicon():
+    # O browser pede /favicon.ico automaticamente — servimos a estrela SVG
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "favicon.svg",
+        mimetype="image/svg+xml",
+    )
 
 # ── Rotas de páginas ──────────────────────────────────────────────────────────
 # Rotas são URLs — quando o browser acede a um URL, Flask chama a função correspondente

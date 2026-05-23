@@ -1,0 +1,175 @@
+/* ── AstroGuide — design system glass + fundo Three.js ─────────────── */
+
+:root {
+    --glass-bg: rgba(10, 14, 32, 0.52);
+    --glass-bg-light: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.14);
+    --glass-border-top: rgba(255, 255, 255, 0.28);
+    --glass-blur: 22px;
+    --glass-radius: 18px;
+    --accent: #6eb8ff;
+    --accent-soft: rgba(110, 184, 255, 0.25);
+    --accent-glow: rgba(110, 184, 255, 0.45);
+    --violet-glow: rgba(180, 120, 255, 0.35);
+    --content-z: 2;
+}
+
+/* Canvas Three.js — atrás de tudo */
+#three-bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Vinheta + gradiente para legibilidade do UI */
+.bg-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% 40%, transparent 0%, rgba(3, 5, 18, 0.55) 70%, rgba(2, 3, 12, 0.92) 100%),
+        linear-gradient(180deg, rgba(8, 12, 40, 0.15) 0%, transparent 35%, rgba(2, 4, 16, 0.5) 100%);
+}
+
+body.three-ready .stars {
+    opacity: 0.35;
+}
+
+body.three-ready .stars.stars--hidden {
+    display: none;
+}
+
+/* Painel glass genérico */
+.glass-panel {
+    position: relative;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-top-color: var(--glass-border-top);
+    border-radius: var(--glass-radius);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 12px 40px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+}
+
+.glass-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+        125deg,
+        rgba(255, 255, 255, 0.14) 0%,
+        transparent 40%,
+        transparent 60%,
+        rgba(110, 184, 255, 0.06) 100%
+    );
+    pointer-events: none;
+}
+
+.glass-shimmer::after {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -60%;
+    width: 45%;
+    height: 200%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.08),
+        transparent
+    );
+    transform: rotate(18deg);
+    animation: glassShimmer 5s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes glassShimmer {
+    0%, 100% {
+        left: -80%;
+        opacity: 0;
+    }
+    45% {
+        opacity: 1;
+    }
+    55% {
+        left: 120%;
+        opacity: 0.6;
+    }
+}
+
+@keyframes floatSoft {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+@keyframes borderGlow {
+    0%, 100% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.12),
+            0 12px 40px rgba(0, 0, 0, 0.4),
+            0 0 24px var(--accent-soft);
+    }
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.18),
+            0 16px 48px rgba(0, 0, 0, 0.5),
+            0 0 36px var(--accent-glow);
+    }
+}
+
+/* Conteúdo acima do fundo 3D */
+.conteudo,
+.app {
+    position: relative;
+    z-index: var(--content-z);
+}
+
+/* Config + voltar em glass */
+body.three-ready #btn-config,
+body.three-ready #btn-voltar {
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.three-ready #btn-config:hover,
+body.three-ready #btn-voltar:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 24px var(--accent-soft);
+}
+
+body.three-ready #painel-config {
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+body.three-ready .btn-musica {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--glass-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-shimmer::after {
+        animation: none;
+    }
+}

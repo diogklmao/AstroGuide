@@ -1,14 +1,7 @@
-/* ── Comportamento específico do body nesta página ────────────────── */
-body {
+/* ── App — layout sobre fundo Three.js ────────────────────────────── */
+body.page-app {
     overflow-x: hidden;
-    /* evita scroll horizontal causado por elementos animados */
-    background-image: url('static/images/Moon.jpg');
-    backdrop-filter: blur(5px);
-    background-size: cover;
-    /* Cobre o ecrã inteiro sem distorcer */
-    background-position: center;
-    /* Centra a imagem */
-
+    background: #020408;
 }
 
 
@@ -26,9 +19,22 @@ body {
 
 
 /* ── Cabeçalho ────────────────────────────────────────────────────── */
-header {
+header.glass-header {
     text-align: center;
-    padding: 60px 0 20px;
+    padding: 28px 32px 22px;
+    margin-top: 48px;
+    animation: entrarApp 0.8s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes entrarApp {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 header h1 {
@@ -42,18 +48,18 @@ header h1 {
 
 /* Texto secundário abaixo do título */
 header .subtitulo {
-    color: #556070;
+    color: rgba(200, 220, 255, 0.75);
     font-size: 0.95rem;
     margin-top: 6px;
+    letter-spacing: 0.04em;
 }
 
-/* Relógio em tempo real no cabeçalho */
 #relogio {
     font-family: 'Courier New', monospace;
-    /* fonte monospace para os números não saltarem */
-    color: #334455;
+    color: rgba(150, 190, 230, 0.85);
     font-size: 0.85rem;
-    margin-top: 4px;
+    margin-top: 8px;
+    text-shadow: 0 0 12px rgba(110, 184, 255, 0.3);
 }
 
 
@@ -62,36 +68,33 @@ header .subtitulo {
     position: fixed;
     top: 20px;
     left: 20px;
-    background: #0a0a20;
-    border: 1px solid #1a1a3e;
-    border-radius: 10px;
-    color: #4fc3f7;
+    border-radius: 12px;
+    color: var(--accent, #6eb8ff);
     text-decoration: none;
     font-size: 0.85rem;
     font-weight: 600;
-    padding: 8px 16px;
+    padding: 10px 18px;
     z-index: 9999;
     display: flex;
     align-items: center;
     gap: 8px;
-    transition: all 0.2s;
+    transition: all 0.25s ease;
 }
 
 #btn-voltar:hover {
-    border-color: #4fc3f7;
-    box-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
+    color: #fff;
+    transform: translateX(-2px);
 }
 
 
 /* ── Navegação por tabs ───────────────────────────────────────────── */
-nav {
+nav.glass-nav {
     display: flex;
-    gap: 4px;
-    background: #0a0a20;
-    border-radius: 12px;
-    padding: 6px;
+    gap: 6px;
+    border-radius: 14px;
+    padding: 8px;
     margin: 20px 0;
-    border: 1px solid #1a1a3e;
+    animation: entrarApp 0.8s 0.1s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 nav button {
@@ -109,15 +112,15 @@ nav button {
 
 /* Tab selecionada */
 nav button.ativo {
-    background: #1a1a4e;
-    color: #4fc3f7;
-    box-shadow: 0 0 20px rgba(79, 195, 247, 0.15);
+    background: rgba(110, 184, 255, 0.18);
+    color: #9ed4ff;
+    box-shadow: 0 0 24px rgba(110, 184, 255, 0.2);
+    border: 1px solid rgba(110, 184, 255, 0.25);
 }
 
-/* Tab em hover (mas não ativa) */
 nav button:hover:not(.ativo) {
-    color: #aaaacc;
-    background: #111128;
+    color: #c8d8f0;
+    background: rgba(255, 255, 255, 0.06);
 }
 
 
@@ -130,21 +133,23 @@ nav button:hover:not(.ativo) {
 /* O JavaScript adiciona esta classe ao ecrã ativo */
 .ecra.ativo {
     display: block;
+    animation: entrarApp 0.55s 0.15s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
-
-/* ── Cards de dados ───────────────────────────────────────────────── */
-.card {
-    background: #0a0a20;
-    border: 1px solid #1a1a3e;
-    border-radius: 16px;
+/* Cards de dados — glass */
+.app .card.glass-panel {
     padding: 24px;
     margin-bottom: 16px;
-    transition: border-color 0.3s;
+    transition: border-color 0.35s ease, box-shadow 0.35s ease, transform 0.35s ease;
 }
 
-.card:hover {
-    border-color: #2a2a5e;
+.app .card.glass-panel:hover {
+    border-color: rgba(110, 184, 255, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 16px 40px rgba(0, 0, 0, 0.4),
+        0 0 28px rgba(110, 184, 255, 0.12);
+    transform: translateY(-2px);
 }
 
 .card-titulo {
@@ -167,13 +172,21 @@ nav button:hover:not(.ativo) {
 
 /* Célula individual de dado */
 .dado {
-    background: #0d0d26;
-    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
     padding: 12px 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid #15153a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: border-color 0.25s ease, background 0.25s ease;
+}
+
+.dado:hover {
+    background: rgba(110, 184, 255, 0.06);
+    border-color: rgba(110, 184, 255, 0.2);
 }
 
 .dado-label {
@@ -210,18 +223,19 @@ nav button:hover:not(.ativo) {
 
 /* Card individual de planeta */
 .planeta-card {
-    background: #0d0d26;
-    border: 1px solid #15153a;
-    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
     padding: 14px;
-    transition: all 0.3s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .planeta-card:hover {
-    border-color: #ffcc02;
-    box-shadow: 0 0 15px rgba(255, 204, 2, 0.1);
-    transform: translateY(-2px);
-    /* sobe ligeiramente ao hover */
+    border-color: rgba(255, 204, 80, 0.45);
+    box-shadow: 0 0 22px rgba(255, 204, 80, 0.15);
+    transform: translateY(-3px);
 }
 
 /* Planeta abaixo do horizonte (não visível) */
@@ -259,24 +273,31 @@ nav button:hover:not(.ativo) {
 
 .cal-nav h2 {
     font-size: 1.4rem;
-    color: #4fc3f7;
+    color: #9ed4ff;
+    text-shadow: 0 0 20px rgba(110, 184, 255, 0.35);
 }
 
 /* Botões de mês anterior/seguinte */
+.glass-btn-sm,
 .cal-nav button {
-    background: #0a0a20;
-    border: 1px solid #1a1a3e;
-    color: #4fc3f7;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--accent, #6eb8ff);
     font-size: 1.2rem;
-    width: 38px;
-    height: 38px;
-    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
     cursor: pointer;
-    transition: all 0.2s;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
 }
 
+.glass-btn-sm:hover,
 .cal-nav button:hover {
-    background: #1a1a4e;
+    background: rgba(110, 184, 255, 0.15);
+    border-color: rgba(110, 184, 255, 0.35);
+    box-shadow: 0 0 16px rgba(110, 184, 255, 0.2);
 }
 
 /* Cabeçalho com os dias da semana */
@@ -311,32 +332,44 @@ nav button:hover:not(.ativo) {
 /* Célula de cada dia */
 .cal-dia {
     aspect-ratio: 1;
-    /* mantém forma quadrada */
-    background: #0a0a20;
-    border: 1px solid #111128;
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
     min-height: 52px;
+    animation: calDiaIn 0.4s ease backwards;
+}
+
+@keyframes calDiaIn {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .cal-dia:hover {
-    border-color: #4fc3f7;
-    background: #0f0f2e;
-    transform: scale(1.05);
+    border-color: rgba(110, 184, 255, 0.5);
+    background: rgba(110, 184, 255, 0.1);
+    transform: scale(1.06);
     z-index: 2;
-    /* fica por cima dos dias vizinhos ao fazer hover */
+    box-shadow: 0 0 18px rgba(110, 184, 255, 0.15);
 }
 
-/* Dia atual */
 .cal-dia.hoje {
-    border-color: #4fc3f7;
-    background: #0f1a30;
-    box-shadow: 0 0 12px rgba(79, 195, 247, 0.2);
+    border-color: rgba(110, 184, 255, 0.55);
+    background: rgba(110, 184, 255, 0.12);
+    box-shadow: 0 0 16px rgba(110, 184, 255, 0.25);
 }
 
 /* Dia com evento astronómico */
@@ -346,9 +379,9 @@ nav button:hover:not(.ativo) {
 
 /* Dia selecionado pelo utilizador */
 .cal-dia.selecionado {
-    border-color: #ce93d8;
-    background: #1a0a2e;
-    box-shadow: 0 0 15px rgba(206, 147, 216, 0.3);
+    border-color: rgba(200, 150, 255, 0.6);
+    background: rgba(140, 80, 200, 0.15);
+    box-shadow: 0 0 20px rgba(180, 120, 255, 0.3);
 }
 
 .cal-dia.selecionado .cal-dia-num {
@@ -409,13 +442,9 @@ nav button:hover:not(.ativo) {
 /* ── Painel de detalhe do dia selecionado ─────────────────────────── */
 #detalhe-dia {
     margin-top: 16px;
-    background: #0a0a20;
-    border: 1px solid #1a1a3e;
-    border-radius: 16px;
     padding: 24px;
     display: none;
-    /* escondido até o utilizador clicar num dia */
-    animation: fadeIn 0.3s ease;
+    animation: fadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Classe adicionada pelo JavaScript para mostrar o painel */
@@ -479,11 +508,14 @@ nav button:hover:not(.ativo) {
 
 /* ── Card de evento astronómico ───────────────────────────────────── */
 .evento-card {
-    background: #120900;
-    border: 1px solid #ff8f00;
-    border-radius: 12px;
+    background: rgba(255, 140, 40, 0.08);
+    border: 1px solid rgba(255, 160, 60, 0.45);
+    border-radius: 14px;
     padding: 16px;
     margin-top: 12px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 0 24px rgba(255, 140, 40, 0.08);
 }
 
 .evento-topo {
@@ -527,9 +559,13 @@ nav button:hover:not(.ativo) {
 /* ── Estado de carregamento ───────────────────────────────────────── */
 .loading {
     text-align: center;
-    color: #334455;
+    color: rgba(180, 200, 230, 0.7);
     padding: 40px;
     font-size: 0.9rem;
+}
+
+.loading.glass-panel {
+    padding: 32px;
 }
 
 /* Spinner circular animado */

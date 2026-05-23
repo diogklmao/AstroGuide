@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt">
 
-<!-- Importa as fontes do Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300&display=swap" rel="stylesheet">
@@ -10,27 +9,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AstroGuide</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/shared-ui-controls.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/glass.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/menu.css') }}">
 </head>
 
-<body>
+<body class="page-menu" data-bg-theme="menu">
 
+    <div class="bg-foto" aria-hidden="true">
+        <img src="{{ url_for('static', filename='images/618.jpg') }}" alt="">
+    </div>
+    <canvas id="three-bg" aria-hidden="true"></canvas>
+    <div class="bg-vignette" aria-hidden="true"></div>
     <div class="stars" id="stars"></div>
 
-    <div class="titulo">
-        <div class="frosted-card">
-            <div class="frosted-title">AstroGuide</div>
-            <div class="frosted-sub">Observatório Digital</div>
+    <div class="conteudo">
+        <div class="titulo">
+            <div class="frosted-card glass-panel glass-shimmer">
+                <div class="frosted-title">AstroGuide</div>
+                <div class="frosted-sub">Observatório Digital</div>
+            </div>
         </div>
-    </div>
-            <div id="lbl-localizacao">📍 A detetar localização...</div>
-        </div>
+        <div id="lbl-localizacao">📍 A detetar localização...</div>
 
         <div class="cards">
-
-            <!-- Céu Agora -->
-            <a class="card card-ceu" href="/ceu">
+            <a class="card card-ceu glass-card" href="/ceu">
                 <img class="card-imagem" src="{{ url_for('static', filename='images/SolarSystem.jpg') }}" alt="Céu estrelado">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
@@ -40,8 +44,7 @@
                 </div>
             </a>
 
-            <!-- Calendário Lunar -->
-            <a class="card card-calendario" href="/calendario">
+            <a class="card card-calendario glass-card" href="/calendario">
                 <img class="card-imagem" src="{{ url_for('static', filename='images/Moon.jpg') }}" alt="Lua cheia">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
@@ -51,8 +54,7 @@
                 </div>
             </a>
 
-            <!-- Observatório -->
-            <a class="card card-observatorio" href="#">
+            <a class="card card-observatorio glass-card" href="#">
                 <img class="card-imagem" src="{{ url_for('static', filename='images/Sky.jpg') }}" alt="Telescópio">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
@@ -61,15 +63,12 @@
                     <div class="card-desc">Céu interativo com constelações e estrelas clicáveis</div>
                 </div>
             </a>
-
         </div>
     </div>
 
-    <!-- Botão configurações -->
     <div id="btn-config" onclick="toggleConfig()">⚙️</div>
 
-    <!-- Painel configurações -->
-    <div id="painel-config">
+    <div id="painel-config" class="glass-panel">
         <div class="config-titulo">⚙ CONFIGURAÇÕES</div>
         <div class="config-linha">
             <label>🔊 Volume</label>
@@ -79,11 +78,12 @@
         <button class="btn-musica" onclick="toggleMusica()">▶ Ativar Música</button>
     </div>
 
-    <!-- Música -->
     <audio id="musica" loop>
         <source src="/static/audio/musica.mp3" type="audio/mpeg">
     </audio>
 
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="/static/js/three-bg.js"></script>
     <script src="/static/js/shared-ui-controls.js"></script>
     <script src="/static/js/menu.js"></script>
 </body>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="AstroGuide">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#b8d8ff"/>
+      <stop offset="100%" stop-color="#5a9eff"/>
+    </radialGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#060818"/>
+  <path fill="url(#glow)" d="M16 5.5 18.1 13.2 26 15.2 18.1 17.2 16 24.9 13.9 17.2 6 15.2 13.9 13.2Z"/>
+  <circle cx="16" cy="15.2" r="1.6" fill="#ffffff" opacity="0.95"/>
+</svg>

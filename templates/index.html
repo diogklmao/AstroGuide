@@ -5,51 +5,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AstroGuide</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/shared-ui-controls.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/glass.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
 </head>
 
-<body>
+<body class="page-app" data-bg-theme="app">
 
-    <!-- Botão voltar ao menu -->
-    <a id="btn-voltar" href="/">◀ Menu</a>
-
-    <!-- Estrelas de fundo -->
+    <canvas id="three-bg" aria-hidden="true"></canvas>
+    <div class="bg-vignette" aria-hidden="true"></div>
     <div class="stars" id="stars"></div>
 
-    <div class="app">
+    <a id="btn-voltar" class="glass-panel" href="/">◀ Menu</a>
 
-        <!-- Cabeçalho -->
-        <header>
+    <div class="app">
+        <header class="glass-panel glass-header glass-shimmer">
             <div class="subtitulo" id="localizacao">📍 A carregar...</div>
             <div id="relogio">🕐 --/--/---- --:--:--</div>
         </header>
 
-        <!-- Navegação -->
-        <nav id="nav-bar">
+        <nav id="nav-bar" class="glass-panel glass-nav">
             <button id="btn-ceu" onclick="mudarEcra('ceu')">🌌 Céu Agora</button>
             <button id="btn-calendario" onclick="mudarEcra('calendario')">📅 Calendário Lunar</button>
         </nav>
 
-        <!-- Ecrã: Céu Agora -->
         <div id="ecra-ceu" class="ecra ativo">
             <div id="ceu-conteudo">
-                <div class="loading"><span class="spinner"></span>A carregar dados da NASA...</div>
+                <div class="loading glass-panel"><span class="spinner"></span>A carregar dados da NASA...</div>
             </div>
         </div>
 
-        <!-- Ecrã: Calendário -->
         <div id="ecra-calendario" class="ecra">
-            <div class="card">
+            <div class="card glass-panel">
                 <div class="cal-nav">
-                    <button onclick="mesAnterior()">◀</button>
+                    <button class="glass-btn-sm" onclick="mesAnterior()">◀</button>
                     <h2 id="cal-titulo">—</h2>
-                    <button onclick="mesSeguinte()">▶</button>
+                    <button class="glass-btn-sm" onclick="mesSeguinte()">▶</button>
                 </div>
                 <div class="cal-legenda">
                     <span>🌑🌒🌓🌔🌕🌖🌗🌘 Fase da Lua</span>
                     <span>⚡ Evento astronómico</span>
-                    <span style="color:#4fc3f7">■ Hoje</span>
+                    <span style="color:#6eb8ff">■ Hoje</span>
                 </div>
                 <div class="cal-cabecalho">
                     <div>Seg</div>
@@ -57,23 +57,20 @@
                     <div>Qua</div>
                     <div>Qui</div>
                     <div>Sex</div>
-                    <div style="color:#5a3535">Sáb</div>
-                    <div style="color:#5a3535">Dom</div>
+                    <div style="color:#8a6060">Sáb</div>
+                    <div style="color:#8a6060">Dom</div>
                 </div>
                 <div class="cal-grelha" id="cal-grelha">
                     <div class="loading"><span class="spinner"></span>A calcular...</div>
                 </div>
             </div>
-            <div id="detalhe-dia"></div>
+            <div id="detalhe-dia" class="glass-panel"></div>
         </div>
-
     </div>
 
-    <!-- Botão configurações -->
     <div id="btn-config" onclick="toggleConfig()">⚙️</div>
 
-    <!-- Painel configurações -->
-    <div id="painel-config">
+    <div id="painel-config" class="glass-panel">
         <div class="config-titulo">⚙ CONFIGURAÇÕES</div>
         <div class="config-linha">
             <label>🔊 Volume</label>
@@ -83,11 +80,12 @@
         <button class="btn-musica" onclick="toggleMusica()">▶ Ativar Música</button>
     </div>
 
-    <!-- Música -->
     <audio id="musica" loop>
         <source src="/static/audio/musica.mp3" type="audio/mpeg">
     </audio>
 
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="/static/js/three-bg.js"></script>
     <script src="/static/js/shared-ui-controls.js"></script>
     <script src="/static/js/index.js"></script>
 </body>
