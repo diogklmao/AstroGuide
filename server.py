@@ -13,10 +13,6 @@ from sky_engine import (
     get_fase_lua_dia, get_nascer_por_sol, get_fases_mes
 )
 
-from eventos import get_eventos_do_dia, get_eventos_do_mes
-from config import LOCATION
-import datetime
-
 from eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
 from config import LOCATION                                  # importa localização
 import datetime                                              # para obter a hora atual
