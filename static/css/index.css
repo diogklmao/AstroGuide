@@ -11,7 +11,7 @@ body.page-app {
     position: relative;
     z-index: 1;
     /* fica por cima das estrelas (z-index: 0) */
-    max-width: 1000px;
+    max-width: 1200px;
     margin: 0 auto;
     /* centra horizontalmente */
     padding: 0 20px 40px;
@@ -587,3 +587,264 @@ nav button:hover:not(.ativo) {
         transform: rotate(360deg);
     }
 }
+
+
+/* ── Observatório Astronómico ────────────────────────────────────── */
+.observatorio-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    margin-top: 10px;
+    animation: entrarApp 0.8s 0.15s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.observatorio-painel-lateral {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+.observatorio-controlos,
+#observatorio-detalhes {
+    padding: 20px;
+}
+
+.observatorio-mapa-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    background: rgba(2, 4, 8, 0.4);
+    border-radius: 16px;
+    min-height: 450px;
+}
+
+#observatorio-canvas {
+    max-width: 100%;
+    height: auto;
+    border-radius: 16px;
+    background: radial-gradient(circle, #070d1a 0%, #010408 100%);
+    box-shadow: 0 0 35px rgba(110, 184, 255, 0.12), inset 0 0 40px rgba(0, 0, 0, 0.9);
+    border: 2px solid rgba(110, 184, 255, 0.15);
+    cursor: crosshair;
+    transition: all 0.4s ease, cursor 0s;
+}
+
+#observatorio-canvas.drag-mode {
+    cursor: grab;
+}
+
+#observatorio-canvas.dragging {
+    cursor: grabbing;
+}
+
+#observatorio-canvas:hover {
+    border-color: rgba(110, 184, 255, 0.3);
+    box-shadow: 0 0 45px rgba(110, 184, 255, 0.22), inset 0 0 40px rgba(0, 0, 0, 0.9);
+}
+
+.glass-select:hover, .glass-select:focus {
+    border-color: rgba(110, 184, 255, 0.6) !important;
+    box-shadow: 0 0 8px rgba(110, 184, 255, 0.25);
+}
+
+.glass-select option {
+    background: #080d1a;
+    color: #fff;
+}
+
+/* Checkboxes personalizadas para o tema escuro/glass */
+.config-linha-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    color: rgba(220, 227, 240, 0.85);
+    font-size: 0.9rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.config-linha-check input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid rgba(110, 184, 255, 0.4);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s ease;
+}
+
+.config-linha-check input[type="checkbox"]:checked {
+    background: rgba(110, 184, 255, 0.2);
+    border-color: #6eb8ff;
+    box-shadow: 0 0 10px rgba(110, 184, 255, 0.35);
+}
+
+.config-linha-check input[type="checkbox"]:checked::after {
+    content: "✓";
+    color: #9ed4ff;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.config-linha-check label {
+    cursor: pointer;
+    flex-grow: 1;
+}
+
+/* ── Observatório em Ecrã Inteiro (Fullscreen Imersivo) ──────────────── */
+
+/* Quando o observatório está ativo, os menus superiores flutuam */
+body.observatorio-ativo header.glass-header {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 40px);
+    max-width: 1200px;
+    z-index: 100;
+    margin: 0;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    top: 20px;
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-left: 110px; /* Espaço para o botão Voltar integrado */
+}
+
+body.observatorio-ativo nav.glass-nav {
+    display: none; /* Oculta as abas superior no observatório */
+}
+
+body.observatorio-ativo #btn-voltar {
+    position: fixed;
+    top: 26px;
+    left: 35px;
+    z-index: 101;
+}
+
+/* O wrapper do canvas e o canvas passam a ocupar o ecrã inteiro */
+body.observatorio-ativo .observatorio-mapa-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    padding: 0;
+    margin: 0;
+    z-index: 1;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+body.observatorio-ativo #observatorio-canvas {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    max-width: none;
+}
+
+/* Painel lateral flutuante e independente */
+body.observatorio-ativo .observatorio-layout {
+    display: block; /* Desativa a grelha padrão */
+    margin-top: 0;
+}
+
+body.observatorio-ativo .observatorio-painel-lateral {
+    position: fixed;
+    left: 20px;
+    top: 90px; /* Alinhado mais acima sem o menu de abas */
+    bottom: 20px;
+    width: 310px;
+    z-index: 100;
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none; /* Oculta a barra no Firefox */
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+    margin: 0;
+}
+
+/* Oculta totalmente a barra de scroll no Chrome, Edge, Safari e Opera */
+body.observatorio-ativo .observatorio-painel-lateral::-webkit-scrollbar {
+    display: none;
+}
+
+/* Estado recolhido do painel lateral */
+body.observatorio-ativo .observatorio-painel-lateral.recolhido {
+    transform: translateX(-340px); /* Desliza totalmente para a esquerda */
+}
+
+/* Botão toggle redondo flutuante */
+#btn-toggle-painel {
+    position: absolute;
+    left: 100%;
+    top: 0;
+    margin-left: 10px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: none; /* Escondido por defeito */
+    align-items: center;
+    justify-content: center;
+    z-index: 105;
+    cursor: pointer;
+    background: rgba(2, 4, 8, 0.7);
+    border: 1px solid rgba(110, 184, 255, 0.3);
+    color: #6eb8ff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 0 10px rgba(110, 184, 255, 0.15);
+    transition: all 0.3s ease;
+    padding: 0;
+}
+
+body.observatorio-ativo #btn-toggle-painel {
+    display: flex; /* Apenas no modo observatório */
+}
+
+#btn-toggle-painel:hover {
+    background: rgba(110, 184, 255, 0.15);
+    border-color: #6eb8ff;
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(110, 184, 255, 0.3);
+}
+
+#btn-toggle-painel span.icon {
+    font-size: 0.85rem;
+    transition: transform 0.4s ease;
+    line-height: 1;
+}
+
+/* Roda o ícone do botão quando o painel está recolhido */
+.observatorio-painel-lateral.recolhido #btn-toggle-painel span.icon {
+    transform: rotate(180deg);
+}
+
+/* Responsividade adicional para fullscreen */
+@media (max-width: 900px) {
+    body.observatorio-ativo header.glass-header {
+        padding-left: 24px;
+        flex-direction: column;
+        gap: 6px;
+    }
+    body.observatorio-ativo #btn-voltar {
+        position: absolute;
+        top: -60px; /* Coloca acima */
+        left: 20px;
+    }
+    body.observatorio-ativo .observatorio-painel-lateral {
+        top: 130px; /* Mais acima responsivo */
+        max-height: calc(100vh - 150px);
+    }
+}

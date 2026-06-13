@@ -10,7 +10,8 @@ import os
 
 from sky_engine import (
     get_sol, get_lua, get_todos_planetas,
-    get_fase_lua_dia, get_nascer_por_sol, get_fases_mes
+    get_fase_lua_dia, get_nascer_por_sol, get_fases_mes,
+    get_observatorio
 )
 
 from eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
@@ -50,6 +51,11 @@ def calendario():
 def ceu():
     return render_template("index.html")
 
+@app.route("/observatorio")                         # serve o observatório ao browser
+def observatorio():
+    return render_template("index.html")
+
+
 # ── Rotas da API — devolvem JSON ──────────────────────────────────────────────
 # A API é o canal de comunicação entre o browser (JavaScript) e o Python
 # O JavaScript faz fetch("/api/ceu") e recebe os dados em JSON
@@ -64,6 +70,12 @@ def api_ceu():
         "hora":     datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),  # hora atual formatada
         "location": LOCATION["nome"],               # nome da localização para mostrar na interface
     })
+
+@app.route("/api/observatorio")                      # URL: http://localhost:5000/api/observatorio
+def api_observatorio():
+    # Devolve as posições das estrelas e constelações no céu de Vila Nova de Gaia
+    return jsonify(get_observatorio())
+
 
 @app.route("/api/calendario/<int:ano>/<int:mes>")   # URL com parâmetros: ex: /api/calendario/2026/3
 def api_calendario(ano, mes):
@@ -104,6 +116,6 @@ if __name__ == "__main__":                          # só executa se correr dire
     t.daemon = True                                 # fecha automaticamente quando o servidor fechar
     t.start()                                       # inicia a thread
 
-    print("🔭 AstroGuide a iniciar em http://localhost:5000")
+    print("AstroGuide a iniciar em http://localhost:5000")
     app.run(port=5000, debug=False)                 # inicia o servidor na porta 5000
                                                     # debug=False para não abrir o browser duas vezes

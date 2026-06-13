@@ -30,6 +30,7 @@
 
         <nav id="nav-bar" class="glass-panel glass-nav">
             <button id="btn-ceu" onclick="mudarEcra('ceu')">🌌 Céu Agora</button>
+            <button id="btn-observatorio" onclick="mudarEcra('observatorio')">🔭 Observatório</button>
             <button id="btn-calendario" onclick="mudarEcra('calendario')">📅 Calendário Lunar</button>
         </nav>
 
@@ -65,6 +66,64 @@
                 </div>
             </div>
             <div id="detalhe-dia" class="glass-panel"></div>
+        </div>
+        <div id="ecra-observatorio" class="ecra">
+            <div class="observatorio-layout">
+                <div class="observatorio-painel-lateral">
+                    <button id="btn-toggle-painel" onclick="togglePainelLateral()" class="glass-btn-sm" title="Mostrar/Esconder Painel">
+                        <span class="icon">◀</span>
+                    </button>
+                    <!-- Controlos -->
+                    <div class="observatorio-controlos glass-panel">
+                        <div class="card-titulo" style="color:#ffcc02">⚙️ Controles</div>
+                        <div class="config-linha" style="margin-bottom: 15px;">
+                            <label for="sel-modo-visao">📍 Modo de Visão</label>
+                            <select id="sel-modo-visao" onchange="alterarModoVisao(); desenharObservatorio()" class="glass-select" style="width: 100%; margin-top: 5px; background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(110, 184, 255, 0.3); border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; outline: none; cursor: pointer; transition: border-color 0.3s ease;">
+                                <option value="360" selected>Vista 360° (Primeira Pessoa)</option>
+                                <option value="2d">Planisfério (Vista Zenital)</option>
+                            </select>
+                        </div>
+                        <div class="config-linha-check">
+                            <input type="checkbox" id="chk-constelacoes" checked onchange="desenharObservatorio()">
+                            <label for="chk-constelacoes">Linhas de Constelações</label>
+                        </div>
+                        <div class="config-linha-check">
+                            <input type="checkbox" id="chk-nomes-estrelas" checked onchange="desenharObservatorio()">
+                            <label for="chk-nomes-estrelas">Nomes das Estrelas</label>
+                        </div>
+                        <div class="config-linha-check">
+                            <input type="checkbox" id="chk-nomes-constelacoes" checked onchange="desenharObservatorio()">
+                            <label for="chk-nomes-constelacoes">Nomes das Constelações</label>
+                        </div>
+                        <div class="config-linha-check">
+                            <input type="checkbox" id="chk-astros" checked onchange="desenharObservatorio()">
+                            <label for="chk-astros">Sol, Lua e Planetas</label>
+                        </div>
+                        <div class="config-linha">
+                            <label for="rng-mag">Brilho (Mag ≤)</label>
+                            <input type="range" id="rng-mag" min="-1.5" max="5.0" step="0.5" value="5.0" oninput="document.getElementById('lbl-mag').textContent = parseFloat(this.value).toFixed(1); desenharObservatorio()">
+                            <span id="lbl-mag">5.0</span>
+                        </div>
+                    </div>
+                    <!-- Painel de Detalhes -->
+                    <div id="observatorio-detalhes" class="glass-panel">
+                        <div class="detalhe-titulo">ℹ️ Detalhes</div>
+                        <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">Clique num astro ou estrela no mapa celeste para ver os seus detalhes astronómicos.</p>
+                    </div>
+                    <!-- Ajuda e Instruções -->
+                    <div id="observatorio-ajuda" class="glass-panel" style="padding: 14px; font-size: 0.82rem; line-height: 1.4; color: rgba(220, 227, 240, 0.8);">
+                        💡 <strong style="color: #6eb8ff;">Navegação 360°:</strong>
+                        <ul style="margin: 6px 0 0 16px; padding: 0;">
+                            <li>Arrasta no mapa para olhar à volta.</li>
+                            <li>Usa a roda do rato para aproximar/afastar.</li>
+                        </ul>
+                    </div>
+                </div>
+                <!-- Mapa Celeste -->
+                <div class="observatorio-mapa-wrapper glass-panel">
+                    <canvas id="observatorio-canvas" width="800" height="800"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 

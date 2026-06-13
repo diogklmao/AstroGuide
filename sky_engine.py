@@ -5,13 +5,14 @@
 # ============================================================
 
 # --- Bibliotecas externas ---
-from skyfield.api import load, wgs84, N, W  # load = carrega dados NASA | wgs84 = sistema GPS da Terra | N/W = direções
-from skyfield import almanac                 # funções de astronomia: nascer/pôr do sol, fases da lua, etc.
-from zoneinfo import ZoneInfo               # converte horas UTC para hora local com suporte a hora de verão
-import datetime                             # manipulação de datas e horas
+from skyfield.api import load, wgs84, N, W, Star  # load = carrega dados NASA | wgs84 = sistema GPS da Terra | N/W = direções | Star = coordenadas de estrelas
+from skyfield import almanac                      # funções de astronomia: nascer/pôr do sol, fases da lua, etc.
+from zoneinfo import ZoneInfo                    # converte horas UTC para hora local com suporte a hora de verão
+import datetime                                  # manipulação de datas e horas
 
 # --- Módulos internos ---
-from config import LOCATION                 # localização definida em config.py
+from config import LOCATION                      # localização definida em config.py
+from estrelas import ESTRELAS_BD, CONSTELACOES_BD # base de dados de estrelas e constelações
 
 # ── Inicialização global ──────────────────────────────────────────────────────
 # Estas variáveis são criadas uma vez quando o ficheiro é carregado
@@ -205,3 +206,88 @@ def get_fases_mes(ano, mes):
         })
 
     return resultado
+
+def get_observatorio():
+    # Calcula a posição atual das estrelas, constelações e planetas
+    # observáveis a partir de Vila Nova de Gaia.
+    
+    agora = ts.now()
+    terra = eph["earth"]
+    observador_pos = terra + observador
+    
+    estrelas_calculadas = {}
+    
+    # Calcular posição das estrelas
+    for star_id, dados in ESTRELAS_BD.items():
+        # Criar o objeto Star com as coordenadas de Ascensão Reta e Declinação
+        estrela_sf = Star(ra_hours=dados["ra"], dec_degrees=dados["dec"])
+        
+        # Calcular posição horizontal (Alt/Az)
+        posicao = observador_pos.at(agora).observe(estrela_sf).apparent()
+        alt, az, _ = posicao.altaz()
+        
+        alt_deg = round(float(alt.degrees), 2)
+        az_deg = round(float(az.degrees), 2)
+        
+        # Guardamos a informação. Enviamos todas para o frontend poder ligar
+        # as linhas das constelações de forma contínua, mas marcamos a visibilidade.
+        estrelas_calculadas[star_id] = {
+            "nome": dados["nome"],
+            "altitude": alt_deg,
+            "azimute": az_deg,
+            "mag": dados["mag"],
+            "visivel": alt_deg > 0
+        }
+        
+    # Obter posições atuais do Sol, Lua e Planetas
+    sol_dados = get_sol()
+    lua_dados = get_lua()
+    planetas_dados = get_todos_planetas()
+    
+    # Adicionar astros à lista de planetas/luminares
+    astros = []
+    
+    # Adicionar Sol
+    astros.append({
+        "id": "sol",
+        "nome": "Sol",
+        "altitude": sol_dados["altitude"],
+        "azimute": sol_dados["azimute"],
+        "visivel": sol_dados["visivel"],
+        "tipo": "sol"
+    })
+    
+    # Adicionar Lua com o seu emoji correto da fase atual
+    hoje = datetime.datetime.now()
+    fase_lua = get_fase_lua_dia(hoje.year, hoje.month, hoje.day)
+    
+    astros.append({
+        "id": "lua",
+        "nome": "Lua",
+        "altitude": lua_dados["altitude"],
+        "azimute": lua_dados["azimute"],
+        "visivel": lua_dados["visivel"],
+        "tipo": "lua",
+        "emoji": fase_lua["emoji"],
+        "fase_nome": fase_lua["nome"],
+        "iluminacao": fase_lua["iluminacao"]
+    })
+    
+    # Adicionar Planetas
+    for p in planetas_dados:
+        # Encontrar a chave correspondente ao nome em português para ID
+        p_id = p["nome"].lower().replace("ú", "u").replace("é", "e").replace("ó", "o")
+        astros.append({
+            "id": p_id,
+            "nome": p["nome"],
+            "altitude": p["altitude"],
+            "azimute": p["azimute"],
+            "visivel": p["visivel"],
+            "tipo": "planeta"
+        })
+        
+    return {
+        "estrelas": estrelas_calculadas,
+        "constelacoes": CONSTELACOES_BD,
+        "astros": astros
+    }
