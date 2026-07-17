@@ -34,10 +34,14 @@ astroguide/
 │
 ├── sky_engine.py          → Motor de cálculo astronómico
 │                            Usa as efemérides da NASA para
-│                            calcular posições de astros.
+│                            calcular posições de astros em
+│                            qualquer momento (passado/futuro).
 │
 ├── eventos.py             → Base de dados de eventos
 │                            Chuvas de meteoros e eclipses.
+│
+├── estrelas.py            → Base de dados de estrelas e
+│                            constelações para o Observatório.
 │
 ├── config.py              → Configurações globais
 │                            Localização, nome, versão,
@@ -59,7 +63,8 @@ astroguide/
 │   │                        configurações de áudio.
 │   │
 │   └── index.html         → Interface principal da app
-│                            Céu Agora e Calendário Lunar.
+│                            Céu Agora, Observatório e
+│                            Calendário Lunar.
 │
 └── static/
     ├── css/
@@ -74,7 +79,8 @@ astroguide/
     │   │                    (foto de fundo, cards, título).
     │   │
     │   └── index.css      → Estilos da app principal
-    │                        (céu agora, calendário, dados).
+    │                        (céu agora, calendário, dados,
+    │                        observatório e painel de tempo).
     │
     ├── js/
     │   ├── three-bg.js    → Fundo 3D partilhado (Three.js)
@@ -91,8 +97,9 @@ astroguide/
     │   │                    lua crescente, telescópio).
     │   │
     │   └── index.js       → Lógica da app: navegação SPA,
-    │                        dados do céu, calendário lunar
-    │                        e auto-refresh a cada 30s.
+    │                        dados do céu, calendário lunar,
+    │                        observatório interativo (canvas
+    │                        360°/2D) e auto-refresh a cada 30s.
     │
     ├── audio/
     │   └── musica.mp3     → Música ambiente relaxante
@@ -107,11 +114,14 @@ A aplicação usa um sistema de rotas simples:
   /            → Menu de entrada (Landing Page)
   /ceu         → Ecrã Céu Agora
   /calendario  → Ecrã Calendário Lunar
+  /observatorio → Ecrã Observatório Astronómico
 
 Rotas da API (devolvem JSON para o JavaScript):
-  /api/ceu                    → Sol, Lua e 7 planetas em tempo real
-  /api/calendario/ano/mes     → Fases da lua e eventos do mês
-  /api/dia/ano/mes/dia        → Detalhes de um dia específico
+  /api/ceu                         → Sol, Lua e 7 planetas em tempo real
+  /api/calendario/ano/mes          → Fases da lua e eventos do mês
+  /api/dia/ano/mes/dia             → Detalhes de um dia específico
+  /api/observatorio                → Estrelas, constelações e astros (tempo real)
+  /api/observatorio?data=&hora=    → Idem para uma data/hora específica
 
 ---
 
@@ -120,7 +130,7 @@ Rotas da API (devolvem JSON para o JavaScript):
 PYTHON (Backend)
   Responsável por todos os cálculos astronómicos e pelo
   servidor. Nunca é visível para o utilizador.
-  Ficheiros: server.py, sky_engine.py, eventos.py, config.py
+  Ficheiros: server.py, sky_engine.py, eventos.py, config.py, estrelas.py
 
 HTML (Estrutura)
   Define a estrutura das páginas e as secções da app.
@@ -134,8 +144,9 @@ CSS (Estilo)
 
 JavaScript (Interatividade)
   Gere o estado da aplicação no browser. Comunica com o
-  Python via API (fetch). Desenha estrelas e ícones usando
-  Canvas API. Renderiza o fundo 3D com Three.js.
+  Python via API (fetch). Desenha o mapa celeste em Canvas
+  com projeção 360° e 2D (planisfério). Renderiza o fundo
+  3D com Three.js.
   Ficheiros: three-bg.js, shared-ui-controls.js,
              menu.js, index.js
 
@@ -148,10 +159,13 @@ skyfield (pip install skyfield)
   Usa as efemérides DE421 da NASA para calcular com
   precisão a posição de qualquer astro em qualquer
   momento e lugar da Terra.
+  Suporta ts.from_datetime() para cálculos em datas
+  passadas ou futuras (funcionalidade de Viagem no Tempo).
 
 flask (pip install flask)
   Micro-framework web para Python.
   Cria o servidor que serve as páginas e a API JSON.
+  Usa request.args para ler os query parameters da API.
 
 tzdata (pip install tzdata)
   Base de dados de fusos horários.
@@ -168,6 +182,13 @@ Three.js (via CDN)
   com parallax suave controlado pelo movimento do rato.
   Versão: r160 — cdn.jsdelivr.net/npm/three@0.160.0
 
+Canvas API (nativa do browser)
+  Usada para desenhar o mapa celeste do Observatório.
+  Suporta dois modos: Vista 360° (projeção perspetiva 3D
+  com rotação de câmara por arrasto) e Planisfério (vista
+  zenital 2D clássica). Permite clicar em astros e
+  estrelas para ver detalhes.
+
 ---
 
 ## CONCEITOS-CHAVE
@@ -183,6 +204,12 @@ API (Application Programming Interface)
   Python (servidor). O JavaScript faz fetch("/api/ceu")
   e recebe os dados em formato JSON.
 
+Query Parameters
+  Parâmetros opcionais passados no URL após o "?".
+  Ex: /api/observatorio?data=2026-07-18&hora=02:00
+  Usados na funcionalidade de Viagem no Tempo para
+  calcular o céu num momento diferente do atual.
+
 JSON (JavaScript Object Notation)
   Formato de troca de dados entre Python e JavaScript.
   Ex: {"altitude": 36.5, "azimute": 202.1, "visivel": true}
@@ -197,6 +224,13 @@ Glassmorphism
   fundo (backdrop-filter: blur). Cria profundidade e
   elegância mantendo o conteúdo legível sobre fundos
   complexos como o starfield Three.js.
+
+Projeção Perspetiva 3D (Vista 360°)
+  O Observatório usa geometria de câmara virtual com
+  rotação Yaw (azimute) e Pitch (altitude) e campo de
+  visão (FOV) variável via scroll. Cada estrela/astro
+  é projetado no plano do ecrã com divisão pela
+  profundidade (z), criando a ilusão de perspetiva real.
 
 Altitude
   Ângulo em graus acima do horizonte.
@@ -240,21 +274,32 @@ DRY (Don't Repeat Yourself)
   [x] Painel de configurações com controlo de volume
   [x] Música ambiente com persistência entre páginas
   [x] Deteção automática de localização no menu
-  [x] Navegação SPA — ambos os ecrãs sempre acessíveis
+  [x] Navegação SPA — todos os ecrãs sempre acessíveis
   [x] Atualização automática dos dados a cada 30 segundos
   [x] Relógio em tempo real
   [x] Botão ◀ Menu em todas as páginas
   [x] Separação de responsabilidades HTML / CSS / JS
   [x] Código partilhado (DRY) em ficheiros shared
   [x] Repositório no GitHub com historial de commits
+  [x] Observatório — Mapa celeste interativo com Canvas
+  [x] Vista 360° com câmara virtual (arrastar + zoom)
+  [x] Vista Planisfério (2D zenital clássico)
+  [x] Estrelas reais com magnitude e posição calculada
+  [x] Constelações com linhas e nomes
+  [x] Sol, Lua e planetas no mapa celeste
+  [x] Clique num astro/estrela para ver detalhes
+  [x] Painel de filtros — constelações, nomes, magnitude
+  [x] Painel lateral com scroll independente
+  [x] Viagem no Tempo — simular o céu em qualquer data/hora
+  [x] Botão "↺ Tempo Real" para voltar ao céu atual
+  [x] Auto-refresh desativado automaticamente em simulação
+  [x] Conversão automática hora local → UTC (hora de verão)
 
 ---
 
 ## ROADMAP — PRÓXIMAS FUNCIONALIDADES
 
-  [ ] Observatório — Mapa do céu interativo com Canvas
-  [ ] Catálogo de estrelas reais (Hipparcos — 117k estrelas)
-  [ ] Constelações clicáveis com informação de cada estrela
+  [ ] Catálogo de estrelas alargado (Hipparcos — 117k estrelas)
   [ ] Hosting online com URL público
   [ ] Versão mobile (React Native ou Capacitor)
   [ ] Ligação a telescópio via Arduino (Fase 2)
