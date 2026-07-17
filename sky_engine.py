@@ -37,20 +37,21 @@ PLANETAS = {                            # mapeamento de nomes internos NASA para
     "neptune barycenter": "Neptuno",
 }
 
-# ── Funções de posição em tempo real ─────────────────────────────────────────
+# ── Funções de posição (suportam instante personalizado) ──────────────────────
 
-def get_planeta(chave):
-    # Calcula a posição atual de um planeta visto de Vila Nova de Gaia.
+def get_planeta(chave, momento=None):
+    # Calcula a posição de um planeta visto de Vila Nova de Gaia.
     # Recebe a chave interna ex: "saturn barycenter"
+    # momento: objeto Time do Skyfield; se None usa ts.now() (tempo real)
     # Devolve dicionário com altitude, azimute, distância e visibilidade.
 
-    agora = ts.now()            # instante atual em tempo científico Skyfield
+    t = momento if momento is not None else ts.now()   # usa o instante pedido ou o atual
     terra = eph["earth"]        # objeto Terra nas efemérides
     planeta = eph[chave]        # objeto do planeta pedido nas efemérides
 
-    posicao = (terra + observador).at(agora).observe(planeta).apparent()
+    posicao = (terra + observador).at(t).observe(planeta).apparent()
     # terra + observador → posiciona o observador em Gaia especificamente
-    # .at(agora)         → define o instante de cálculo
+    # .at(t)             → define o instante de cálculo
     # .observe(planeta)  → calcula o vetor de direção Gaia → planeta
     # .apparent()        → aplica correções atmosféricas para posição aparente real
 
@@ -64,20 +65,20 @@ def get_planeta(chave):
         "visivel": bool(alt.degrees > 0)                # True se acima do horizonte
     }
 
-def get_todos_planetas():
+def get_todos_planetas(momento=None):
     # Devolve lista com os 7 planetas de uma vez.
     # List comprehension — chama get_planeta() para cada chave do dicionário PLANETAS.
-    return [get_planeta(chave) for chave in PLANETAS]
+    return [get_planeta(chave, momento) for chave in PLANETAS]
 
-def get_sol():
-    # Calcula a posição atual do Sol.
+def get_sol(momento=None):
+    # Calcula a posição do Sol num dado instante (ou agora se None).
     # Distância em UA e km porque faz sentido para uma estrela.
 
-    agora = ts.now()
+    t = momento if momento is not None else ts.now()
     terra = eph["earth"]
     sol = eph["sun"]            # "sun" = nome do Sol nas efemérides NASA
 
-    posicao = (terra + observador).at(agora).observe(sol).apparent()
+    posicao = (terra + observador).at(t).observe(sol).apparent()
     alt, az, dist = posicao.altaz()
 
     km = round(float(dist.au) * 149597870.7, 0)    # converte UA para km (1 UA = 149.597.870,7 km)
@@ -90,15 +91,15 @@ def get_sol():
         "visivel": bool(alt.degrees > 0)
     }
 
-def get_lua():
-    # Calcula a posição atual da Lua.
+def get_lua(momento=None):
+    # Calcula a posição da Lua num dado instante (ou agora se None).
     # Distância só em km — UA seria "0.0026", pouco intuitivo.
 
-    agora = ts.now()
+    t = momento if momento is not None else ts.now()
     terra = eph["earth"]
     lua = eph["moon"]           # "moon" = nome da Lua nas efemérides NASA
 
-    posicao = (terra + observador).at(agora).observe(lua).apparent()
+    posicao = (terra + observador).at(t).observe(lua).apparent()
     alt, az, dist = posicao.altaz()
 
     km = round(float(dist.au) * 149597870.7, 0)    # converte UA para km
@@ -207,11 +208,15 @@ def get_fases_mes(ano, mes):
 
     return resultado
 
-def get_observatorio():
-    # Calcula a posição atual das estrelas, constelações e planetas
+def get_observatorio(timestamp_utc=None):
+    # Calcula a posição das estrelas, constelações e planetas
     # observáveis a partir de Vila Nova de Gaia.
-    
-    agora = ts.now()
+    # timestamp_utc: datetime UTC com tzinfo; se None usa o instante atual.
+
+    if timestamp_utc is not None:
+        agora = ts.from_datetime(timestamp_utc)  # converte datetime Python → Time Skyfield
+    else:
+        agora = ts.now()                         # tempo real
     terra = eph["earth"]
     observador_pos = terra + observador
     
@@ -239,10 +244,10 @@ def get_observatorio():
             "visivel": alt_deg > 0
         }
         
-    # Obter posições atuais do Sol, Lua e Planetas
-    sol_dados = get_sol()
-    lua_dados = get_lua()
-    planetas_dados = get_todos_planetas()
+    # Obter posições do Sol, Lua e Planetas para o instante pedido
+    sol_dados = get_sol(agora)
+    lua_dados = get_lua(agora)
+    planetas_dados = get_todos_planetas(agora)
     
     # Adicionar astros à lista de planetas/luminares
     astros = []
@@ -257,9 +262,12 @@ def get_observatorio():
         "tipo": "sol"
     })
     
-    # Adicionar Lua com o seu emoji correto da fase atual
-    hoje = datetime.datetime.now()
-    fase_lua = get_fase_lua_dia(hoje.year, hoje.month, hoje.day)
+    # Adicionar Lua com o seu emoji correto da fase para o instante pedido
+    if timestamp_utc is not None:
+        ref_dt = timestamp_utc
+    else:
+        ref_dt = datetime.datetime.now()
+    fase_lua = get_fase_lua_dia(ref_dt.year, ref_dt.month, ref_dt.day)
     
     astros.append({
         "id": "lua",

@@ -17,6 +17,8 @@ from sky_engine import (
 from eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
 from config import LOCATION                                  # importa localização
 import datetime                                              # para obter a hora atual
+from zoneinfo import ZoneInfo                                # conversão de fuso horário
+from flask import request                                    # para ler query parameters
 
 app = Flask(__name__)                               # cria a aplicação Flask
                                                     # __name__ diz ao Flask onde está a pasta do projeto
@@ -73,8 +75,26 @@ def api_ceu():
 
 @app.route("/api/observatorio")                      # URL: http://localhost:5000/api/observatorio
 def api_observatorio():
-    # Devolve as posições das estrelas e constelações no céu de Vila Nova de Gaia
-    return jsonify(get_observatorio())
+    # Devolve as posições das estrelas e constelações no céu de Vila Nova de Gaia.
+    # Aceita query params opcionais: ?data=YYYY-MM-DD&hora=HH:MM
+    # Se fornecidos, calcula para essa data/hora local em vez do tempo real.
+
+    data_str = request.args.get("data")   # ex: "2026-07-18"
+    hora_str = request.args.get("hora")   # ex: "02:00"
+
+    timestamp_utc = None
+    if data_str and hora_str:
+        try:
+            local_tz = ZoneInfo(LOCATION["timezone"])
+            # Converte a data e hora local para UTC com suporte a hora de verão
+            dt_local = datetime.datetime.strptime(
+                f"{data_str} {hora_str}", "%Y-%m-%d %H:%M"
+            ).replace(tzinfo=local_tz)
+            timestamp_utc = dt_local.astimezone(datetime.timezone.utc)
+        except Exception:
+            pass  # em caso de erro nos parâmetros, usa tempo real
+
+    return jsonify(get_observatorio(timestamp_utc))
 
 
 @app.route("/api/calendario/<int:ano>/<int:mes>")   # URL com parâmetros: ex: /api/calendario/2026/3

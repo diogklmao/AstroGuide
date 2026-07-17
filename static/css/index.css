@@ -605,10 +605,58 @@ nav button:hover:not(.ativo) {
     width: 100%;
 }
 
-.observatorio-controlos,
+.observatorio-controlos {
+    padding: 20px;
+    max-height: 420px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(110, 184, 255, 0.3) transparent;
+}
+
+.observatorio-controlos::-webkit-scrollbar {
+    width: 4px;
+}
+
+.observatorio-controlos::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.observatorio-controlos::-webkit-scrollbar-thumb {
+    background: rgba(110, 184, 255, 0.3);
+    border-radius: 4px;
+}
+
+
 #observatorio-detalhes {
     padding: 20px;
+    max-height: 340px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(110, 184, 255, 0.3) transparent;
 }
+
+#observatorio-detalhes::-webkit-scrollbar {
+    width: 4px;
+}
+
+#observatorio-detalhes::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#observatorio-detalhes::-webkit-scrollbar-thumb {
+    background: rgba(110, 184, 255, 0.3);
+    border-radius: 4px;
+}
+
+/* Evita que o label "Modo de Visão" parta para a linha seguinte */
+.config-linha label {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    color: rgba(200, 220, 255, 0.75);
+}
+
 
 .observatorio-mapa-wrapper {
     display: flex;
@@ -654,7 +702,97 @@ nav button:hover:not(.ativo) {
     color: #fff;
 }
 
-/* Checkboxes personalizadas para o tema escuro/glass */
+/* ── Bloco de Simulação de Data/Hora (Observatório) ─────────────────────── */
+.obs-tempo-bloco {
+    background: rgba(206, 147, 216, 0.06);
+    border: 1px solid rgba(206, 147, 216, 0.2);
+    border-radius: 12px;
+    padding: 14px 14px 10px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.obs-tempo-titulo {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #ce93d8;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.obs-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.4);
+    color: #e8d5f0;
+    border: 1px solid rgba(206, 147, 216, 0.25);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.88rem;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-family: 'Courier New', monospace;
+}
+
+.obs-input:hover,
+.obs-input:focus {
+    border-color: rgba(206, 147, 216, 0.55);
+    box-shadow: 0 0 8px rgba(206, 147, 216, 0.15);
+}
+
+/* Forçar cor do picker em navegadores Chromium */
+.obs-input::-webkit-calendar-picker-indicator {
+    filter: invert(0.7) sepia(1) saturate(3) hue-rotate(250deg);
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.obs-btn-agora {
+    width: 100%;
+    padding: 8px 0;
+    background: rgba(206, 147, 216, 0.12);
+    color: #ce93d8;
+    border: 1px solid rgba(206, 147, 216, 0.3);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+    margin-top: 2px;
+}
+
+.obs-btn-agora:hover {
+    background: rgba(206, 147, 216, 0.25);
+    box-shadow: 0 0 14px rgba(206, 147, 216, 0.2);
+    transform: translateY(-1px);
+}
+
+.obs-btn-agora:active {
+    transform: translateY(0);
+}
+
+.obs-simulacao-label {
+    text-align: center;
+    font-size: 0.75rem;
+    color: rgba(206, 147, 216, 0.65);
+    font-family: 'Courier New', monospace;
+    min-height: 0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.obs-simulacao-label.ativa {
+    max-height: 24px;
+    padding-top: 2px;
+}
+
+
 .config-linha-check {
     display: flex;
     align-items: center;

@@ -262,7 +262,7 @@ function alterarModoVisao() {
     }
 }
 
-async function carregarObservatorio() {
+async function carregarObservatorio(data, hora) {
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas) return;
     
@@ -286,10 +286,16 @@ async function carregarObservatorio() {
         canvas.dataset.eventsConfigured = "true";
     }
     
+    // Construir URL com ou sem parâmetros de data/hora
+    let url = "/api/observatorio";
+    if (data && hora) {
+        url += `?data=${encodeURIComponent(data)}&hora=${encodeURIComponent(hora)}`;
+    }
+    
     try {
-        const res = await fetch("/api/observatorio");
-        const data = await res.json();
-        observatorioDados = data;
+        const res = await fetch(url);
+        const apiData = await res.json();
+        observatorioDados = apiData;
         
         // Atualiza a localização no cabeçalho
         document.getElementById("localizacao").textContent = "📍 Vila Nova de Gaia";
@@ -299,6 +305,52 @@ async function carregarObservatorio() {
     } catch (err) {
         console.error("Erro ao carregar observatório:", err);
     }
+}
+
+// ── Seletor de Hora do Observatório ──────────────────────────────────────────
+function inicializarSeletorHora() {
+    const inputData = document.getElementById("obs-data");
+    const inputHora = document.getElementById("obs-hora");
+    if (!inputData || !inputHora) return;
+
+    const agora = new Date();
+    inputData.value = agora.toLocaleDateString("sv-SE");   // formato YYYY-MM-DD
+    const hh = String(agora.getHours()).padStart(2, "0");
+    const mm = String(agora.getMinutes()).padStart(2, "0");
+    inputHora.value = `${hh}:${mm}`;
+
+    const label = document.getElementById("obs-hora-label");
+    if (label) label.textContent = "";
+}
+
+function atualizarObservatorioComHora() {
+    const inputData = document.getElementById("obs-data");
+    const inputHora = document.getElementById("obs-hora");
+    if (!inputData || !inputHora) return;
+
+    const data = inputData.value;
+    const hora = inputHora.value;
+
+    const agora = new Date();
+    const dataAtual = agora.toLocaleDateString("sv-SE");
+    const horaAtual = String(agora.getHours()).padStart(2, "0") + ":" + String(agora.getMinutes()).padStart(2, "0");
+
+    const label = document.getElementById("obs-hora-label");
+    if (data === dataAtual && hora === horaAtual) {
+        if (label) { label.textContent = ""; label.classList.remove("ativa"); }
+        carregarObservatorio();
+    } else {
+        const [ano, mes, dia] = data.split("-");
+        if (label) { label.textContent = `⏱ ${dia}/${mes}/${ano} às ${hora}`; label.classList.add("ativa"); }
+        carregarObservatorio(data, hora);
+    }
+}
+
+function repoeHoraAtual() {
+    inicializarSeletorHora();
+    const label = document.getElementById("obs-hora-label");
+    if (label) { label.textContent = ""; label.classList.remove("ativa"); }
+    carregarObservatorio();
 }
 
 // ── Controlos de Arrastar e Zoom ──────────────────────────────────
@@ -530,87 +582,8 @@ function desenharObservatorio() {
             ctx.fillStyle = gradGround;
             ctx.fill();
 
-            // ── Relva realista: lâminas com bezier curves ────────────
-            // Usar semente determinística baseada na azimute para estabilidade
-            const seed = Math.floor(cameraAzimuth * 10);
-            // Simple seeded pseudo-random
-            function rng(n) {
-                const x = Math.sin(n + seed * 0.731) * 43758.5453;
-                return x - Math.floor(x);
-            }
-
-            ctx.save();
-            // Clipar às linhas do horizonte para não sair acima
-            ctx.beginPath();
-            ctx.moveTo(horizonPoints[0].x, horizonPoints[0].y);
-            for (let i = 1; i < horizonPoints.length; i++) ctx.lineTo(horizonPoints[i].x, horizonPoints[i].y);
-            ctx.lineTo(width, height); ctx.lineTo(0, height); ctx.closePath();
-            ctx.clip();
-
-            // Camada 1: relva de fundo (curta, densa, escura)
-            const numBladesBack = Math.ceil(width / 4);
-            for (let i = 0; i < numBladesBack; i++) {
-                const bx     = rng(i * 7 + 1) * width;
-                const bh     = 8  + rng(i * 7 + 2) * 18;
-                const lean   = (rng(i * 7 + 3) - 0.5) * 14;
-                const g      = Math.floor(55 + rng(i * 7 + 4) * 35);
-                const baseY  = horizY + rng(i * 7 + 5) * 12;
-
-                ctx.beginPath();
-                ctx.moveTo(bx, baseY);
-                ctx.quadraticCurveTo(bx + lean * 0.6, baseY - bh * 0.55,
-                                     bx + lean,         baseY - bh);
-                ctx.strokeStyle = `rgba(0, ${g}, 8, 0.55)`;
-                ctx.lineWidth   = 0.9 + rng(i * 7 + 6) * 0.6;
-                ctx.stroke();
-            }
-
-            // Camada 2: relva de frente (alta, esparsa, mais clara)
-            const numBladesFront = Math.ceil(width / 7);
-            for (let i = 0; i < numBladesFront; i++) {
-                const bx    = rng(i * 13 + 10) * width;
-                const bh    = 20 + rng(i * 13 + 11) * 38;
-                const lean  = (rng(i * 13 + 12) - 0.5) * 22;
-                const g     = Math.floor(80 + rng(i * 13 + 13) * 55);
-                const baseY = horizY + 2 + rng(i * 13 + 14) * 8;
-                const w     = 1.0 + rng(i * 13 + 15) * 1.2;
-
-                // Bezier com ponta ligeiramente curvada
-                const cpx = bx + lean * 0.5;
-                const cpy = baseY - bh * 0.6;
-                const tipx = bx + lean;
-                const tipy = baseY - bh;
-
-                ctx.beginPath();
-                ctx.moveTo(bx, baseY);
-                ctx.quadraticCurveTo(cpx, cpy, tipx, tipy);
-                ctx.strokeStyle = `rgba(20, ${g}, 15, 0.75)`;
-                ctx.lineWidth   = w;
-                ctx.stroke();
-            }
-
-            // Camada 3: algumas hastes de erva altíssimas com semente de flor
-            const numTall = Math.ceil(width / 28);
-            for (let i = 0; i < numTall; i++) {
-                const bx   = rng(i * 23 + 50) * width;
-                const bh   = 45 + rng(i * 23 + 51) * 55;
-                const lean = (rng(i * 23 + 52) - 0.5) * 28;
-                const g    = Math.floor(90 + rng(i * 23 + 53) * 60);
-                const baseY= horizY + rng(i * 23 + 54) * 6;
-
-                ctx.beginPath();
-                ctx.moveTo(bx, baseY);
-                ctx.bezierCurveTo(
-                    bx + lean * 0.3, baseY - bh * 0.4,
-                    bx + lean * 0.7, baseY - bh * 0.75,
-                    bx + lean,       baseY - bh
-                );
-                ctx.strokeStyle = `rgba(30, ${g}, 20, 0.55)`;
-                ctx.lineWidth   = 0.8 + rng(i * 23 + 55) * 0.7;
-            }
 
 
-            ctx.restore();
 
             // Névoa suave no horizonte
             const gradFog = ctx.createLinearGradient(0, horizY - 20, 0, horizY + 35);
@@ -1030,11 +1003,15 @@ function obterRosaDosVentos(azimute) {
 
 // ── Auto-refresh ──────────────────────────────────────────────────
 // Atualiza dados se o ecrã ativo for o Céu Agora ou o Observatório.
+// No observatório, só atualiza se estiver em tempo real (sem simulação).
 function autoRefresh() {
     if (document.getElementById("ecra-ceu").classList.contains("ativo")) {
         carregarCeu();
     } else if (document.getElementById("ecra-observatorio").classList.contains("ativo")) {
-        carregarObservatorio();
+        // Só auto-atualiza se não há simulação ativa
+        const label = document.getElementById("obs-hora-label");
+        const emSimulacao = label && label.textContent.trim() !== "";
+        if (!emSimulacao) carregarObservatorio();
     }
     setTimeout(autoRefresh, 30000);
 }
@@ -1048,10 +1025,18 @@ const pagina = window.location.pathname;
 if (pagina === "/calendario") {
     mudarEcra("calendario");
 } else if (pagina === "/observatorio") {
+    inicializarSeletorHora();
     mudarEcra("observatorio");
 } else {
     mudarEcra("ceu");
 }
+
+// Inicializa o seletor quando o utilizador navega para o observatório
+const _mudarEcraOriginal = mudarEcra;
+window.mudarEcra = function(nome) {
+    _mudarEcraOriginal(nome);
+    if (nome === "observatorio") inicializarSeletorHora();
+};
 
 setTimeout(autoRefresh, 30000);
 document.getElementById("musica").volume = 0.4;

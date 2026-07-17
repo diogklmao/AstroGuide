@@ -76,6 +76,16 @@
                     <!-- Controlos -->
                     <div class="observatorio-controlos glass-panel">
                         <div class="card-titulo" style="color:#ffcc02">⚙️ Controles</div>
+                        <!-- Seletor de Data e Hora -->
+                        <div class="obs-tempo-bloco">
+                            <div class="obs-tempo-titulo">🕐 Simular Data/Hora</div>
+                            <input type="date" id="obs-data" class="obs-input" onchange="atualizarObservatorioComHora()">
+                            <input type="time" id="obs-hora" class="obs-input" onchange="atualizarObservatorioComHora()">
+                            <button id="btn-obs-agora" class="obs-btn-agora" onclick="repoeHoraAtual()">
+                                ↺ Tempo Real
+                            </button>
+                            <div id="obs-hora-label" class="obs-simulacao-label"></div>
+                        </div>
                         <div class="config-linha" style="margin-bottom: 15px;">
                             <label for="sel-modo-visao">📍 Modo de Visão</label>
                             <select id="sel-modo-visao" onchange="alterarModoVisao(); desenharObservatorio()" class="glass-select" style="width: 100%; margin-top: 5px; background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(110, 184, 255, 0.3); border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; outline: none; cursor: pointer; transition: border-color 0.3s ease;">
