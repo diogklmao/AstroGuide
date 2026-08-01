@@ -91,8 +91,10 @@ def api_observatorio():
                 f"{data_str} {hora_str}", "%Y-%m-%d %H:%M"
             ).replace(tzinfo=local_tz)
             timestamp_utc = dt_local.astimezone(datetime.timezone.utc)
-        except Exception:
-            pass  # em caso de erro nos parâmetros, usa tempo real
+        except Exception as e:
+            # Regista o erro (para depuração) mas não interrompe o pedido —
+            # o utilizador simplesmente recebe os dados em tempo real como fallback.
+            app.logger.warning(f"Parâmetros data/hora inválidos ('{data_str}', '{hora_str}'): {e}")
 
     return jsonify(get_observatorio(timestamp_utc))
 
@@ -101,6 +103,11 @@ def api_observatorio():
 def api_calendario(ano, mes):
     # Devolve fases da lua e eventos de um mês específico.
     # <int:ano> e <int:mes> são parâmetros passados pelo JavaScript.
+    if not (1 <= mes <= 12):
+        # <int:mes> aceita qualquer inteiro (ex: /api/calendario/2026/13) — sem isto,
+        # o Skyfield rebentava com um erro 500 em vez de uma resposta sensata.
+        return jsonify({"erro": "Mês inválido — tem de estar entre 1 e 12"}), 400
+
     fases   = get_fases_mes(ano, mes)               # luas novas, cheias, quartos do mês
     eventos = get_eventos_do_mes(ano, mes)         # chuvas de meteoros e eclipses filtrados por ano
     return jsonify({
@@ -111,6 +118,13 @@ def api_calendario(ano, mes):
 @app.route("/api/dia/<int:ano>/<int:mes>/<int:dia>")  # URL: ex: /api/dia/2026/3/17
 def api_dia(ano, mes, dia):
     # Devolve detalhes de um dia específico para o painel do calendário.
+    try:
+        # datetime.date() valida mês (1-12) e dia (conforme o mês/ano, incluindo anos bissextos)
+        # de uma vez só — mais simples e mais correto do que reimplementar essas regras à mão.
+        datetime.date(ano, mes, dia)
+    except ValueError:
+        return jsonify({"erro": "Data inválida"}), 400
+
     sol     = get_nascer_por_sol(ano, mes, dia)     # horas de nascer e pôr do sol
     fase    = get_fase_lua_dia(ano, mes, dia)        # fase da lua nesse dia
     eventos = get_eventos_do_dia(ano, mes, dia)     # eventos astronómicos nesse dia (filtrado por ano para eclipses)
@@ -127,9 +141,18 @@ if __name__ == "__main__":                          # só executa se correr dire
     import webbrowser                               # módulo do Python para abrir o browser
 
     def abrir_browser():
-        # Espera 1 segundo para o Flask estar pronto antes de abrir o browser.
+        # Em vez de esperar um tempo fixo (que falha se o Flask ainda estiver a carregar
+        # o de421.bsp na 1ª execução), tenta ligar-se ao servidor até responder,
+        # até 15 segundos. Só então abre o browser — mais fiável em máquinas lentas.
         import time
-        time.sleep(1)
+        import urllib.request
+
+        for _ in range(30):
+            try:
+                urllib.request.urlopen("http://localhost:5000", timeout=1)
+                break
+            except Exception:
+                time.sleep(0.5)
         webbrowser.open("http://localhost:5000")    # abre o browser automaticamente
 
     t = threading.Thread(target=abrir_browser)      # cria uma thread separada para abrir o browser
