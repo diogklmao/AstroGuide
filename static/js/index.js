@@ -5,6 +5,24 @@ let calMes = new Date().getMonth() + 1;
 const MESES_PT = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const DIAS_PT = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
+// ── Curiosidades das Constelações ─────────────────────────────────
+const CURIOSIDADES_CONSTELACOES = {
+    "UMi": "A Ursa Menor contém a Polaris, a Estrela Polar, que há séculos guia navegadores para o Norte. Curiosamente, Polaris não está exatamente no polo celeste — desvia-se cerca de 0.7°.",
+    "UMa": "A Ursa Maior é uma das constelações mais reconhecidas do céu. As suas sete estrelas principais formam o 'Grande Carro'. Na Grécia Antiga, representava Calisto, transformada em ursa por Zeus.",
+    "Ori": "Orião, o caçador, contém Betelgeuse — uma supergigante vermelha tão enorme que, se estivesse no lugar do Sol, englobaria a órbita de Marte. Um dia explodirá como supernova!",
+    "Cas": "Cassiopeia é facilmente reconhecível pelo seu formato em 'W'. Na mitologia grega, era uma rainha vaidosa que foi castigada por Poseidon e colocada no céu a girar eternamente à volta do polo.",
+    "Leo": "O Leão é uma das constelações do zodíaco. A sua estrela principal, Regulus, significa 'pequeno rei' em latim. Todos os anos em novembro, a chuva de meteoros Leónidas parece irradiar desta constelação.",
+    "Tau": "O Touro alberga as Plêiades, um aglomerado estelar visível a olho nu com cerca de 1.000 estrelas. Na antiguidade, as Plêiades eram usadas para testar a acuidade visual dos guerreiros.",
+    "Gem": "Os Gémeos representam Castor e Pólux da mitologia grega. Curiosamente, apesar de serem 'gémeos', Castor é na verdade um sistema de seis estrelas, enquanto Pólux é uma gigante laranja com um exoplaneta confirmado.",
+    "Cyg": "O Cisne 'voa' ao longo da Via Láctea. Deneb, a sua estrela mais brilhante, é uma das estrelas mais luminosas conhecidas — cerca de 200.000 vezes mais luminosa que o Sol, a quase 2.600 anos-luz de distância.",
+    "Lyr": "A Lira contém Vega, uma das estrelas mais brilhantes do céu e a primeira estrela (depois do Sol) a ser fotografada. Há 12.000 anos, Vega era a Estrela Polar, e voltará a sê-lo daqui a cerca de 13.700 anos.",
+    "Aql": "A Águia contém Altair, que está a apenas 16.7 anos-luz da Terra. Altair roda sobre si mesma a uma velocidade vertiginosa — completa uma rotação em cerca de 9 horas, o que a achata nos polos.",
+    "Boo": "O Boieiro contém Arcturus, a estrela mais brilhante do hemisfério norte celeste. Arcturus move-se a grande velocidade em relação ao Sol e daqui a meio milhão de anos já não será visível a olho nu.",
+    "Vir": "Virgem é a maior constelação do zodíaco e contém o Aglomerado de Virgem — um enorme grupo de mais de 2.000 galáxias a cerca de 54 milhões de anos-luz. Spica, a sua estrela principal, é na verdade um sistema binário.",
+    "Sco": "O Escorpião contém Antares, cujo nome significa 'rival de Marte' devido à sua cor avermelhada. Antares é uma supergigante tão grande que, colocada no centro do sistema solar, a sua superfície chegaria à órbita de Júpiter.",
+    "Peg": "Pégaso representa o cavalo alado da mitologia grega. O 'Grande Quadrado de Pégaso' é um asterismo formado por quatro estrelas e é usado pelos astrónomos como referência para estimar a transparência do céu."
+};
+
 
 
 // ── Estrelas ──────────────────────────────────────────────────────
@@ -716,26 +734,43 @@ function desenharObservatorio() {
                 }
             });
             
-            // Nomes das constelações
-            if (showNomesConstelacoes) {
-                let sumX = 0, sumY = 0, count = 0;
-                constelacao.linhas.forEach(linha => {
-                    const estA = estrelas[linha[0]];
-                    if (estA && estA.visivel) {
-                        const pos = projectar(estA.altitude, estA.azimute);
-                        if (pos) {
-                            sumX += pos.x;
-                            sumY += pos.y;
-                            count++;
-                        }
+            // Calcular centróide da constelação (usado para nomes e cliques)
+            let sumX = 0, sumY = 0, count = 0;
+            const estrelasUnicas = new Set();
+            constelacao.linhas.forEach(linha => {
+                estrelasUnicas.add(linha[0]);
+                estrelasUnicas.add(linha[1]);
+                const estA = estrelas[linha[0]];
+                if (estA && estA.visivel) {
+                    const pos = projectar(estA.altitude, estA.azimute);
+                    if (pos) {
+                        sumX += pos.x;
+                        sumY += pos.y;
+                        count++;
                     }
-                });
-                if (count > 0) {
-                    ctx.fillStyle = "rgba(110, 184, 255, 0.35)";
-                    ctx.font = "italic 9.5px sans-serif";
-                    ctx.textAlign = "center";
-                    ctx.fillText(constelacao.nome, sumX / count, sumY / count);
                 }
+            });
+
+            // Nomes das constelações
+            if (showNomesConstelacoes && count > 0) {
+                ctx.fillStyle = "rgba(110, 184, 255, 0.35)";
+                ctx.font = "italic 9.5px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText(constelacao.nome, sumX / count, sumY / count);
+            }
+
+            // Registar constelação como elemento clicável
+            if (count > 0) {
+                elementosNoEcra.push({
+                    id: "const_" + const_id,
+                    nome: constelacao.nome,
+                    x: sumX / count,
+                    y: sumY / count,
+                    raio: 18,
+                    tipo: "constelacao",
+                    const_id: const_id,
+                    numEstrelas: estrelasUnicas.size
+                });
             }
         }
     }
@@ -927,36 +962,52 @@ function tratarCliqueCanvas(e) {
     if (encontrado) {
         objetoSelecionado = encontrado;
         
-        let extrasHTML = "";
-        if (encontrado.tipo === "lua" && encontrado.fase_nome) {
-            extrasHTML = `
-                <div class="detalhe-linha"><span class="detalhe-icon">${encontrado.emoji}</span><span class="detalhe-label">Fase da Lua</span><span class="detalhe-valor" style="color:#ce93d8">${encontrado.fase_nome} (${encontrado.iluminacao}%)</span></div>
+        if (encontrado.tipo === "constelacao") {
+            // ── Detalhes de Constelação ──
+            const curiosidade = CURIOSIDADES_CONSTELACOES[encontrado.const_id] || "Uma constelação fascinante do céu noturno.";
+            painel.innerHTML = `
+                <div class="detalhe-titulo">⭐ ${encontrado.nome}</div>
+                <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:#6eb8ff">CONSTELAÇÃO</span></div>
+                <div class="detalhe-linha"><span class="detalhe-icon">🔤</span><span class="detalhe-label">Abreviatura</span><span class="detalhe-valor" style="font-family:monospace;color:#ce93d8">${encontrado.const_id}</span></div>
+                <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Estrelas</span><span class="detalhe-valor" style="font-family:monospace">${encontrado.numEstrelas}</span></div>
+                <div style="margin-top:14px;padding:10px 12px;background:rgba(110,184,255,0.07);border-left:3px solid rgba(110,184,255,0.4);border-radius:6px;">
+                    <div style="font-size:0.75rem;color:#6eb8ff;margin-bottom:6px;font-weight:600;">💡 Curiosidade</div>
+                    <p style="color:rgba(220,227,240,0.85);font-size:0.82rem;line-height:1.5;margin:0;">${curiosidade}</p>
+                </div>
             `;
-        } else if (encontrado.tipo === "estrela") {
-            const constName = encontrarConstelacaoDaEstrela(encontrado.id);
-            extrasHTML = `
-                <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Constelação</span><span class="detalhe-valor" style="color:#9ed4ff">${constName}</span></div>
+        } else {
+            // ── Detalhes de Estrela / Astro ──
+            let extrasHTML = "";
+            if (encontrado.tipo === "lua" && encontrado.fase_nome) {
+                extrasHTML = `
+                    <div class="detalhe-linha"><span class="detalhe-icon">${encontrado.emoji}</span><span class="detalhe-label">Fase da Lua</span><span class="detalhe-valor" style="color:#ce93d8">${encontrado.fase_nome} (${encontrado.iluminacao}%)</span></div>
+                `;
+            } else if (encontrado.tipo === "estrela") {
+                const constName = encontrarConstelacaoDaEstrela(encontrado.id);
+                extrasHTML = `
+                    <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Constelação</span><span class="detalhe-valor" style="color:#9ed4ff">${constName}</span></div>
+                `;
+            }
+            
+            const corTipo = encontrado.tipo === "sol" ? "#ff8f00" : (encontrado.tipo === "lua" ? "#b0bec5" : (encontrado.tipo === "estrela" ? "#4fc3f7" : "#ffd54f"));
+            const labelTipo = encontrado.tipo.toUpperCase();
+            
+            painel.innerHTML = `
+                <div class="detalhe-titulo">🔭 ${encontrado.nome}</div>
+                <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:${corTipo}">${labelTipo}</span></div>
+                <div class="detalhe-linha"><span class="detalhe-icon">🔆</span><span class="detalhe-label">Magnitude</span><span class="detalhe-valor" style="font-family:monospace">${encontrado.mag}</span></div>
+                <div class="detalhe-linha"><span class="detalhe-icon">📈</span><span class="detalhe-label">Altitude</span><span class="detalhe-valor" style="font-family:monospace;color:#ffcc80">${encontrado.altitude}°</span></div>
+                <div class="detalhe-linha"><span class="detalhe-icon">🧭</span><span class="detalhe-label">Azimute</span><span class="detalhe-valor" style="font-family:monospace;color:#ff8a65">${encontrado.azimute}° (${obterRosaDosVentos(encontrado.azimute)})</span></div>
+                ${extrasHTML}
             `;
         }
-        
-        const corTipo = encontrado.tipo === "sol" ? "#ff8f00" : (encontrado.tipo === "lua" ? "#b0bec5" : (encontrado.tipo === "estrela" ? "#4fc3f7" : "#ffd54f"));
-        const labelTipo = encontrado.tipo.toUpperCase();
-        
-        painel.innerHTML = `
-            <div class="detalhe-titulo">🔭 ${encontrado.nome}</div>
-            <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:${corTipo}">${labelTipo}</span></div>
-            <div class="detalhe-linha"><span class="detalhe-icon">🔆</span><span class="detalhe-label">Magnitude</span><span class="detalhe-valor" style="font-family:monospace">${encontrado.mag}</span></div>
-            <div class="detalhe-linha"><span class="detalhe-icon">📈</span><span class="detalhe-label">Altitude</span><span class="detalhe-valor" style="font-family:monospace;color:#ffcc80">${encontrado.altitude}°</span></div>
-            <div class="detalhe-linha"><span class="detalhe-icon">🧭</span><span class="detalhe-label">Azimute</span><span class="detalhe-valor" style="font-family:monospace;color:#ff8a65">${encontrado.azimute}° (${obterRosaDosVentos(encontrado.azimute)})</span></div>
-            ${extrasHTML}
-        `;
         
         desenharObservatorio();
     } else {
         objetoSelecionado = null;
         painel.innerHTML = `
             <div class="detalhe-titulo">ℹ️ Detalhes</div>
-            <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">Clique num astro ou estrela no mapa celeste para ver os seus detalhes astronómicos.</p>
+            <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">Clique num astro, estrela ou constelação no mapa celeste para ver os seus detalhes astronómicos.</p>
         `;
         desenharObservatorio();
     }
