@@ -15,6 +15,7 @@ from sky_engine import (
 )
 
 from eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
+from apod import get_imagem_do_dia                           # importa Imagem Astronómica do Dia (NASA)
 from config import LOCATION                                  # importa localização
 import datetime                                              # para obter a hora atual
 from zoneinfo import ZoneInfo                                # conversão de fuso horário
@@ -57,6 +58,9 @@ def ceu():
 def observatorio():
     return render_template("index.html")
 
+@app.route("/apod")                                  # serve a aba NASA - Imagem do Dia ao browser
+def apod_pagina():
+    return render_template("index.html")
 
 # ── Rotas da API — devolvem JSON ──────────────────────────────────────────────
 # A API é o canal de comunicação entre o browser (JavaScript) e o Python
@@ -133,6 +137,17 @@ def api_dia(ano, mes, dia):
         "fase":    fase,
         "eventos": eventos,
     })
+
+@app.route("/api/apod")                              # URL: http://localhost:5000/api/apod
+def api_apod():
+    # Devolve a Imagem Astronómica do Dia (APOD) da NASA para a aba "NASA - Imagem do Dia".
+    try:
+        return jsonify(get_imagem_do_dia())
+    except Exception as e:
+        # Se a NASA estiver em baixo, sem internet, ou o limite de pedidos for excedido,
+        # devolve um erro claro em vez de rebentar o servidor.
+        app.logger.warning(f"Erro ao obter APOD: {e}")
+        return jsonify({"erro": "Não foi possível carregar a imagem do dia. Tenta novamente mais tarde."}), 503
 
 # ── Iniciar servidor ──────────────────────────────────────────────────────────
 

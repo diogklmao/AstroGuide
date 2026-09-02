@@ -31,6 +31,7 @@ header.glass-header {
         opacity: 0;
         transform: translateY(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -352,6 +353,7 @@ nav button:hover:not(.ativo) {
         opacity: 0;
         transform: scale(0.85);
     }
+
     to {
         opacity: 1;
         transform: scale(1);
@@ -692,7 +694,8 @@ nav button:hover:not(.ativo) {
     box-shadow: 0 0 45px rgba(110, 184, 255, 0.22), inset 0 0 40px rgba(0, 0, 0, 0.9);
 }
 
-.glass-select:hover, .glass-select:focus {
+.glass-select:hover,
+.glass-select:focus {
     border-color: rgba(110, 184, 255, 0.6) !important;
     box-shadow: 0 0 8px rgba(110, 184, 255, 0.25);
 }
@@ -855,11 +858,13 @@ body.observatorio-ativo header.glass-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-left: 110px; /* Espaço para o botão Voltar integrado */
+    padding-left: 110px;
+    /* Espaço para o botão Voltar integrado */
 }
 
 body.observatorio-ativo nav.glass-nav {
-    display: none; /* Oculta as abas superior no observatório */
+    display: none;
+    /* Oculta as abas superior no observatório */
 }
 
 body.observatorio-ativo #btn-voltar {
@@ -896,21 +901,24 @@ body.observatorio-ativo #observatorio-canvas {
 
 /* Painel lateral flutuante e independente */
 body.observatorio-ativo .observatorio-layout {
-    display: block; /* Desativa a grelha padrão */
+    display: block;
+    /* Desativa a grelha padrão */
     margin-top: 0;
 }
 
 body.observatorio-ativo .observatorio-painel-lateral {
     position: fixed;
     left: 20px;
-    top: 90px; /* Alinhado mais acima sem o menu de abas */
+    top: 90px;
+    /* Alinhado mais acima sem o menu de abas */
     bottom: 20px;
     width: 310px;
     z-index: 100;
     max-height: calc(100vh - 110px);
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-width: none; /* Oculta a barra no Firefox */
+    scrollbar-width: none;
+    /* Oculta a barra no Firefox */
     transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
     margin: 0;
 }
@@ -922,7 +930,8 @@ body.observatorio-ativo .observatorio-painel-lateral::-webkit-scrollbar {
 
 /* Estado recolhido do painel lateral */
 body.observatorio-ativo .observatorio-painel-lateral.recolhido {
-    transform: translateX(-340px); /* Desliza totalmente para a esquerda */
+    transform: translateX(-340px);
+    /* Desliza totalmente para a esquerda */
 }
 
 /* Botão toggle redondo flutuante */
@@ -934,7 +943,8 @@ body.observatorio-ativo .observatorio-painel-lateral.recolhido {
     width: 38px;
     height: 38px;
     border-radius: 50%;
-    display: none; /* Escondido por defeito */
+    display: none;
+    /* Escondido por defeito */
     align-items: center;
     justify-content: center;
     z-index: 105;
@@ -942,13 +952,14 @@ body.observatorio-ativo .observatorio-painel-lateral.recolhido {
     background: rgba(2, 4, 8, 0.7);
     border: 1px solid rgba(110, 184, 255, 0.3);
     color: #6eb8ff;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 0 10px rgba(110, 184, 255, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 10px rgba(110, 184, 255, 0.15);
     transition: all 0.3s ease;
     padding: 0;
 }
 
 body.observatorio-ativo #btn-toggle-painel {
-    display: flex; /* Apenas no modo observatório */
+    display: flex;
+    /* Apenas no modo observatório */
 }
 
 #btn-toggle-painel:hover {
@@ -976,13 +987,72 @@ body.observatorio-ativo #btn-toggle-painel {
         flex-direction: column;
         gap: 6px;
     }
+
     body.observatorio-ativo #btn-voltar {
         position: absolute;
-        top: -60px; /* Coloca acima */
+        top: -60px;
+        /* Coloca acima */
         left: 20px;
     }
+
     body.observatorio-ativo .observatorio-painel-lateral {
-        top: 130px; /* Mais acima responsivo */
+        top: 130px;
+        /* Mais acima responsivo */
         max-height: calc(100vh - 150px);
     }
-}
+}
+
+/* ── NASA - Imagem do Dia (APOD) ─────────────────────────────────── */
+.apod-card {
+    max-width: 780px;
+    margin: 0 auto;
+}
+
+.apod-imagem {
+    width: 100%;
+    max-height: 480px;
+    object-fit: contain;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.apod-video-aviso {
+    padding: 40px 20px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    color: rgba(220, 227, 240, 0.85);
+}
+
+.apod-video-aviso a {
+    display: block;
+    margin-top: 10px;
+    color: #6eb8ff;
+}
+
+.apod-titulo {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #ffcc02;
+}
+
+.apod-data {
+    font-size: 0.82rem;
+    color: rgba(220, 227, 240, 0.6);
+    margin-bottom: 14px;
+}
+
+.apod-explicacao {
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: rgba(220, 227, 240, 0.85);
+}
+
+.apod-hd-link {
+    display: inline-block;
+    margin-top: 14px;
+    color: #6eb8ff;
+    font-size: 0.85rem;
+}

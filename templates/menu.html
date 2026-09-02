@@ -9,7 +9,9 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300&display=swap"
+        rel="stylesheet">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/shared-ui-controls.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/glass.css') }}">
@@ -21,7 +23,7 @@
     <div class="bg-foto" aria-hidden="true">
         <img src="{{ url_for('static', filename='images/618.jpg') }}" alt="">
     </div>
-    <canvas id="three-bg" aria-hidden="true"></canvas>
+
     <div class="bg-vignette" aria-hidden="true"></div>
     <div class="stars" id="stars"></div>
 
@@ -36,7 +38,8 @@
 
         <div class="cards">
             <a class="card card-ceu glass-card" href="/ceu">
-                <img class="card-imagem" src="{{ url_for('static', filename='images/SolarSystem.jpg') }}" alt="Céu estrelado">
+                <img class="card-imagem" src="{{ url_for('static', filename='images/SolarSystem.jpg') }}"
+                    alt="Céu estrelado">
                 <div class="card-overlay"></div>
                 <div class="card-conteudo">
                     <canvas id="ic-ceu" width="36" height="36" class="card-emoji"></canvas>
@@ -64,6 +67,16 @@
                     <div class="card-desc">Céu interativo com constelações e estrelas clicáveis</div>
                 </div>
             </a>
+
+            <a class="card card-apod glass-card" href="/apod">
+                <img class="card-imagem" src="{{ url_for('static', filename='images/space.jpg') }}" alt="Imagem astronómica">
+                <div class="card-overlay"></div>
+                <div class="card-conteudo">
+                    <canvas id="ic-apod" width="36" height="36" class="card-emoji"></canvas>
+                    <div class="card-titulo">NASA - Imagem do Dia</div>
+                    <div class="card-desc">A fotografia astronómica oficial da NASA, todos os dias</div>
+                </div>
+            </a>
         </div>
     </div>
 
@@ -83,8 +96,6 @@
         <source src="/static/audio/musica.mp3" type="audio/mpeg">
     </audio>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-    <script src="/static/js/three-bg.js"></script>
     <script src="/static/js/shared-ui-controls.js"></script>
     <script src="/static/js/menu.js"></script>
 </body>

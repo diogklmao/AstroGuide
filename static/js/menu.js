@@ -53,11 +53,11 @@ function detetarLocalizacao() {
 // Utilitário: desenha uma linha com cor e efeito de brilho (glow)
 function tracoGlow(ctx, x1, y1, x2, y2, cor, brilho, espessura) {
     ctx.shadowColor = cor;       // cor do brilho à volta da linha
-    ctx.shadowBlur  = brilho;    // intensidade do brilho (em píxeis)
+    ctx.shadowBlur = brilho;    // intensidade do brilho (em píxeis)
     ctx.strokeStyle = cor;       // cor da própria linha
-    ctx.lineWidth   = espessura; // espessura da linha
-    ctx.lineCap     = 'round';   // pontas arredondadas
-    ctx.lineJoin    = 'round';   // junções arredondadas
+    ctx.lineWidth = espessura; // espessura da linha
+    ctx.lineCap = 'round';   // pontas arredondadas
+    ctx.lineJoin = 'round';   // junções arredondadas
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -68,32 +68,32 @@ function tracoGlow(ctx, x1, y1, x2, y2, cor, brilho, espessura) {
 function desenharIconeCeu() {
     const canvas = document.getElementById('ic-ceu');
     if (!canvas) return;             // sai sem erro se o canvas não existir na página atual
-    const c  = canvas.getContext('2d');
+    const c = canvas.getContext('2d');
     const cx = 18, cy = 18;         // centro do canvas de 36x36
     const COR = '#88bbff';          // azul celeste
 
     // 4 braços da estrela: vertical, horizontal e 2 diagonais
     const bracos = [
-        [cx, cy-13, cx, cy+13],          // cima → baixo
-        [cx-13, cy, cx+13, cy],          // esquerda → direita
-        [cx-8, cy-8, cx+8, cy+8],        // diagonal ↘
-        [cx+8, cy-8, cx-8, cy+8],        // diagonal ↙
+        [cx, cy - 13, cx, cy + 13],          // cima → baixo
+        [cx - 13, cy, cx + 13, cy],          // esquerda → direita
+        [cx - 8, cy - 8, cx + 8, cy + 8],        // diagonal ↘
+        [cx + 8, cy - 8, cx - 8, cy + 8],        // diagonal ↙
     ];
-    bracos.forEach(([x1,y1,x2,y2]) => tracoGlow(c, x1, y1, x2, y2, COR, 10, 1.2));
+    bracos.forEach(([x1, y1, x2, y2]) => tracoGlow(c, x1, y1, x2, y2, COR, 10, 1.2));
 
     // núcleo brilhante no cruzamento dos braços
     c.shadowColor = '#ffffff';
-    c.shadowBlur  = 14;
-    c.fillStyle   = '#ddeeff';
+    c.shadowBlur = 14;
+    c.fillStyle = '#ddeeff';
     c.beginPath();
     c.arc(cx, cy, 2.5, 0, Math.PI * 2);
     c.fill();
 
     // 2 estrelas pequenas de fundo para dar profundidade
-    [{x:7, y:8}, {x:27, y:10}].forEach(s => {
+    [{ x: 7, y: 8 }, { x: 27, y: 10 }].forEach(s => {
         c.shadowColor = COR;
-        c.shadowBlur  = 6;
-        c.fillStyle   = 'rgba(180,210,255,0.8)';
+        c.shadowBlur = 6;
+        c.fillStyle = 'rgba(180,210,255,0.8)';
         c.beginPath();
         c.arc(s.x, s.y, 1, 0, Math.PI * 2);
         c.fill();
@@ -111,8 +111,8 @@ function desenharIconeCalendario() {
 
     // 1. Círculo cheio da lua com glow
     c.shadowColor = COR;
-    c.shadowBlur  = 14;
-    c.fillStyle   = COR;
+    c.shadowBlur = 14;
+    c.fillStyle = COR;
     c.beginPath();
     c.arc(17, 18, 12, 0, Math.PI * 2);
     c.fill();
@@ -129,10 +129,10 @@ function desenharIconeCalendario() {
     c.globalCompositeOperation = 'source-over';
 
     // 4. Estrelinhas ao lado direito do crescente
-    [{x:27, y:8}, {x:30, y:18}, {x:27, y:28}].forEach(s => {
+    [{ x: 27, y: 8 }, { x: 30, y: 18 }, { x: 27, y: 28 }].forEach(s => {
         c.shadowColor = COR;
-        c.shadowBlur  = 8;
-        c.fillStyle   = 'rgba(255,220,100,0.85)';
+        c.shadowBlur = 8;
+        c.fillStyle = 'rgba(255,220,100,0.85)';
         c.beginPath();
         c.arc(s.x, s.y, 1.2, 0, Math.PI * 2);
         c.fill();
@@ -159,28 +159,57 @@ function desenharIconeObservatorio() {
 
     // tripé: 3 pernas a partir do centro inferior do tubo
     const bx = 18, by = 17;
-    tracoGlow(c, bx, by, bx-8, 32, 'rgba(150,200,255,0.6)', 5, 1.2);  // perna esquerda
-    tracoGlow(c, bx, by, bx,   32, 'rgba(150,200,255,0.6)', 5, 1.2);  // perna central
-    tracoGlow(c, bx, by, bx+8, 32, 'rgba(150,200,255,0.6)', 5, 1.2);  // perna direita
+    tracoGlow(c, bx, by, bx - 8, 32, 'rgba(150,200,255,0.6)', 5, 1.2);  // perna esquerda
+    tracoGlow(c, bx, by, bx, 32, 'rgba(150,200,255,0.6)', 5, 1.2);  // perna central
+    tracoGlow(c, bx, by, bx + 8, 32, 'rgba(150,200,255,0.6)', 5, 1.2);  // perna direita
 
     // estrela alvo — onde o telescópio está apontado
     c.shadowColor = '#ffffff';
-    c.shadowBlur  = 12;
-    c.fillStyle   = '#e8f4ff';
+    c.shadowBlur = 12;
+    c.fillStyle = '#e8f4ff';
     c.beginPath();
     c.arc(5, 6, 2, 0, Math.PI * 2);
     c.fill();
 
     // cruz de difração na estrela (efeito óptico realista)
-    c.shadowBlur  = 6;
+    c.shadowBlur = 6;
     c.strokeStyle = 'rgba(220,240,255,0.7)';
-    c.lineWidth   = 0.8;
-    [[5,2,5,10],[1,6,9,6]].forEach(([x1,y1,x2,y2]) => {
+    c.lineWidth = 0.8;
+    [[5, 2, 5, 10], [1, 6, 9, 6]].forEach(([x1, y1, x2, y2]) => {
         c.beginPath();
         c.moveTo(x1, y1);
         c.lineTo(x2, y2);
         c.stroke();
     });
+}
+
+// ── Ícone: NASA - Imagem do Dia — jornal dobrado ─────────────────────────────
+function desenharIconeApod() {
+    const canvas = document.getElementById('ic-apod');
+    if (!canvas) return;
+    const c = canvas.getContext('2d');
+    const COR = '#ff9955';    // laranja quente, distinto dos outros 3 ícones
+
+    // corpo do jornal — retângulo com glow
+    c.shadowColor = COR;
+    c.shadowBlur = 10;
+    c.strokeStyle = COR;
+    c.lineWidth = 1.4;
+    c.strokeRect(6, 8, 24, 20);
+
+    // vinco central de dobra do jornal
+    tracoGlow(c, 18, 8, 18, 28, 'rgba(255,153,85,0.5)', 4, 1);
+
+    // "manchete" — linha grossa no topo (título da notícia)
+    tracoGlow(c, 9, 13, 15, 13, COR, 6, 1.8);
+
+    // linhas de texto mais finas por baixo da manchete
+    [17, 20, 23].forEach(y => tracoGlow(c, 9, y, 15, y, 'rgba(255,200,160,0.7)', 3, 1));
+
+    // pequena "foto" do lado direito — representa a imagem do dia
+    c.shadowBlur = 6;
+    c.fillStyle = 'rgba(255,180,130,0.85)';
+    c.fillRect(21, 13, 6, 6);
 }
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
@@ -192,5 +221,5 @@ detetarLocalizacao();   // tenta obter e mostrar a localização do utilizador
 desenharIconeCeu();
 desenharIconeCalendario();
 desenharIconeObservatorio();
-
+desenharIconeApod();
 document.getElementById("musica").volume = 0.4;    // volume inicial da música ambiente

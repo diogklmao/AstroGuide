@@ -12,3 +12,6 @@ skyfield==1.48
 # Base de dados de fusos horários – necessário para skyfield
 # calcular horas locais corretamente em qualquer país
 tzdata==2025.2
+
+# Pedidos HTTP – usado para ir buscar a Imagem Astronómica do Dia (APOD) à NASA
+requests==2.32.3

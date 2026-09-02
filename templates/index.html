@@ -8,7 +8,9 @@
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/shared-ui-controls.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/glass.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
@@ -16,7 +18,7 @@
 
 <body class="page-app" data-bg-theme="app">
 
-    <canvas id="three-bg" aria-hidden="true"></canvas>
+
     <div class="bg-vignette" aria-hidden="true"></div>
     <div class="stars" id="stars"></div>
 
@@ -30,6 +32,7 @@
 
         <nav id="nav-bar" class="glass-panel glass-nav">
             <button id="btn-ceu" onclick="mudarEcra('ceu')">🌌 Céu Agora</button>
+            <button id="btn-apod" onclick="mudarEcra('apod')">📰 NASA - Imagem do Dia</button>
             <button id="btn-calendario" onclick="mudarEcra('calendario')">📅 Calendário Lunar</button>
             <button id="btn-observatorio" onclick="mudarEcra('observatorio')">🔭 Observatório</button>
         </nav>
@@ -70,7 +73,8 @@
         <div id="ecra-observatorio" class="ecra">
             <div class="observatorio-layout">
                 <div class="observatorio-painel-lateral">
-                    <button id="btn-toggle-painel" onclick="togglePainelLateral()" class="glass-btn-sm" title="Mostrar/Esconder Painel">
+                    <button id="btn-toggle-painel" onclick="togglePainelLateral()" class="glass-btn-sm"
+                        title="Mostrar/Esconder Painel">
                         <span class="icon">◀</span>
                     </button>
                     <!-- Controlos -->
@@ -79,8 +83,10 @@
                         <!-- Seletor de Data e Hora -->
                         <div class="obs-tempo-bloco">
                             <div class="obs-tempo-titulo">🕐 Simular Data/Hora</div>
-                            <input type="date" id="obs-data" class="obs-input" onchange="atualizarObservatorioComHora()">
-                            <input type="time" id="obs-hora" class="obs-input" onchange="atualizarObservatorioComHora()">
+                            <input type="date" id="obs-data" class="obs-input"
+                                onchange="atualizarObservatorioComHora()">
+                            <input type="time" id="obs-hora" class="obs-input"
+                                onchange="atualizarObservatorioComHora()">
                             <button id="btn-obs-agora" class="obs-btn-agora" onclick="repoeHoraAtual()">
                                 ↺ Tempo Real
                             </button>
@@ -88,7 +94,9 @@
                         </div>
                         <div class="config-linha" style="margin-bottom: 15px;">
                             <label for="sel-modo-visao">📍 Modo de Visão</label>
-                            <select id="sel-modo-visao" onchange="alterarModoVisao(); desenharObservatorio()" class="glass-select" style="width: 100%; margin-top: 5px; background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(110, 184, 255, 0.3); border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; outline: none; cursor: pointer; transition: border-color 0.3s ease;">
+                            <select id="sel-modo-visao" onchange="alterarModoVisao(); desenharObservatorio()"
+                                class="glass-select"
+                                style="width: 100%; margin-top: 5px; background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(110, 184, 255, 0.3); border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; outline: none; cursor: pointer; transition: border-color 0.3s ease;">
                                 <option value="360" selected>Vista 360° (Primeira Pessoa)</option>
                                 <option value="2d">Planisfério (Vista Zenital)</option>
                             </select>
@@ -102,7 +110,8 @@
                             <label for="chk-nomes-estrelas">Nomes das Estrelas</label>
                         </div>
                         <div class="config-linha-check">
-                            <input type="checkbox" id="chk-nomes-constelacoes" checked onchange="desenharObservatorio()">
+                            <input type="checkbox" id="chk-nomes-constelacoes" checked
+                                onchange="desenharObservatorio()">
                             <label for="chk-nomes-constelacoes">Nomes das Constelações</label>
                         </div>
                         <div class="config-linha-check">
@@ -111,17 +120,21 @@
                         </div>
                         <div class="config-linha">
                             <label for="rng-mag">Brilho (Mag ≤)</label>
-                            <input type="range" id="rng-mag" min="-1.5" max="5.0" step="0.5" value="5.0" oninput="document.getElementById('lbl-mag').textContent = parseFloat(this.value).toFixed(1); desenharObservatorio()">
+                            <input type="range" id="rng-mag" min="-1.5" max="5.0" step="0.5" value="5.0"
+                                oninput="document.getElementById('lbl-mag').textContent = parseFloat(this.value).toFixed(1); desenharObservatorio()">
                             <span id="lbl-mag">5.0</span>
                         </div>
                     </div>
                     <!-- Painel de Detalhes -->
                     <div id="observatorio-detalhes" class="glass-panel">
                         <div class="detalhe-titulo">ℹ️ Detalhes</div>
-                        <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">Clique num astro, estrela ou constelação no mapa celeste para ver os seus detalhes astronómicos.</p>
+                        <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">
+                            Clique num astro, estrela ou constelação no mapa celeste para ver os seus detalhes
+                            astronómicos.</p>
                     </div>
                     <!-- Ajuda e Instruções -->
-                    <div id="observatorio-ajuda" class="glass-panel" style="padding: 14px; font-size: 0.82rem; line-height: 1.4; color: rgba(220, 227, 240, 0.8);">
+                    <div id="observatorio-ajuda" class="glass-panel"
+                        style="padding: 14px; font-size: 0.82rem; line-height: 1.4; color: rgba(220, 227, 240, 0.8);">
                         💡 <strong style="color: #6eb8ff;">Navegação 360°:</strong>
                         <ul style="margin: 6px 0 0 16px; padding: 0;">
                             <li>Arrasta no mapa para olhar à volta.</li>
@@ -133,6 +146,11 @@
                 <div class="observatorio-mapa-wrapper glass-panel">
                     <canvas id="observatorio-canvas" width="800" height="800"></canvas>
                 </div>
+            </div>
+        </div>
+        <div id="ecra-apod" class="ecra">
+            <div id="apod-conteudo">
+                <div class="loading glass-panel"><span class="spinner"></span>A carregar imagem do dia...</div>
             </div>
         </div>
     </div>
@@ -153,8 +171,6 @@
         <source src="/static/audio/musica.mp3" type="audio/mpeg">
     </audio>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-    <script src="/static/js/three-bg.js"></script>
     <script src="/static/js/shared-ui-controls.js"></script>
     <script src="/static/js/index.js"></script>
 </body>

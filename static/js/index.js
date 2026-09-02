@@ -73,6 +73,7 @@ function mudarEcra(nome) {
     if (nome === "calendario") carregarCalendario();
     if (nome === "ceu") carregarCeu();
     if (nome === "observatorio") carregarObservatorio();
+    if (nome === "apod") carregarApod();
 }
 
 // ── Céu Agora ─────────────────────────────────────────────────────
@@ -119,6 +120,33 @@ function dadoVisivel(visivel) {
 
 function planetaHTML(p) {
     return `<div class="planeta-card ${p.visivel ? "" : "invisivel"}"><div class="planeta-nome">${p.nome}</div><div class="planeta-info">Alt: ${p.altitude}°<br>Az: ${p.azimute}°<br>${p.visivel ? "✓ Visível" : "× Não visível"}</div></div>`;
+}
+
+// ── NASA - Imagem do Dia (APOD) ─────────────────────────────────────
+async function carregarApod() {
+    const container = document.getElementById("apod-conteudo");
+    try {
+        const res = await fetch("/api/apod");
+        if (!res.ok) throw new Error("Resposta não OK");
+        const data = await res.json();
+
+        // A APOD por vezes é um vídeo em vez de uma imagem (ex: lançamentos, eclipses filmados)
+        const mediaHTML = data.tipo_media === "video"
+            ? `<div class="apod-video-aviso">🎬 O conteúdo de hoje é um vídeo.
+                 <a href="${data.url_imagem}" target="_blank" rel="noopener">Ver vídeo original ↗</a></div>`
+            : `<img class="apod-imagem" src="${data.url_imagem}" alt="${data.titulo}">`;
+
+        container.innerHTML = `
+            <div class="card glass-panel apod-card">
+                ${mediaHTML}
+                <div class="apod-titulo">${data.titulo}</div>
+                <div class="apod-data">${data.data}${data.autor ? " · © " + data.autor : ""}</div>
+                <p class="apod-explicacao">${data.explicacao}</p>
+                ${data.url_hd ? `<a class="apod-hd-link" href="${data.url_hd}" target="_blank" rel="noopener">Ver em alta resolução ↗</a>` : ""}
+            </div>`;
+    } catch (err) {
+        container.innerHTML = '<div class="loading glass-panel">❌ Não foi possível carregar a imagem do dia</div>';
+    }
 }
 
 // ── Calendário Lunar: Geração Dinâmica ────────────────────────────────────────
@@ -236,7 +264,7 @@ let draggedActive = false; // true se arrastou mais de 4px (para distinguir de c
 function redimensionarCanvas() {
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas) return;
-    
+
     if (document.body.classList.contains("observatorio-ativo")) {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -265,11 +293,11 @@ window.addEventListener("resize", () => {
 function alterarModoVisao() {
     const modoSelect = document.getElementById("sel-modo-visao");
     if (!modoSelect) return;
-    
+
     const modo = modoSelect.value;
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas) return;
-    
+
     if (modo === "360") {
         canvas.classList.add("drag-mode");
     } else {
@@ -283,41 +311,41 @@ function alterarModoVisao() {
 async function carregarObservatorio(data, hora) {
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas) return;
-    
+
     // Configurar interatividade de clique e arrasto no canvas caso ainda não tenha sido configurada
     if (!canvas.dataset.eventsConfigured) {
         canvas.addEventListener("click", tratarCliqueCanvas);
-        
+
         // Eventos de Rato para Arrastamento
         canvas.addEventListener("mousedown", iniciarArrasto);
         window.addEventListener("mousemove", moverArrasto);
         window.addEventListener("mouseup", terminarArrasto);
-        
+
         // Eventos de Toque (Mobile)
         canvas.addEventListener("touchstart", iniciarArrastoToque, { passive: false });
         window.addEventListener("touchmove", moverArrastoToque, { passive: false });
         window.addEventListener("touchend", terminarArrastoToque);
-        
+
         // Zoom via Roda do Rato
         canvas.addEventListener("wheel", tratarScrollZoom, { passive: false });
-        
+
         canvas.dataset.eventsConfigured = "true";
     }
-    
+
     // Construir URL com ou sem parâmetros de data/hora
     let url = "/api/observatorio";
     if (data && hora) {
         url += `?data=${encodeURIComponent(data)}&hora=${encodeURIComponent(hora)}`;
     }
-    
+
     try {
         const res = await fetch(url);
         const apiData = await res.json();
         observatorioDados = apiData;
-        
+
         // Atualiza a localização no cabeçalho
         document.getElementById("localizacao").textContent = "📍 Vila Nova de Gaia";
-        
+
         alterarModoVisao();
         redimensionarCanvas();
     } catch (err) {
@@ -375,47 +403,47 @@ function repoeHoraAtual() {
 function iniciarArrasto(e) {
     const modoSelect = document.getElementById("sel-modo-visao");
     if (!modoSelect || modoSelect.value !== "360") return;
-    
+
     isDragging = true;
     draggedActive = false;
     startX = e.clientX;
     startY = e.clientY;
     startAzimuth = cameraAzimuth;
     startAltitude = cameraAltitude;
-    
+
     const canvas = document.getElementById("observatorio-canvas");
     if (canvas) canvas.classList.add("dragging");
 }
 
 function moverArrasto(e) {
     if (!isDragging) return;
-    
+
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    
-    if (Math.sqrt(dx*dx + dy*dy) > 4) {
+
+    if (Math.sqrt(dx * dx + dy * dy) > 4) {
         draggedActive = true;
     }
-    
+
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas) return;
-    
+
     // Sensibilidade baseada no FOV atual
     const sensibilidade = cameraFOV / canvas.width;
-    
+
     // Arrastar para a direita (dx > 0) -> câmara roda para a esquerda (azimute diminui)
     cameraAzimuth = (startAzimuth - dx * sensibilidade + 360) % 360;
-    
+
     // Arrastar para baixo (dy > 0) -> câmara inclina para cima (altitude aumenta)
     cameraAltitude = Math.max(-85, Math.min(85, startAltitude + dy * sensibilidade));
-    
+
     desenharObservatorio();
 }
 
 function terminarArrasto(e) {
     if (!isDragging) return;
     isDragging = false;
-    
+
     const canvas = document.getElementById("observatorio-canvas");
     if (canvas) canvas.classList.remove("dragging");
 }
@@ -425,7 +453,7 @@ let touchStartDist = 0;
 function iniciarArrastoToque(e) {
     const modoSelect = document.getElementById("sel-modo-visao");
     if (!modoSelect || modoSelect.value !== "360") return;
-    
+
     if (e.touches.length === 1) {
         isDragging = true;
         draggedActive = false;
@@ -433,7 +461,7 @@ function iniciarArrastoToque(e) {
         startY = e.touches[0].clientY;
         startAzimuth = cameraAzimuth;
         startAltitude = cameraAltitude;
-        
+
         const canvas = document.getElementById("observatorio-canvas");
         if (canvas) canvas.classList.add("dragging");
         e.preventDefault();
@@ -449,18 +477,18 @@ function moverArrastoToque(e) {
     if (e.touches.length === 1 && isDragging) {
         const dx = e.touches[0].clientX - startX;
         const dy = e.touches[0].clientY - startY;
-        
-        if (Math.sqrt(dx*dx + dy*dy) > 4) {
+
+        if (Math.sqrt(dx * dx + dy * dy) > 4) {
             draggedActive = true;
         }
-        
+
         const canvas = document.getElementById("observatorio-canvas");
         if (!canvas) return;
-        
+
         const sensibilidade = cameraFOV / canvas.width;
         cameraAzimuth = (startAzimuth - dx * sensibilidade + 360) % 360;
         cameraAltitude = Math.max(-85, Math.min(85, startAltitude + dy * sensibilidade));
-        
+
         desenharObservatorio();
         e.preventDefault();
     } else if (e.touches.length === 2) {
@@ -488,12 +516,12 @@ function terminarArrastoToque(e) {
 function tratarScrollZoom(e) {
     const modoSelect = document.getElementById("sel-modo-visao");
     if (!modoSelect || modoSelect.value !== "360") return;
-    
+
     e.preventDefault();
-    
+
     const factor = e.deltaY > 0 ? 1.05 : 0.95;
     cameraFOV = Math.max(35, Math.min(110, cameraFOV * factor));
-    
+
     desenharObservatorio();
 }
 
@@ -501,20 +529,20 @@ function tratarScrollZoom(e) {
 function desenharObservatorio() {
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas || !observatorioDados) return;
-    
+
     const ctx = canvas.getContext("2d");
     const width = canvas.width;
     const height = canvas.height;
     const centroX = width / 2;
     const centroY = height / 2;
     const raioMax = Math.min(width, height) / 2 - 40;
-    
+
     const modoSelect = document.getElementById("sel-modo-visao");
     const modoVisao = modoSelect ? modoSelect.value : "360";
-    
+
     // Limpar canvas
     ctx.clearRect(0, 0, width, height);
-    
+
     // Função de Projeção Dinâmica
     function projectar(alt, az) {
         if (modoVisao === "360") {
@@ -523,31 +551,31 @@ function desenharObservatorio() {
             const azRad = az * Math.PI / 180;
             const camAltRad = cameraAltitude * Math.PI / 180;
             const camAzRad = cameraAzimuth * Math.PI / 180;
-            
+
             // Coordenadas cartesianas no espaço 3D (esfera unitária)
             const x = Math.cos(altRad) * Math.cos(azRad);
             const y = Math.cos(altRad) * Math.sin(azRad);
             const z = Math.sin(altRad);
-            
+
             // Rotação em torno do eixo Z (Yaw - Azimute da Câmara)
             const x1 = x * Math.cos(camAzRad) + y * Math.sin(camAzRad);
             const y1 = -x * Math.sin(camAzRad) + y * Math.cos(camAzRad);
-            
+
             // Rotação em torno do eixo Y local (Pitch - Altitude da Câmara)
             const x2 = x1 * Math.cos(camAltRad) + z * Math.sin(camAltRad);
             const z2 = -x1 * Math.sin(camAltRad) + z * Math.cos(camAltRad);
-            
+
             // Se o objeto estiver atrás da câmara, não renderizar
             if (x2 <= 0.05) return null;
-            
+
             // Distância focal a partir do FOV horizontal
             const fovRad = cameraFOV * Math.PI / 180;
             const f = width / (2 * Math.tan(fovRad / 2));
-            
+
             // Coordenadas no plano do ecrã
             const px = centroX + f * (y1 / x2);
             const py = centroY - f * (z2 / x2);
-            
+
             return { x: px, y: py };
         } else {
             // ── Projeção Zenital 2D (Planisfério Clássico) ──
@@ -558,15 +586,15 @@ function desenharObservatorio() {
             return { x, y };
         }
     }
-    
+
     // 1. Desenhar fundos e grelhas específicas do modo
     if (modoVisao === "360") {
 
         // ── Fundo: Gradiente de céu noturno ──────────────────────────
         const gradSky = ctx.createLinearGradient(0, 0, 0, height);
-        gradSky.addColorStop(0,   "#01020a");
+        gradSky.addColorStop(0, "#01020a");
         gradSky.addColorStop(0.5, "#04081a");
-        gradSky.addColorStop(1,   "#08122a");
+        gradSky.addColorStop(1, "#08122a");
         ctx.fillStyle = gradSky;
         ctx.fillRect(0, 0, width, height);
 
@@ -593,10 +621,10 @@ function desenharObservatorio() {
             ctx.closePath();
 
             const gradGround = ctx.createLinearGradient(0, horizY, 0, height);
-            gradGround.addColorStop(0,    "rgba(10, 48, 14, 0.97)");
-            gradGround.addColorStop(0.3,  "rgba(14, 60, 18, 0.98)");
+            gradGround.addColorStop(0, "rgba(10, 48, 14, 0.97)");
+            gradGround.addColorStop(0.3, "rgba(14, 60, 18, 0.98)");
             gradGround.addColorStop(0.65, "rgba( 8, 38, 10, 0.99)");
-            gradGround.addColorStop(1,    "rgba( 3, 18,  5, 1.00)");
+            gradGround.addColorStop(1, "rgba( 3, 18,  5, 1.00)");
             ctx.fillStyle = gradGround;
             ctx.fill();
 
@@ -605,9 +633,9 @@ function desenharObservatorio() {
 
             // Névoa suave no horizonte
             const gradFog = ctx.createLinearGradient(0, horizY - 20, 0, horizY + 35);
-            gradFog.addColorStop(0,   "rgba(15, 55, 30, 0.0)");
-            gradFog.addColorStop(0.45,"rgba(18, 65, 32, 0.22)");
-            gradFog.addColorStop(1,   "rgba( 8, 35, 15, 0.0)");
+            gradFog.addColorStop(0, "rgba(15, 55, 30, 0.0)");
+            gradFog.addColorStop(0.45, "rgba(18, 65, 32, 0.22)");
+            gradFog.addColorStop(1, "rgba( 8, 35, 15, 0.0)");
             ctx.fillStyle = gradFog;
             ctx.fillRect(0, horizY - 20, width, 55);
 
@@ -616,10 +644,10 @@ function desenharObservatorio() {
             ctx.moveTo(horizonPoints[0].x, horizonPoints[0].y);
             for (let i = 1; i < horizonPoints.length; i++) ctx.lineTo(horizonPoints[i].x, horizonPoints[i].y);
             ctx.strokeStyle = "rgba(70, 190, 100, 0.28)";
-            ctx.lineWidth   = 1.5;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
             ctx.strokeStyle = "rgba(50, 160, 80, 0.07)";
-            ctx.lineWidth   = 10;
+            ctx.lineWidth = 10;
             ctx.stroke();
         }
 
@@ -649,7 +677,7 @@ function desenharObservatorio() {
                 ctx.shadowBlur = 0;
             }
         });
-        
+
     } else {
         // Círculo exterior do horizonte 2D
         ctx.beginPath();
@@ -657,14 +685,14 @@ function desenharObservatorio() {
         ctx.strokeStyle = "rgba(110, 184, 255, 0.25)";
         ctx.lineWidth = 2;
         ctx.stroke();
-        
+
         const gradSky = ctx.createRadialGradient(centroX, centroY, 0, centroX, centroY, raioMax);
         gradSky.addColorStop(0, "rgba(7, 13, 26, 0.45)");
         gradSky.addColorStop(0.7, "rgba(4, 8, 16, 0.8)");
         gradSky.addColorStop(1, "rgba(1, 4, 8, 0.95)");
         ctx.fillStyle = gradSky;
         ctx.fill();
-        
+
         // Linhas de grelha altitude (30° e 60°)
         ctx.strokeStyle = "rgba(110, 184, 255, 0.08)";
         ctx.lineWidth = 1;
@@ -673,13 +701,13 @@ function desenharObservatorio() {
             ctx.beginPath();
             ctx.arc(centroX, centroY, r, 0, 2 * Math.PI);
             ctx.stroke();
-            
+
             ctx.fillStyle = "rgba(110, 184, 255, 0.3)";
             ctx.font = "9px monospace";
             ctx.textAlign = "center";
             ctx.fillText(alt + "°", centroX, centroY - r - 3);
         });
-        
+
         // Linhas de azimute (Cruz N-S, E-W)
         ctx.beginPath();
         ctx.moveTo(centroX, centroY - raioMax);
@@ -687,7 +715,7 @@ function desenharObservatorio() {
         ctx.moveTo(centroX - raioMax, centroY);
         ctx.lineTo(centroX + raioMax, centroY);
         ctx.stroke();
-        
+
         // Letras Cardeais no limite do círculo
         ctx.fillStyle = "#6eb8ff";
         ctx.font = "bold 14px 'Cormorant Garamond', serif";
@@ -698,33 +726,33 @@ function desenharObservatorio() {
         ctx.fillText("E", centroX - raioMax - 18, centroY);
         ctx.fillText("W", centroX + raioMax + 18, centroY);
     }
-    
+
     const showConstelacoes = document.getElementById("chk-constelacoes").checked;
     const showNomesEstrelas = document.getElementById("chk-nomes-estrelas").checked;
     const showNomesConstelacoes = document.getElementById("chk-nomes-constelacoes").checked;
     const showAstros = document.getElementById("chk-astros").checked;
     const magLimite = parseFloat(document.getElementById("rng-mag").value);
-    
+
     const elementosNoEcra = [];
-    
+
     // 2. Desenhar as linhas das constelações (se ativo)
     if (showConstelacoes) {
         ctx.strokeStyle = "rgba(110, 184, 255, 0.45)"; // Mais brilhante
         ctx.lineWidth = 1.5;
-        
+
         const constelacoes = observatorioDados.constelacoes;
         const estrelas = observatorioDados.estrelas;
-        
+
         for (const const_id in constelacoes) {
             const constelacao = constelacoes[const_id];
             constelacao.linhas.forEach(linha => {
                 const estA = estrelas[linha[0]];
                 const estB = estrelas[linha[1]];
-                
+
                 if (estA && estB && (estA.visivel || estB.visivel)) {
                     const posA = projectar(estA.altitude, estA.azimute);
                     const posB = projectar(estB.altitude, estB.azimute);
-                    
+
                     if (posA && posB) {
                         ctx.beginPath();
                         ctx.moveTo(posA.x, posA.y);
@@ -733,7 +761,7 @@ function desenharObservatorio() {
                     }
                 }
             });
-            
+
             // Calcular centróide da constelação (usado para nomes e cliques)
             let sumX = 0, sumY = 0, count = 0;
             const estrelasUnicas = new Set();
@@ -774,23 +802,23 @@ function desenharObservatorio() {
             }
         }
     }
-    
+
     // 3. Desenhar as Estrelas
     const estrelas = observatorioDados.estrelas;
     for (const est_id in estrelas) {
         const est = estrelas[est_id];
-        if (!est.visivel) continue; 
-        if (est.mag > magLimite) continue; 
-        
+        if (!est.visivel) continue;
+        if (est.mag > magLimite) continue;
+
         const pos = projectar(est.altitude, est.azimute);
         if (!pos) continue; // ignora se estiver fora da perspetiva 3D
-        
+
         // Tamanho da estrela com base na magnitude
         const maxStarSize = 4.5;
         const minStarSize = 1.0;
         let starSize = maxStarSize - ((est.mag - (-1.5)) / (5.0 - (-1.5))) * (maxStarSize - minStarSize);
         starSize = Math.max(minStarSize, Math.min(maxStarSize, starSize));
-        
+
         // Halo de brilho para as estrelas principais
         if (est.mag < 1.8) {
             ctx.beginPath();
@@ -798,13 +826,13 @@ function desenharObservatorio() {
             ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
             ctx.fill();
         }
-        
+
         // Ponto da Estrela
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, starSize, 0, 2 * Math.PI);
         ctx.fillStyle = est.mag < 1.5 ? "#ffffff" : "rgba(220, 235, 255, 0.95)";
         ctx.fill();
-        
+
         // Polaris destaca-se com uma pequena mira
         if (est_id === "polaris") {
             ctx.strokeStyle = "rgba(110, 184, 255, 0.35)";
@@ -814,7 +842,7 @@ function desenharObservatorio() {
             ctx.moveTo(pos.x, pos.y - 7); ctx.lineTo(pos.x, pos.y + 7);
             ctx.stroke();
         }
-        
+
         // Nomes das estrelas
         if (showNomesEstrelas) {
             ctx.fillStyle = "rgba(200, 220, 255, 0.65)";
@@ -823,7 +851,7 @@ function desenharObservatorio() {
             ctx.textBaseline = "middle";
             ctx.fillText(" " + est.nome, pos.x + starSize + 2, pos.y);
         }
-        
+
         // Registar elemento para cliques
         elementosNoEcra.push({
             id: est_id,
@@ -837,20 +865,20 @@ function desenharObservatorio() {
             azimute: est.azimute
         });
     }
-    
+
     // 4. Desenhar Sol, Lua e Planetas
     if (showAstros) {
         const astros = observatorioDados.astros;
         astros.forEach(astro => {
             if (!astro.visivel) return;
-            
+
             const pos = projectar(astro.altitude, astro.azimute);
             if (!pos) return; // ignora se estiver fora do FOV 3D
-            
+
             const size = 6.5;
             let corHalo = "rgba(255, 255, 255, 0.15)";
             let corAstro = "#ffffff";
-            
+
             if (astro.tipo === "sol") {
                 corHalo = "rgba(255, 143, 0, 0.25)";
                 corAstro = "#ff8f00";
@@ -869,26 +897,26 @@ function desenharObservatorio() {
                     corAstro = "#4fc3f7";
                 }
             }
-            
+
             // Halo
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, size * 2.2, 0, 2 * Math.PI);
             ctx.fillStyle = corHalo;
             ctx.fill();
-            
+
             // Astro
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, size, 0, 2 * Math.PI);
             ctx.fillStyle = corAstro;
             ctx.fill();
-            
+
             // Rótulo de Nome do Astro
             ctx.fillStyle = "#ffffff";
             ctx.font = "bold 9px sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "bottom";
             ctx.fillText(astro.nome, pos.x, pos.y - size - 4);
-            
+
             // Fase da Lua em Emoji
             if (astro.tipo === "lua" && astro.emoji) {
                 ctx.font = "11px sans-serif";
@@ -896,7 +924,7 @@ function desenharObservatorio() {
                 ctx.textBaseline = "middle";
                 ctx.fillText(astro.emoji, pos.x + size + 3, pos.y);
             }
-            
+
             elementosNoEcra.push({
                 id: astro.id,
                 nome: astro.nome,
@@ -913,10 +941,10 @@ function desenharObservatorio() {
             });
         });
     }
-    
+
     // Guardar posições projetadas para o click handler
     canvas.elementosNoEcra = elementosNoEcra;
-    
+
     // Desenhar destaque circular tracejado sobre o astro selecionado
     if (objetoSelecionado) {
         const itemNoEcra = elementosNoEcra.find(el => el.id === objetoSelecionado.id);
@@ -939,11 +967,11 @@ function tratarCliqueCanvas(e) {
     }
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas || !canvas.elementosNoEcra) return;
-    
+
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     // Deteção de clique
     let encontrado = null;
     for (const el of canvas.elementosNoEcra) {
@@ -955,13 +983,13 @@ function tratarCliqueCanvas(e) {
             break;
         }
     }
-    
+
     const painel = document.getElementById("observatorio-detalhes");
     if (!painel) return;
-    
+
     if (encontrado) {
         objetoSelecionado = encontrado;
-        
+
         if (encontrado.tipo === "constelacao") {
             // ── Detalhes de Constelação ──
             const curiosidade = CURIOSIDADES_CONSTELACOES[encontrado.const_id] || "Uma constelação fascinante do céu noturno.";
@@ -988,10 +1016,10 @@ function tratarCliqueCanvas(e) {
                     <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Constelação</span><span class="detalhe-valor" style="color:#9ed4ff">${constName}</span></div>
                 `;
             }
-            
+
             const corTipo = encontrado.tipo === "sol" ? "#ff8f00" : (encontrado.tipo === "lua" ? "#b0bec5" : (encontrado.tipo === "estrela" ? "#4fc3f7" : "#ffd54f"));
             const labelTipo = encontrado.tipo.toUpperCase();
-            
+
             painel.innerHTML = `
                 <div class="detalhe-titulo">🔭 ${encontrado.nome}</div>
                 <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:${corTipo}">${labelTipo}</span></div>
@@ -1001,7 +1029,7 @@ function tratarCliqueCanvas(e) {
                 ${extrasHTML}
             `;
         }
-        
+
         desenharObservatorio();
     } else {
         objetoSelecionado = null;
@@ -1033,13 +1061,13 @@ function inline_equals_check(a, b) {
 
 function obterRosaDosVentos(azimute) {
     const direcoes = [
-        { label: "N",  min: 337.5, max: 22.5 },
-        { label: "NE", min: 22.5,  max: 67.5 },
-        { label: "E",  min: 67.5,  max: 112.5 },
+        { label: "N", min: 337.5, max: 22.5 },
+        { label: "NE", min: 22.5, max: 67.5 },
+        { label: "E", min: 67.5, max: 112.5 },
         { label: "SE", min: 112.5, max: 157.5 },
-        { label: "S",  min: 157.5, max: 202.5 },
+        { label: "S", min: 157.5, max: 202.5 },
         { label: "SO", min: 202.5, max: 247.5 },
-        { label: "O",  min: 247.5, max: 292.5 },
+        { label: "O", min: 247.5, max: 292.5 },
         { label: "NO", min: 292.5, max: 337.5 }
     ];
     for (const d of direcoes) {
@@ -1078,13 +1106,15 @@ if (pagina === "/calendario") {
 } else if (pagina === "/observatorio") {
     inicializarSeletorHora();
     mudarEcra("observatorio");
+} else if (pagina === "/apod") {
+    mudarEcra("apod");
 } else {
     mudarEcra("ceu");
 }
 
 // Inicializa o seletor quando o utilizador navega para o observatório
 const _mudarEcraOriginal = mudarEcra;
-window.mudarEcra = function(nome) {
+window.mudarEcra = function (nome) {
     _mudarEcraOriginal(nome);
     if (nome === "observatorio") inicializarSeletorHora();
 };
