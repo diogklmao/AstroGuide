@@ -1,4 +1,4 @@
-/* ── App — layout sobre fundo Three.js ────────────────────────────── */
+/* ── App — layout ────────────────────────────── */
 body.page-app {
     overflow-x: hidden;
     background: #020408;
@@ -1004,8 +1004,7 @@ body.observatorio-ativo #btn-toggle-painel {
 
 /* ── NASA - Imagem do Dia (APOD) ─────────────────────────────────── */
 .apod-card {
-    max-width: 780px;
-    margin: 0 auto;
+    width: 100%;
 }
 
 .apod-imagem {
