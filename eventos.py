@@ -101,8 +101,8 @@ EVENTOS = [
         "descricao": "Chuva discreta de fim de ano. Até 10 meteoros/hora.",
     },
 
-    # ── Eclipses 2026 ─────────────────────────────────────────────────────────
-    # Calculados com precisão — datas específicas de 2026.
+    # ── Eclipses 2026/2027 ─────────────────────────────────────────────────────────
+    # Calculados com precisão — datas específicas de 2026/2027.
 
     {
         "nome":      "Eclipse Solar Total",
@@ -128,7 +128,32 @@ EVENTOS = [
         "hora_pico": "23:30",
         "descricao": "Eclipse lunar penumbral — a Lua fica ligeiramente escurecida.",
     },
-]
+    {
+        "nome":      "Eclipse Solar Parcial",
+        "tipo":      "eclipse_solar",
+        "emoji":     "🌑",
+        "ano":       2027,
+        "mes":       8,                         # agosto
+        "dia":       2,
+        "hora_ini":  "09:30",                   # aproximado — CONFIRMAR horas exatas para a tua localização
+        "hora_fim":  "11:30",                   # em timeanddate.com/eclipse/in/portugal antes da apresentação
+        "hora_pico": "10:30",
+        "descricao": "Em Portugal será visível como eclipse parcial (a totalidade só é visível no sul de Espanha, Gibraltar e Norte de África). Usa sempre óculos próprios para eclipses.",
+    },
+    {
+        "nome":      "Eclipse Lunar Penumbral",
+        "tipo":      "eclipse_lunar",
+        "emoji":     "🌕",
+        "ano":       2027,
+        "mes":       2,                         # fevereiro
+        "dia":       20,
+        "hora_ini":  "21:12",                   # P1 — início da fase penumbral (fonte: Wikipédia, Saros 143)
+        "hora_fim":  "01:13",                   # P4 — fim (já no dia 21, hora de Lisboa = UTC em fevereiro)
+        "hora_pico": "23:13",                   # momento de eclipse máximo
+        "descricao": "Eclipse lunar penumbral, efeito subtil (a Lua fica ligeiramente mais escura). Seguro de observar a olho nu.",
+    },
+    
+]   
 
 def get_eventos_do_dia(ano, mes, dia):
     """
