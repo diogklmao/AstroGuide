@@ -252,6 +252,11 @@ let cameraAzimuth = 0;   // 0° = Norte, 90° = Este, 180° = Sul, 270° = Oeste
 let cameraAltitude = 15;  // Altitude em graus (-85° a 85°)
 let cameraFOV = 80;       // Campo de visão horizontal em graus
 
+// Imagem de fundo do céu (Via Láctea real) — dá um efeito panorâmico ao rodar a câmara
+const imgCeuFundo = new Image();
+imgCeuFundo.src = "/static/images/space.jpg";
+imgCeuFundo.onload = () => desenharObservatorio(); // redesenha assim que a imagem estiver pronta
+
 // Estado de Arrastamento para a Câmara 360°
 let isDragging = false;
 let startX = 0;
@@ -590,13 +595,41 @@ function desenharObservatorio() {
     // 1. Desenhar fundos e grelhas específicas do modo
     if (modoVisao === "360") {
 
-        // ── Fundo: Gradiente de céu noturno ──────────────────────────
+        // ── Fundo: imagem panorâmica real da Via Láctea, com parallax ao rodar a câmara ──
         const gradSky = ctx.createLinearGradient(0, 0, 0, height);
         gradSky.addColorStop(0, "#01020a");
         gradSky.addColorStop(0.5, "#04081a");
         gradSky.addColorStop(1, "#08122a");
-        ctx.fillStyle = gradSky;
-        ctx.fillRect(0, 0, width, height);
+
+        if (imgCeuFundo.complete && imgCeuFundo.naturalWidth > 0) {
+            // Escala a imagem para cobrir a altura do canvas, com alguma folga extra
+            // (1.4x) para haver imagem suficiente quando o utilizador olha para cima/baixo.
+            const escala = (height / imgCeuFundo.naturalHeight) * 1.4;
+            const imgW = imgCeuFundo.naturalWidth * escala;
+            const imgH = imgCeuFundo.naturalHeight * escala;
+
+            // Desloca a imagem horizontalmente conforme o azimute da câmara — dá a
+            // sensação de estar a rodar sobre uma cúpula panorâmica, como um céu real.
+            let offsetX = -((cameraAzimuth / 360) * imgW) % imgW;
+            if (offsetX > 0) offsetX -= imgW;
+            // Desloca verticalmente conforme a altitude da câmara (olhar para cima/baixo).
+            const offsetY = (height - imgH) / 2 - (cameraAltitude / 90) * (imgH * 0.15);
+
+            ctx.drawImage(imgCeuFundo, offsetX, offsetY, imgW, imgH);
+            ctx.drawImage(imgCeuFundo, offsetX + imgW, offsetY, imgW, imgH); // 2ª cópia: evita "buraco" ao dar a volta
+
+            // Gradiente por cima, semi-transparente — escurece a foto e mantém o tom
+            // azulado noturno consistente com o resto da app, em vez da foto "crua".
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = gradSky;
+            ctx.fillRect(0, 0, width, height);
+            ctx.globalAlpha = 1;
+        } else {
+            // Enquanto a imagem ainda não carregou (ou falhou), usa só o gradiente —
+            // assim que carregar, o onload chama desenharObservatorio() outra vez.
+            ctx.fillStyle = gradSky;
+            ctx.fillRect(0, 0, width, height);
+        }
 
         // Calcular linha do horizonte
         let horizonPoints = [];

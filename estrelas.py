@@ -116,7 +116,7 @@ ESTRELAS_BD = {
 # Estrutura: "id_constelacao": {"nome": "Nome da Constelação", "linhas": [("id_estrela_A", "id_estrela_B"), ...]}
 CONSTELACOES_BD = {
     "UMi": {
-        "nome": "Ursa Menor",
+        "nome": "Ursa Minor",
         "linhas": [
             ("polaris", "yildun"),
             ("yildun", "eps_umi"),
@@ -128,7 +128,7 @@ CONSTELACOES_BD = {
         ]
     },
     "UMa": {
-        "nome": "Ursa Maior",
+        "nome": "Ursa Major",
         "linhas": [
             ("dubhe", "merak"),
             ("merak", "phecda"),
@@ -140,7 +140,7 @@ CONSTELACOES_BD = {
         ]
     },
     "Ori": {
-        "nome": "Orião",
+        "nome": "Orion",
         "linhas": [
             ("betelgeuse", "bellatrix"),
             ("bellatrix", "mintaka"),
@@ -164,7 +164,7 @@ CONSTELACOES_BD = {
         ]
     },
     "Leo": {
-        "nome": "Leão",
+        "nome": "Leo",
         "linhas": [
             ("denebola", "chertan"),
             ("chertan", "zosma"),
@@ -177,7 +177,7 @@ CONSTELACOES_BD = {
         ]
     },
     "Tau": {
-        "nome": "Touro",
+        "nome": "Taurus",
         "linhas": [
             ("elnath", "aldebaran"),
             ("aldebaran", "gam_tau"),
@@ -186,7 +186,7 @@ CONSTELACOES_BD = {
         ]
     },
     "Gem": {
-        "nome": "Gémeos",
+        "nome": "Gemini",
         "linhas": [
             ("castor", "pollux"),
             ("castor", "mebsuta"),
@@ -197,7 +197,7 @@ CONSTELACOES_BD = {
         ]
     },
     "Cyg": {
-        "nome": "Cisne",
+        "nome": "Cygnus",
         "linhas": [
             ("deneb", "sadr"),
             ("sadr", "albireo"),
@@ -206,7 +206,7 @@ CONSTELACOES_BD = {
         ]
     },
     "Lyr": {
-        "nome": "Lira",
+        "nome": "Lyra",
         "linhas": [
             ("vega", "sheliak"),
             ("sheliak", "sulafat"),
@@ -214,14 +214,14 @@ CONSTELACOES_BD = {
         ]
     },
     "Aql": {
-        "nome": "Águia",
+        "nome": "Aquila",
         "linhas": [
             ("altair", "alshain"),
             ("altair", "tarazed")
         ]
     },
     "Boo": {
-        "nome": "Boieiro",
+        "nome": "Boötes",
         "linhas": [
             ("arcturus", "muphrid"),
             ("arcturus", "izar"),
@@ -231,7 +231,7 @@ CONSTELACOES_BD = {
         ]
     },
     "Vir": {
-        "nome": "Virgem",
+        "nome": "Virgo",
         "linhas": [
             ("spica", "porrima"),
             ("porrima", "vindemiat"),
@@ -240,7 +240,7 @@ CONSTELACOES_BD = {
         ]
     },
     "Sco": {
-        "nome": "Escorpião",
+        "nome": "Scorpius",
         "linhas": [
             ("antares", "dschubba"),
             ("dschubba", "graffias"),
@@ -249,7 +249,7 @@ CONSTELACOES_BD = {
         ]
     },
     "Peg": {
-        "nome": "Pégaso",
+        "nome": "Pegasus",
         "linhas": [
             ("markab", "scheat"),
             ("scheat", "algenib"),
