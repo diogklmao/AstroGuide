@@ -23,7 +23,23 @@ const CURIOSIDADES_CONSTELACOES = {
     "Peg": "Pégaso representa o cavalo alado da mitologia grega. O 'Grande Quadrado de Pégaso' é um asterismo formado por quatro estrelas e é usado pelos astrónomos como referência para estimar a transparência do céu."
 };
 
-
+// ── Imagens das Constelações ────────────────────────────────────────
+const IMAGENS_CONSTELACOES = {
+    "UMi": "/static/images/constelacoes/umi.png",
+    "UMa": "/static/images/constelacoes/uma.png",
+    "Ori": "/static/images/constelacoes/ori.png",
+    "Cas": "/static/images/constelacoes/cas.png",
+    "Leo": "/static/images/constelacoes/leo.png",
+    "Tau": "/static/images/constelacoes/tau.png",
+    "Gem": "/static/images/constelacoes/gem.png",
+    "Cyg": "/static/images/constelacoes/cyg.png",
+    "Lyr": "/static/images/constelacoes/lyr.png",
+    "Aql": "/static/images/constelacoes/aql.png",
+    "Boo": "/static/images/constelacoes/boo.png",
+    "Vir": "/static/images/constelacoes/vir.png",
+    "Sco": "/static/images/constelacoes/sco.png",
+    "Peg": "/static/images/constelacoes/peg.png",
+};
 
 // ── Estrelas ──────────────────────────────────────────────────────
 function criarEstrelas() {
@@ -1026,8 +1042,13 @@ function tratarCliqueCanvas(e) {
         if (encontrado.tipo === "constelacao") {
             // ── Detalhes de Constelação ──
             const curiosidade = CURIOSIDADES_CONSTELACOES[encontrado.const_id] || "Uma constelação fascinante do céu noturno.";
+            const imagemConst = IMAGENS_CONSTELACOES[encontrado.const_id];
+            const imagemHTML = imagemConst
+                ? `<img class="constelacao-img" src="${imagemConst}" alt="${encontrado.nome}" onerror="this.style.display='none'">`
+                : "";
             painel.innerHTML = `
                 <div class="detalhe-titulo">⭐ ${encontrado.nome}</div>
+                ${imagemHTML}
                 <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:#6eb8ff">CONSTELAÇÃO</span></div>
                 <div class="detalhe-linha"><span class="detalhe-icon">🔤</span><span class="detalhe-label">Abreviatura</span><span class="detalhe-valor" style="font-family:monospace;color:#ce93d8">${encontrado.const_id}</span></div>
                 <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Estrelas</span><span class="detalhe-valor" style="font-family:monospace">${encontrado.numEstrelas}</span></div>
