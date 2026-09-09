@@ -468,7 +468,7 @@ nav button:hover:not(.ativo) {
 }
 
 .detalhe-titulo {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
     color: #4fc3f7;
     margin-bottom: 16px;
@@ -489,15 +489,15 @@ nav button:hover:not(.ativo) {
 }
 
 .detalhe-icon {
-    font-size: 1.2rem;
-    width: 28px;
+    font-size: 0.95rem;
+    width: 20px;
     text-align: center;
 }
 
 .detalhe-label {
     color: #556070;
     font-size: 0.85rem;
-    width: 140px;
+    width: 130px;
     flex-shrink: 0;
     /* não encolhe mesmo com pouco espaço */
 }
