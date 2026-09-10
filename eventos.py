@@ -152,7 +152,18 @@ EVENTOS = [
         "hora_pico": "23:13",                   # momento de eclipse máximo
         "descricao": "Eclipse lunar penumbral, efeito subtil (a Lua fica ligeiramente mais escura). Seguro de observar a olho nu.",
     },
-    
+    {
+        "nome":      "Eclipse Lunar Parcial",
+        "tipo":      "eclipse_lunar",
+        "emoji":     "🌕",
+        "ano":       2028,
+        "mes":       1,                         # janeiro
+        "dia":       12,
+        "hora_ini":  "03:45",                   # P1 — início do eclipse (fonte: TutiTempo)
+        "hora_fim":  "04:41",                   # P4 — fim
+        "hora_pico": "04:13",                   # momento de eclipse máximo
+        "descricao": "Eclipse lunar parcial, efeito subtil (somente uma parte da Lua é recoberta pela sombra terrestre). Seguro de observar a olho nu.",
+    },
 ]   
 
 def get_eventos_do_dia(ano, mes, dia):
