@@ -671,6 +671,7 @@ nav button:hover:not(.ativo) {
 
 
 .observatorio-mapa-wrapper {
+    position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1064,4 +1065,84 @@ body.observatorio-ativo #btn-toggle-painel {
     margin-top: 14px;
     color: #6eb8ff;
     font-size: 0.85rem;
+}
+
+/* Botão flutuante "🥽 VR" no canto do Observatório 2D, para entrar no modo VR */
+#btn-entrar-vr {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 5;
+    background: rgba(206, 147, 216, 0.15);
+    border: 1px solid rgba(206, 147, 216, 0.4);
+    color: #ce93d8;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
+}
+
+#btn-entrar-vr:hover {
+    background: rgba(206, 147, 216, 0.3);
+    box-shadow: 0 0 16px rgba(206, 147, 216, 0.3);
+}
+
+/* O ecrã VR ocupa sempre o ecrã inteiro, sem painel nem cabeçalho — só o céu */
+body.vr-ativo header.glass-header,
+body.vr-ativo nav.glass-nav {
+    display: none;
+}
+
+#ecra-vr {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 50;
+    margin: 0;
+}
+
+#vr-canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    background: #01020a;
+    cursor: grab;
+}
+
+#vr-canvas:active {
+    cursor: grabbing;
+}
+
+/* Botão para voltar ao Observatório 2D, flutuante sobre o céu VR */
+#btn-sair-vr {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 51;
+    background: rgba(2, 4, 8, 0.6);
+    border: 1px solid rgba(206, 147, 216, 0.35);
+    color: #ce93d8;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.25s ease;
+}
+
+#btn-sair-vr:hover {
+    background: rgba(206, 147, 216, 0.2);
+}
+
+/* Esconde o botão "Menu" enquanto o VR está ativo — o #btn-sair-vr já serve de "voltar" */
+body.vr-ativo #btn-voltar {
+    display: none;
 }

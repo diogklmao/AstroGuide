@@ -77,12 +77,17 @@ function mudarEcra(nome) {
     const btn = document.getElementById("btn-" + nome);
     if (btn) btn.classList.add("ativo");
 
-    // Gerir modo ecrã inteiro para o observatório
+    // Gerir modo ecrã inteiro para o observatório e para o VR
     if (nome === "observatorio") {
         document.body.classList.add("observatorio-ativo");
+        document.body.classList.remove("vr-ativo");
         setTimeout(redimensionarCanvas, 50);
-    } else {
+    } else if (nome === "vr") {
+        document.body.classList.add("vr-ativo");
         document.body.classList.remove("observatorio-ativo");
+        setTimeout(redimensionarCanvasVR, 50);
+    } else {
+        document.body.classList.remove("observatorio-ativo", "vr-ativo");
     }
 
     // Carrega os dados do ecrã que ficou ativo
@@ -90,6 +95,7 @@ function mudarEcra(nome) {
     if (nome === "ceu") carregarCeu();
     if (nome === "observatorio") carregarObservatorio();
     if (nome === "apod") carregarApod();
+    if (nome === "vr") carregarVR();
 }
 
 // ── Céu Agora ─────────────────────────────────────────────────────

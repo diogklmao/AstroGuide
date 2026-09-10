@@ -18,7 +18,7 @@
 
 <body class="page-app" data-bg-theme="app">
 
-
+    <canvas id="three-bg" aria-hidden="true"></canvas>
     <div class="bg-vignette" aria-hidden="true"></div>
     <div class="stars" id="stars"></div>
 
@@ -129,8 +129,7 @@
                     <div id="observatorio-detalhes" class="glass-panel">
                         <div class="detalhe-titulo">ℹ️ Detalhes</div>
                         <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">
-                            Clique num astro, estrela ou constelação no mapa celeste para ver os seus detalhes
-                            astronómicos.</p>
+                            Clique num astro ou estrela no mapa celeste para ver os seus detalhes astronómicos.</p>
                     </div>
                     <!-- Ajuda e Instruções -->
                     <div id="observatorio-ajuda" class="glass-panel"
@@ -144,14 +143,22 @@
                 </div>
                 <!-- Mapa Celeste -->
                 <div class="observatorio-mapa-wrapper glass-panel">
+                    <button id="btn-entrar-vr" onclick="mudarEcra('vr')" title="Abrir Observatório VR">🥽 VR</button>
                     <canvas id="observatorio-canvas" width="800" height="800"></canvas>
                 </div>
             </div>
         </div>
+
         <div id="ecra-apod" class="ecra">
             <div id="apod-conteudo">
-                <div class="loading glass-panel"><span class="spinner"></span>A carregar imagem do dia...</div>
+                <div class="loading glass-panel"><span class="spinner"></span>A carregar imagem da NASA...</div>
             </div>
+        </div>
+
+        <div id="ecra-vr" class="ecra">
+            <button id="btn-sair-vr" onclick="mudarEcra('observatorio')" title="Voltar ao Observatório">◀
+                Observatório</button>
+            <canvas id="vr-canvas"></canvas>
         </div>
     </div>
 
@@ -171,7 +178,10 @@
         <source src="/static/audio/musica.mp3" type="audio/mpeg">
     </audio>
 
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="/static/js/three-bg.js"></script>
     <script src="/static/js/shared-ui-controls.js"></script>
+    <script src="/static/js/vr-observatorio.js"></script>
     <script src="/static/js/index.js"></script>
 </body>
 
