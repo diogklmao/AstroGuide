@@ -48,23 +48,10 @@ function iniciarCenaVR() {
     vrRenderer.setPixelRatio(window.devicePixelRatio);
     vrRenderer.setClearColor(0x01020a, 1); // mesmo tom escuro do céu do Observatório 2D
 
-    // ── Referências temporárias, só para confirmar que a cena roda bem ──
-    // (isto desaparece quando ligarmos as estrelas reais na próxima etapa)
-    const esferaRef = new THREE.Mesh(
-        new THREE.SphereGeometry(80, 16, 12),
-        new THREE.MeshBasicMaterial({ color: 0x1a3a5a, wireframe: true, transparent: true, opacity: 0.25 })
-    );
-    vrScene.add(esferaRef);
-
-    // Cubo marcador no ponto Norte (az=0°, alt=0°) — confirma a orientação inicial
-    const marcadorNorte = new THREE.Mesh(
-        new THREE.BoxGeometry(3, 3, 3),
-        new THREE.MeshBasicMaterial({ color: 0xff8f00 })
-    );
-    marcadorNorte.position.set(0, 0, -60); // Norte = -Z, ver função altAzParaPosicao() (próxima etapa)
-    vrScene.add(marcadorNorte);
-
     redimensionarCanvasVR();
+
+    // Estrelas e constelações reais, vindas do mesmo /api/observatorio que o Observatório 2D usa
+    carregarDadosVR();
 
     // Controlo por arrasto do rato — mesma ideia do drag do Observatório 2D
     canvas.addEventListener("mousedown", vrIniciarArrasto);
@@ -88,6 +75,80 @@ function redimensionarCanvasVR() {
     vrRenderer.setSize(largura, altura, false);
     vrCamera.aspect = largura / altura;
     vrCamera.updateProjectionMatrix();
+}
+
+const RAIO_CEU_VR = 500; // distância fixa da "cúpula celeste" à volta do observador
+
+// Converte altitude/azimute (graus) — o mesmo sistema de coordenadas que o
+// Observatório 2D já usa — numa posição 3D real do Three.js.
+// Norte (az=0°) fica em -Z, que é a direção "em frente" por defeito da câmara.
+function altAzParaXYZ(altGraus, azGraus, raio) {
+    const alt = altGraus * Math.PI / 180;
+    const az = azGraus * Math.PI / 180;
+    const x = raio * Math.cos(alt) * Math.sin(az);
+    const y = raio * Math.sin(alt);
+    const z = -raio * Math.cos(alt) * Math.cos(az);
+    return new THREE.Vector3(x, y, z);
+}
+
+// Busca os dados reais ao mesmo endpoint que o Observatório 2D já usa —
+// zero duplicação da lógica astronómica do sky_engine.py.
+async function carregarDadosVR() {
+    try {
+        const res = await fetch("/api/observatorio");
+        const dados = await res.json();
+        desenharEstrelasVR(dados);
+        desenharConstelacoesVR(dados);
+    } catch (err) {
+        console.error("Erro ao carregar dados do Observatório VR:", err);
+    }
+}
+
+function desenharEstrelasVR(dados) {
+    const posicoes = [];
+    for (const id in dados.estrelas) {
+        const est = dados.estrelas[id];
+        const p = altAzParaXYZ(est.altitude, est.azimute, RAIO_CEU_VR);
+        posicoes.push(p.x, p.y, p.z);
+    }
+
+    const geometria = new THREE.BufferGeometry();
+    geometria.setAttribute("position", new THREE.Float32BufferAttribute(posicoes, 3));
+
+    const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 2.5,
+        sizeAttenuation: false // mantém o tamanho constante, como estrelas "no infinito"
+    });
+
+    vrScene.add(new THREE.Points(geometria, material));
+}
+
+function desenharConstelacoesVR(dados) {
+    const posicoes = [];
+    const estrelas = dados.estrelas;
+
+    for (const id in dados.constelacoes) {
+        dados.constelacoes[id].linhas.forEach(linha => {
+            const a = estrelas[linha[0]];
+            const b = estrelas[linha[1]];
+            if (!a || !b) return;
+            const pa = altAzParaXYZ(a.altitude, a.azimute, RAIO_CEU_VR);
+            const pb = altAzParaXYZ(b.altitude, b.azimute, RAIO_CEU_VR);
+            posicoes.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
+        });
+    }
+
+    const geometria = new THREE.BufferGeometry();
+    geometria.setAttribute("position", new THREE.Float32BufferAttribute(posicoes, 3));
+
+    const material = new THREE.LineBasicMaterial({
+        color: 0x6eb8ff,
+        transparent: true,
+        opacity: 0.45
+    });
+
+    vrScene.add(new THREE.LineSegments(geometria, material));
 }
 
 function vrIniciarArrasto(e) {
