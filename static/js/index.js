@@ -301,6 +301,33 @@ const imgCeuFundo = new Image();
 imgCeuFundo.src = "/static/images/space.jpg";
 imgCeuFundo.onload = () => desenharObservatorio(); // redesenha assim que a imagem estiver pronta
 
+// Imagens e tamanhos relativos dos astros no observatório
+const IMAGENS_ASTROS = {
+    "Sol":      { src: "/static/images/sun.png",         size: 48 },
+    "Lua":      { src: "/static/images/moon_render.png", size: 18 },
+    "Mercúrio": { src: "/static/images/mercury.png",     size: 12 },
+    "Vénus":    { src: "/static/images/venus.png",       size: 20 },
+    "Marte":    { src: "/static/images/mars.png",        size: 15 },
+    "Júpiter":  { src: "/static/images/jupiter.png",     size: 34 }
+};
+
+const imgsAstros = {};
+Object.entries(IMAGENS_ASTROS).forEach(([nome, cfg]) => {
+    const img = new Image();
+    img.src = cfg.src;
+    img.onload = () => desenharObservatorio();
+    imgsAstros[nome] = img;
+});
+
+function imagemAstro(nome) {
+    const img = imgsAstros[nome];
+    return (img && img.complete && img.naturalWidth > 0) ? img : null;
+}
+
+function tamanhoAstro(nome) {
+    return IMAGENS_ASTROS[nome]?.size ?? 6.5;
+}
+
 // Estado de Arrastamento para a Câmara 360°
 let isDragging = false;
 let startX = 0;
@@ -989,40 +1016,42 @@ function desenharObservatorio() {
             const pos = projectar(astro.altitude, astro.azimute);
             if (!pos) return; // ignora se estiver fora do FOV 3D
 
-            const size = 6.5;
-            let corHalo = "rgba(255, 255, 255, 0.15)";
-            let corAstro = "#ffffff";
+            const imgAstro = imagemAstro(astro.nome);
+            const size = tamanhoAstro(astro.nome);
 
-            if (astro.tipo === "sol") {
-                corHalo = "rgba(255, 143, 0, 0.25)";
-                corAstro = "#ff8f00";
-            } else if (astro.tipo === "lua") {
-                corHalo = "rgba(176, 190, 197, 0.2)";
-                corAstro = "#cfd8dc";
-            } else if (astro.tipo === "planeta") {
-                if (astro.nome === "Marte") {
-                    corHalo = "rgba(239, 83, 80, 0.25)";
-                    corAstro = "#ef5350";
-                } else if (astro.nome === "Saturno" || astro.nome === "Júpiter") {
-                    corHalo = "rgba(255, 204, 2, 0.2)";
-                    corAstro = "#ffe082";
-                } else {
-                    corHalo = "rgba(110, 184, 255, 0.2)";
-                    corAstro = "#4fc3f7";
+            if (imgAstro) {
+                // Recorta a imagem em círculo para parecer uma esfera
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size, 0, 2 * Math.PI);
+                ctx.clip();
+                const drawSize = size * 2.5; // Zoom ligeiramente para eliminar bordas pretas
+                ctx.drawImage(imgAstro, pos.x - drawSize / 2, pos.y - drawSize / 2, drawSize, drawSize);
+                ctx.restore();
+            } else {
+                let corHalo = "rgba(255, 255, 255, 0.15)";
+                let corAstro = "#ffffff";
+
+                if (astro.tipo === "planeta") {
+                    if (astro.nome === "Saturno") {
+                        corHalo = "rgba(255, 204, 2, 0.2)";
+                        corAstro = "#ffe082";
+                    } else {
+                        corHalo = "rgba(110, 184, 255, 0.2)";
+                        corAstro = "#4fc3f7";
+                    }
                 }
+
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size * 2.2, 0, 2 * Math.PI);
+                ctx.fillStyle = corHalo;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size, 0, 2 * Math.PI);
+                ctx.fillStyle = corAstro;
+                ctx.fill();
             }
-
-            // Halo
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, size * 2.2, 0, 2 * Math.PI);
-            ctx.fillStyle = corHalo;
-            ctx.fill();
-
-            // Astro
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, size, 0, 2 * Math.PI);
-            ctx.fillStyle = corAstro;
-            ctx.fill();
 
             // Rótulo de Nome do Astro
             ctx.fillStyle = "#ffffff";
@@ -1031,20 +1060,14 @@ function desenharObservatorio() {
             ctx.textBaseline = "bottom";
             ctx.fillText(astro.nome, pos.x, pos.y - size - 4);
 
-            // Fase da Lua em Emoji
-            if (astro.tipo === "lua" && astro.emoji) {
-                ctx.font = "11px sans-serif";
-                ctx.textAlign = "left";
-                ctx.textBaseline = "middle";
-                ctx.fillText(astro.emoji, pos.x + size + 3, pos.y);
-            }
+            // Fase da Lua em Emoji (só no painel de detalhes, não no canvas)
 
             elementosNoEcra.push({
                 id: astro.id,
                 nome: astro.nome,
                 x: pos.x,
                 y: pos.y,
-                raio: 12,
+                raio: imgAstro ? size + 4 : 12,
                 tipo: astro.tipo,
                 mag: astro.tipo === "sol" ? "-26.7" : (astro.tipo === "lua" ? "-12.5" : "Variável"),
                 altitude: astro.altitude,
