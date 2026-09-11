@@ -301,14 +301,21 @@ const imgCeuFundo = new Image();
 imgCeuFundo.src = "/static/images/space.jpg";
 imgCeuFundo.onload = () => desenharObservatorio(); // redesenha assim que a imagem estiver pronta
 
+// Imagem de relva para o chão
+const imgRelva = new Image();
+imgRelva.src = "/static/images/grass.jpg";
+imgRelva.onload = () => desenharObservatorio();
+
+
 // Imagens e tamanhos relativos dos astros no observatório
 const IMAGENS_ASTROS = {
-    "Sol":      { src: "/static/images/sun.png",         size: 48 },
-    "Lua":      { src: "/static/images/moon_render.png", size: 18 },
-    "Mercúrio": { src: "/static/images/mercury.png",     size: 12 },
-    "Vénus":    { src: "/static/images/venus.png",       size: 20 },
-    "Marte":    { src: "/static/images/mars.png",        size: 15 },
-    "Júpiter":  { src: "/static/images/jupiter.png",     size: 34 }
+    "Sol": { src: "/static/images/sun.png", size: 50 },
+    "Lua": { src: "/static/images/moon_render.png", size: 18 },
+    "Mercúrio": { src: "/static/images/mercury.png", size: 12 },
+    "Vénus": { src: "/static/images/venus.png", size: 20 },
+    "Marte": { src: "/static/images/mars.png", size: 15 },
+    "Júpiter": { src: "/static/images/jupiter.png", size: 37 },
+    "Saturno": { src: "/static/images/saturn.png", size: 34 }
 };
 
 const imgsAstros = {};
@@ -683,11 +690,15 @@ function desenharObservatorio() {
             // sensação de estar a rodar sobre uma cúpula panorâmica, como um céu real.
             let offsetX = -((cameraAzimuth / 360) * imgW) % imgW;
             if (offsetX > 0) offsetX -= imgW;
-            // Desloca verticalmente conforme a altitude da câmara (olhar para cima/baixo).
             const offsetY = (height - imgH) / 2 - (cameraAltitude / 90) * (imgH * 0.15);
+
+            // Filtro ajustado para equilibrar a via láctea e as constelações
+            ctx.filter = "brightness(1.1) contrast(1.5) saturate(1.2)";
 
             ctx.drawImage(imgCeuFundo, offsetX, offsetY, imgW, imgH);
             ctx.drawImage(imgCeuFundo, offsetX + imgW, offsetY, imgW, imgH); // 2ª cópia: evita "buraco" ao dar a volta
+
+            ctx.filter = "none"; // Limpar o filtro
 
             // Dissolve a "costura" onde as duas cópias se encontram — a foto não é
             // um panorama 360° verdadeiro, por isso há um corte visível ali sem isto.
@@ -701,9 +712,7 @@ function desenharObservatorio() {
                 ctx.fillRect(seamX - 120, 0, 240, height);
             }
 
-            // Gradiente por cima, semi-transparente — escurece a foto e mantém o tom
-            // azulado noturno consistente com o resto da app, em vez da foto "crua".
-            ctx.globalAlpha = 0.7;
+            ctx.globalAlpha = 0.45; // Aumentado um pouco para escurecer o fundo e realçar as constelações
             ctx.fillStyle = gradSky;
             ctx.fillRect(0, 0, width, height);
             ctx.globalAlpha = 1;
@@ -740,40 +749,47 @@ function desenharObservatorio() {
             ctx.lineTo(0, height);
             ctx.closePath();
 
-            const gradGround = ctx.createLinearGradient(0, horizY, 0, height);
-            gradGround.addColorStop(0, "rgba(9, 11, 17, 0.97)");
-            gradGround.addColorStop(0.3, "rgba(7, 9, 14, 0.98)");
-            gradGround.addColorStop(0.65, "rgba(5, 6, 10, 0.99)");
-            gradGround.addColorStop(1, "rgba(2, 2, 4, 1.00)");
-            ctx.fillStyle = gradGround;
-            ctx.fill();
-
-            // ── Silhueta de montanhas — assenta sobre o chão, sobe um pouco
-            // acima da linha do horizonte e tapa parte do céu, como distância real ──
-            if (montanhaPoints.length > 0) {
-                ctx.beginPath();
-                ctx.moveTo(montanhaPoints[0].x, montanhaPoints[0].y);
-                for (let i = 1; i < montanhaPoints.length; i++) {
-                    ctx.lineTo(montanhaPoints[i].x, montanhaPoints[i].y);
-                }
-                ctx.lineTo(width, height);
-                ctx.lineTo(0, height);
-                ctx.closePath();
-
-                const gradMontanha = ctx.createLinearGradient(0, montanhaPoints[Math.floor(montanhaPoints.length / 2)].y, 0, horizY + 10);
-                gradMontanha.addColorStop(0, "rgba(28, 38, 58, 0.85)");   // topo — leve neblina azulada de distância
-                gradMontanha.addColorStop(1, "rgba(6, 8, 13, 0.98)");     // base — quase preto, funde com o chão
-                ctx.fillStyle = gradMontanha;
+            if (imgRelva.complete && imgRelva.naturalWidth > 0) {
+                ctx.save();
+                ctx.clip(); // Limita o desenho à área do chão
+                
+                // Cria padrão que se repete e desloca-se de acordo com o azimute da câmara
+                const padraoRelva = ctx.createPattern(imgRelva, "repeat");
+                // Escalar um pouco e mover com o azimute
+                const escalaRelva = 0.5;
+                const deslocamento = -((cameraAzimuth / 360) * imgRelva.naturalWidth * 3) % imgRelva.naturalWidth;
+                
+                ctx.translate(deslocamento, 0);
+                // Também aplicar escala ao contexto para textura ficar mais densa
+                ctx.scale(escalaRelva, escalaRelva);
+                
+                ctx.fillStyle = padraoRelva;
+                ctx.fillRect(-imgRelva.naturalWidth/escalaRelva, horizY/escalaRelva, (width + imgRelva.naturalWidth * 2)/escalaRelva, (height - horizY)/escalaRelva);
+                
+                // Repor matriz para gradiente
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                
+                // Aplicar sombreamento no relvado (mais escuro na distância)
+                const escurecimento = ctx.createLinearGradient(0, horizY, 0, height);
+                escurecimento.addColorStop(0, "rgba(4, 6, 12, 0.95)"); // Horizonte quase preto
+                escurecimento.addColorStop(0.3, "rgba(4, 6, 12, 0.7)");
+                escurecimento.addColorStop(0.8, "rgba(4, 6, 12, 0.3)"); // Relva visível perto
+                escurecimento.addColorStop(1, "rgba(4, 6, 12, 0.1)");
+                ctx.fillStyle = escurecimento;
                 ctx.fill();
-
-                // Contorno subtil no cume — como luar a bater no perfil das montanhas
-                ctx.beginPath();
-                ctx.moveTo(montanhaPoints[0].x, montanhaPoints[0].y);
-                for (let i = 1; i < montanhaPoints.length; i++) ctx.lineTo(montanhaPoints[i].x, montanhaPoints[i].y);
-                ctx.strokeStyle = "rgba(140, 165, 210, 0.18)";
-                ctx.lineWidth = 1;
-                ctx.stroke();
+                
+                ctx.restore();
+            } else {
+                const gradGround = ctx.createLinearGradient(0, horizY, 0, height);
+                gradGround.addColorStop(0, "rgba(9, 11, 17, 0.97)");
+                gradGround.addColorStop(0.3, "rgba(7, 9, 14, 0.98)");
+                gradGround.addColorStop(0.65, "rgba(5, 6, 10, 0.99)");
+                gradGround.addColorStop(1, "rgba(2, 2, 4, 1.00)");
+                ctx.fillStyle = gradGround;
+                ctx.fill();
             }
+
+            // Silhueta de montanhas removida a pedido do utilizador
 
             // Névoa suave no horizonte — tom frio, consistente com as montanhas
             const gradFog = ctx.createLinearGradient(0, horizY - 20, 0, horizY + 35);
@@ -878,8 +894,10 @@ function desenharObservatorio() {
 
     // 2. Desenhar as linhas das constelações (se ativo)
     if (showConstelacoes) {
-        ctx.strokeStyle = "rgba(110, 184, 255, 0.45)"; // Mais brilhante
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(110, 200, 255, 0.8)"; // Azul claro opaco para a linha
+        ctx.lineWidth = 2.0;
+        ctx.shadowBlur = 12; // Efeito neon
+        ctx.shadowColor = "rgba(110, 200, 255, 1)"; // Cor do brilho neon
 
         const constelacoes = observatorioDados.constelacoes;
         const estrelas = observatorioDados.estrelas;
@@ -922,10 +940,19 @@ function desenharObservatorio() {
 
             // Nomes das constelações
             if (showNomesConstelacoes && count > 0) {
-                ctx.fillStyle = "rgba(110, 184, 255, 0.35)";
-                ctx.font = "italic 9.5px sans-serif";
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = "rgba(110, 200, 255, 1)"; // Efeito glow para o texto
+                ctx.fillStyle = "rgba(255, 255, 255, 0.95)"; // Texto quase branco e opaco
+                ctx.font = "bold italic 11px sans-serif"; // Fonte maior e a negrito
                 ctx.textAlign = "center";
                 ctx.fillText(constelacao.nome, sumX / count, sumY / count);
+
+                // Repor o shadowBlur para as linhas na próxima iteração do ciclo
+                if (showConstelacoes) {
+                    ctx.shadowBlur = 12;
+                } else {
+                    ctx.shadowBlur = 0;
+                }
             }
 
             // Registar constelação como elemento clicável
@@ -942,6 +969,8 @@ function desenharObservatorio() {
                 });
             }
         }
+
+        ctx.shadowBlur = 0; // Limpar o efeito neon para não afetar as estrelas e outros elementos
     }
 
     // 3. Desenhar as Estrelas
