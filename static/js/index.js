@@ -274,6 +274,28 @@ let cameraAzimuth = 0;   // 0° = Norte, 90° = Este, 180° = Sul, 270° = Oeste
 let cameraAltitude = 15;  // Altitude em graus (-85° a 85°)
 let cameraFOV = 80;       // Campo de visão horizontal em graus
 
+// ── Silhueta de montanhas no horizonte ─────────────────────────────
+// Gerada uma vez por soma de ondas — dá um perfil irregular mas consistente
+// à volta dos 360°, para as montanhas não "saltarem" quando rodas a câmara.
+const PERFIL_MONTANHAS = (function gerarPerfilMontanhas() {
+    const perfil = [];
+    for (let az = 0; az < 360; az++) {
+        const rad = az * Math.PI / 180;
+        let altura =
+            2.2 * Math.sin(rad * 3 + 1.3) +
+            1.3 * Math.sin(rad * 7 + 0.4) +
+            0.8 * Math.sin(rad * 13 + 2.1) +
+            0.5 * Math.sin(rad * 23 + 0.9);
+        perfil.push(Math.max(0.3, altura + 2.6)); // altitude aparente entre ~0.3° e ~5.5°
+    }
+    return perfil;
+})();
+
+function alturaMontanha(az) {
+    const azNorm = ((az % 360) + 360) % 360;
+    return PERFIL_MONTANHAS[Math.floor(azNorm)];
+}
+
 // Imagem de fundo do céu (Via Láctea real) — dá um efeito panorâmico ao rodar a câmara
 const imgCeuFundo = new Image();
 imgCeuFundo.src = "/static/images/space.jpg";
@@ -640,9 +662,21 @@ function desenharObservatorio() {
             ctx.drawImage(imgCeuFundo, offsetX, offsetY, imgW, imgH);
             ctx.drawImage(imgCeuFundo, offsetX + imgW, offsetY, imgW, imgH); // 2ª cópia: evita "buraco" ao dar a volta
 
+            // Dissolve a "costura" onde as duas cópias se encontram — a foto não é
+            // um panorama 360° verdadeiro, por isso há um corte visível ali sem isto.
+            const seamX = offsetX + imgW;
+            if (seamX > -140 && seamX < width + 140) {
+                const gradCostura = ctx.createLinearGradient(seamX - 120, 0, seamX + 120, 0);
+                gradCostura.addColorStop(0, "rgba(4, 8, 16, 0)");
+                gradCostura.addColorStop(0.5, "rgba(4, 8, 16, 0.6)");
+                gradCostura.addColorStop(1, "rgba(4, 8, 16, 0)");
+                ctx.fillStyle = gradCostura;
+                ctx.fillRect(seamX - 120, 0, 240, height);
+            }
+
             // Gradiente por cima, semi-transparente — escurece a foto e mantém o tom
             // azulado noturno consistente com o resto da app, em vez da foto "crua".
-            ctx.globalAlpha = 0.5;
+            ctx.globalAlpha = 0.7;
             ctx.fillStyle = gradSky;
             ctx.fillRect(0, 0, width, height);
             ctx.globalAlpha = 1;
@@ -653,19 +687,23 @@ function desenharObservatorio() {
             ctx.fillRect(0, 0, width, height);
         }
 
-        // Calcular linha do horizonte
+        // Calcular linha do horizonte e o perfil das montanhas nessa mesma faixa
         let horizonPoints = [];
+        let montanhaPoints = [];
         const step = 2;
         for (let azOffset = -cameraFOV; azOffset <= cameraFOV; azOffset += step) {
             const az = (cameraAzimuth + azOffset + 360) % 360;
             const pos = projectar(0, az);
             if (pos) horizonPoints.push(pos);
+            const posMonte = projectar(alturaMontanha(az), az);
+            if (posMonte) montanhaPoints.push(posMonte);
         }
 
         if (horizonPoints.length > 0) {
             const horizY = horizonPoints[Math.floor(horizonPoints.length / 2)].y;
 
-            // ── Solo: preencher com gradiente verde noturno ───────────
+            // ── Solo: gradiente escuro e neutro (deixa de ser verde vivo,
+            // que destoava da foto real da Via Láctea) ───────────────────
             ctx.beginPath();
             ctx.moveTo(horizonPoints[0].x, horizonPoints[0].y);
             for (let i = 1; i < horizonPoints.length; i++) {
@@ -676,21 +714,45 @@ function desenharObservatorio() {
             ctx.closePath();
 
             const gradGround = ctx.createLinearGradient(0, horizY, 0, height);
-            gradGround.addColorStop(0, "rgba(10, 48, 14, 0.97)");
-            gradGround.addColorStop(0.3, "rgba(14, 60, 18, 0.98)");
-            gradGround.addColorStop(0.65, "rgba( 8, 38, 10, 0.99)");
-            gradGround.addColorStop(1, "rgba( 3, 18,  5, 1.00)");
+            gradGround.addColorStop(0, "rgba(9, 11, 17, 0.97)");
+            gradGround.addColorStop(0.3, "rgba(7, 9, 14, 0.98)");
+            gradGround.addColorStop(0.65, "rgba(5, 6, 10, 0.99)");
+            gradGround.addColorStop(1, "rgba(2, 2, 4, 1.00)");
             ctx.fillStyle = gradGround;
             ctx.fill();
 
+            // ── Silhueta de montanhas — assenta sobre o chão, sobe um pouco
+            // acima da linha do horizonte e tapa parte do céu, como distância real ──
+            if (montanhaPoints.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(montanhaPoints[0].x, montanhaPoints[0].y);
+                for (let i = 1; i < montanhaPoints.length; i++) {
+                    ctx.lineTo(montanhaPoints[i].x, montanhaPoints[i].y);
+                }
+                ctx.lineTo(width, height);
+                ctx.lineTo(0, height);
+                ctx.closePath();
 
+                const gradMontanha = ctx.createLinearGradient(0, montanhaPoints[Math.floor(montanhaPoints.length / 2)].y, 0, horizY + 10);
+                gradMontanha.addColorStop(0, "rgba(28, 38, 58, 0.85)");   // topo — leve neblina azulada de distância
+                gradMontanha.addColorStop(1, "rgba(6, 8, 13, 0.98)");     // base — quase preto, funde com o chão
+                ctx.fillStyle = gradMontanha;
+                ctx.fill();
 
+                // Contorno subtil no cume — como luar a bater no perfil das montanhas
+                ctx.beginPath();
+                ctx.moveTo(montanhaPoints[0].x, montanhaPoints[0].y);
+                for (let i = 1; i < montanhaPoints.length; i++) ctx.lineTo(montanhaPoints[i].x, montanhaPoints[i].y);
+                ctx.strokeStyle = "rgba(140, 165, 210, 0.18)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
 
-            // Névoa suave no horizonte
+            // Névoa suave no horizonte — tom frio, consistente com as montanhas
             const gradFog = ctx.createLinearGradient(0, horizY - 20, 0, horizY + 35);
-            gradFog.addColorStop(0, "rgba(15, 55, 30, 0.0)");
-            gradFog.addColorStop(0.45, "rgba(18, 65, 32, 0.22)");
-            gradFog.addColorStop(1, "rgba( 8, 35, 15, 0.0)");
+            gradFog.addColorStop(0, "rgba(40, 55, 80, 0.0)");
+            gradFog.addColorStop(0.45, "rgba(50, 65, 95, 0.16)");
+            gradFog.addColorStop(1, "rgba(20, 25, 40, 0.0)");
             ctx.fillStyle = gradFog;
             ctx.fillRect(0, horizY - 20, width, 55);
 
@@ -698,11 +760,8 @@ function desenharObservatorio() {
             ctx.beginPath();
             ctx.moveTo(horizonPoints[0].x, horizonPoints[0].y);
             for (let i = 1; i < horizonPoints.length; i++) ctx.lineTo(horizonPoints[i].x, horizonPoints[i].y);
-            ctx.strokeStyle = "rgba(70, 190, 100, 0.28)";
+            ctx.strokeStyle = "rgba(110, 140, 185, 0.2)";
             ctx.lineWidth = 1.5;
-            ctx.stroke();
-            ctx.strokeStyle = "rgba(50, 160, 80, 0.07)";
-            ctx.lineWidth = 10;
             ctx.stroke();
         }
 
