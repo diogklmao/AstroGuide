@@ -7,6 +7,10 @@ let vrIniciado = false;
 let vrScene, vrCamera, vrRenderer;
 let vrSessaoAtiva = false; // true enquanto uma sessão XR (headset) está aberta
 
+// Estado dos astros (Sol/Lua/planetas): dados atuais e grupo de sprites em cena.
+let dadosVRAtuais = null;
+let vrGrupoAstros = null;
+
 // Garante que o THREE está disponível, independentemente de outros scripts
 // o terem carregado ou não. Se já existir globalmente, usa-o; senão, carrega o CDN.
 function garantirTHREE(callback) {
@@ -91,19 +95,52 @@ function iniciarCenaVR() {
 }
 
 // ── Fundo imersivo da Via Láctea ────────────────────────────────────────────
+// Aplica o MESMO tratamento do Observatório 2D ao fundo (filtro de cor +
+// escurecimento com globalAlpha 0.45), tudo DENTRO do canvas antes de virar
+// textura. O Three.js não tem ctx.filter, por isso pré-processa-se a imagem.
+// A esfera fica OPOSTA (sem transparent): se tivesse transparência, como o
+// centro dela coincide com a câmara, o Three.js desenhava-a POR CIMA dos
+// planetas e eles pareciam estar atrás da foto desbotada.
+// O onload é atribuído ANTES do src (padrão já usado nos astros) para não
+// perder o evento em imagens vindas da cache.
 function adicionarFundoViaLactea() {
-    const loader = new THREE.TextureLoader();
-    loader.load("/static/images/space.jpg", (textura) => {
+    const img = new Image();
+    img.onload = () => {
+        if (!(img.naturalWidth > 0)) return;
+
+        // Filtro idêntico ao Observatório 2D: equilibra via láctea e constelações
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.filter = "brightness(0.7) contrast(1.6) saturate(1.9)";
+        ctx.drawImage(img, 0, 0);
+        ctx.filter = "none";
+
+        // Escurecimento igual ao 2D (ctx.globalAlpha = 0.45 + gradSky):
+        // mais escuro no topo, mais claro junto ao horizonte.
+        const gradSky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradSky.addColorStop(0, "#01020a");
+        gradSky.addColorStop(0.5, "#04081a");
+        gradSky.addColorStop(1, "#08122a");
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = gradSky;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1;
+
+        const textura = new THREE.CanvasTexture(canvas);
+        finalizarTexturaVR(textura);
+
         const geometria = new THREE.SphereGeometry(RAIO_CEU_VR * 1.7, 48, 32);
         const material = new THREE.MeshBasicMaterial({
             map: textura,
             side: THREE.BackSide,
-            transparent: true,
-            opacity: 0.30,
             depthWrite: false
         });
         vrScene.add(new THREE.Mesh(geometria, material));
-    });
+    };
+    img.onerror = () => console.error("VR: falha ao carregar o fundo da Via Láctea.");
+    img.src = "/static/images/space.jpg";
 }
 
 // ── Ajustar canvas e câmara ao ecrã (apenas no modo PC; no XR o próprio motor gere) ──
@@ -171,78 +208,300 @@ function desenharEstrelasVR(dados) {
 }
 
 // ── Constelações ────────────────────────────────────────────────────────────
+// Replica o Observatório 2D: linhas com efeito "neon" (núcleo brilhante com
+// halos aditivos suaves) e o nome da constelação no centroide das estrelas.
+// Só usa API do núcleo do Three.js (TubeGeometry, LineCurve3, CanvasTexture),
+// sem depender de addons — funciona no Quest 3 e no navegador normal.
+
+// Tubo fino e direito entre dois pontos da cúpula celeste (segmento de reta)
+function tuboDeLinha(a, b, raio) {
+    return new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 3, raio, 5, false);
+}
+
+// Funde várias geometrias de tubos numa só (todas não-indexadas) — assim a
+// cena de constelações inteira desenha-se com apenas 3 draw calls em VR.
+function fundirPosicoes(listaGeometrias) {
+    const vertices = [];
+    for (const geometria of listaGeometrias) {
+        const semIndice = geometria.toNonIndexed();
+        const pos = semIndice.getAttribute("position");
+        for (let i = 0; i < pos.count; i++) {
+            vertices.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+        }
+        semIndice.dispose();
+        geometria.dispose();
+    }
+    const fundida = new THREE.BufferGeometry();
+    fundida.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+    return fundida;
+}
+
+// Etiqueta de texto (nome da constelação) num sprite orientado à câmara,
+// gerada num canvas — equivalente ao fillText com glow do Observatório 2D.
+function criarEtiquetaConstelacao(nome, posicao) {
+    const largura = 512, altura = 128;
+    const canvas = document.createElement("canvas");
+    canvas.width = largura;
+    canvas.height = altura;
+    const ctx = canvas.getContext("2d");
+    ctx.font = "bold italic 64px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(110, 200, 255, 0.9)";
+    ctx.shadowBlur = 24;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(nome, largura / 2, altura / 2);
+    ctx.shadowBlur = 42;
+    ctx.fillText(nome, largura / 2, altura / 2);
+
+    const textura = new THREE.CanvasTexture(canvas);
+    textura.minFilter = THREE.LinearFilter;
+    textura.anisotropy = vrRenderer.capabilities.getMaxAnisotropy();
+
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: textura,
+        transparent: true,
+        depthWrite: false
+    }));
+    sprite.renderOrder = 1; // por cima das linhas e estrelas, para ser legível
+
+    // Escala proporcional ao comprimento do nome — etiquetas legíveis na cúpula
+    const larguraTexto = ctx.measureText(nome).width;
+    const escalaX = RAIO_CEU_VR * 0.095 * (larguraTexto / 220);
+    sprite.scale.set(escalaX, escalaX * (altura / largura), 1);
+    sprite.position.copy(posicao);
+    return sprite;
+}
+
 function desenharConstelacoesVR(dados) {
-    const posicoes = [];
     const estrelas = dados.estrelas;
+    const geometriasGlowExterior = [];
+    const geometriasGlowInterior = [];
+    const geometriasNucleo = [];
+    const etiquetas = [];
 
     for (const id in dados.constelacoes) {
-        dados.constelacoes[id].linhas.forEach(linha => {
+        const constelacao = dados.constelacoes[id];
+        const estrelasUnicas = new Set();
+
+        constelacao.linhas.forEach(linha => {
             const a = estrelas[linha[0]];
             const b = estrelas[linha[1]];
             if (!a || !b) return;
+            estrelasUnicas.add(linha[0]);
+            estrelasUnicas.add(linha[1]);
+
+            // Tal como no Observatório 2D: só desenha a linha se pelo menos uma
+            // das estrelas estiver acima do horizonte.
+            if (!(a.visivel || b.visivel)) return;
+
             const pa = altAzParaXYZ(a.altitude, a.azimute, RAIO_CEU_VR);
             const pb = altAzParaXYZ(b.altitude, b.azimute, RAIO_CEU_VR);
-            posicoes.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
+            if (pa.distanceTo(pb) < 0.5) return; // evita tubos de comprimento nulo
+
+            // Três camadas do efeito neon: halo exterior largo, halo interior e núcleo
+            geometriasGlowExterior.push(tuboDeLinha(pa, pb, 2.6));
+            geometriasGlowInterior.push(tuboDeLinha(pa, pb, 1.5));
+            geometriasNucleo.push(tuboDeLinha(pa, pb, 0.55));
+        });
+
+        // Nome da constelação no centroide das estrelas visíveis (como no 2D).
+        // Usa só estrelas acima do horizonte; se nenhuma estiver, omitir o nome.
+        const centroide = new THREE.Vector3(0, 0, 0);
+        let count = 0;
+        estrelasUnicas.forEach(idEstrela => {
+            const est = estrelas[idEstrela];
+            if (est && est.visivel) {
+                centroide.add(altAzParaXYZ(est.altitude, est.azimute, 1));
+                count++;
+            }
+        });
+        if (count > 0) {
+            centroide.divideScalar(count).normalize().multiplyScalar(RAIO_CEU_VR);
+            etiquetas.push(criarEtiquetaConstelacao(constelacao.nome, centroide));
+        }
+    }
+
+    // Camada "neon": material aditivo com brilho azul suave
+    const adicionarCamada = (geometrias, cor, opacidade, aditivo, renderOrder) => {
+        if (geometrias.length === 0) return;
+        const material = new THREE.MeshBasicMaterial({
+            color: cor,
+            transparent: true,
+            opacity: opacidade,
+            depthWrite: false,
+            blending: aditivo ? THREE.AdditiveBlending : THREE.NormalBlending
+        });
+        const malha = new THREE.Mesh(fundirPosicoes(geometrias), material);
+        malha.renderOrder = renderOrder; // negativo: desenha atrás das estrelas/astros
+        vrScene.add(malha);
+    };
+
+    adicionarCamada(geometriasGlowExterior, 0x3f9cff, 0.10, true, -3);
+    adicionarCamada(geometriasGlowInterior, 0x6ec8ff, 0.26, true, -2);
+    adicionarCamada(geometriasNucleo, 0xaedcff, 0.92, false, -1);
+
+    etiquetas.forEach(e => vrScene.add(e));
+}
+
+// ── Sol, Lua e Planetas em 3D (mesmas imagens e tamanhos do Observatório 2D) ──
+// Tal como no 2D, o "size" define o raio do disco visível de cada astro.
+// Os PNGs costumam ter fundo opaco/escuro — por isso o sprite teria uma
+// "borda preta" quadrada. Para eliminar isso, replica-se a técnica do 2D:
+// recortar a imagem num círculo (ctx.clip) e ampliá-la 2.5x para preencher
+// o disco sem sobras. Só Saturno é desenhado inteiro (anéis transparentes).
+
+const IMAGENS_ASTROS_VR = {
+    "Sol": { src: "/static/images/sun.png", size: 50 },
+    "Lua": { src: "/static/images/moon_render.png", size: 18 },
+    "Mercúrio": { src: "/static/images/mercury.png", size: 12 },
+    "Vénus": { src: "/static/images/venus.png", size: 20 },
+    "Marte": { src: "/static/images/mars.png", size: 15 },
+    "Júpiter": { src: "/static/images/jupiter.png", size: 37 },
+    "Saturno": { src: "/static/images/saturn.png", size: 34 },
+    "Úrano": { src: "/static/images/uranus.png", size: 25 },
+    "Neptuno": { src: "/static/images/neptune.png", size: 24 }
+};
+
+// Resolução dos canvas gerados (px por unidade de "size" do 2D) — só afeta a
+// nitidez da textura, não o tamanho final do astro na cúpula.
+const RES_IMAGEM_VR = 8;
+
+// Converte os tamanhos do 2D (píxeis) para unidades do mundo VR, mantendo as
+// proporções entre astros. Júpiter (size 37) tem um disco de ~72 unidades de
+// diâmetro a RAIO_CEU_VR=500 (~8.3° — bem visível). Isto é ~1.3x maior do que
+// a versão anterior e ~8x maior do que a v1, em que os astros eram pontos.
+const FATOR_ESCALA_VR = 72 / (37 * 2);
+
+function astroCfg(nome) {
+    const semAcento = (nome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return IMAGENS_ASTROS_VR[nome] || IMAGENS_ASTROS_VR[semAcento];
+}
+
+// ── Pré-carregamento das imagens (igual ao Observatório 2D) ─────────────────
+// As imagens são carregadas UMA vez para um mapa. O onload é atribuído ANTES
+// do src — se for ao contrário, uma imagem já em cache (por já ter sido usada
+// no Observatório 2D) pode terminar antes do handler ficar ligado e o onload
+// nunca dispara, deixando os planetas invisíveis. Sempre que uma imagem fica
+// pronta, reconstrói o grupo de astros (se já houver dados).
+const imgsAstrosVR = {};
+Object.entries(IMAGENS_ASTROS_VR).forEach(([nome, cfg]) => {
+    const img = new Image();
+    img.onload = () => {
+        if (!(img.naturalWidth > 0)) return;
+        if (dadosVRAtuais) reconstruirAstrosVR();
+    };
+    img.onerror = () => console.error("VR: falha ao carregar imagem do astro:", cfg.src);
+    img.src = cfg.src;
+    imgsAstrosVR[nome] = img;
+});
+
+function imagemAstroVR(nome) {
+    if (!nome) return null;
+    const semAcento = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const img = imgsAstrosVR[nome] || imgsAstrosVR[semAcento];
+    return (img && img.complete && img.naturalWidth > 0) ? img : null;
+}
+
+function finalizarTexturaVR(textura) {
+    textura.colorSpace = THREE.SRGBColorSpace;
+    textura.minFilter = THREE.LinearFilter;
+    textura.anisotropy = vrRenderer.capabilities.getMaxAnisotropy();
+    return textura;
+}
+
+// Recorte circular — idêntico ao Observatório 2D (arc + clip + zoom 2.5x).
+// O resultado tem fundo transparente, sem a "borda preta" do PNG original.
+function texturaAstroCircular(img, size2d) {
+    const lado = Math.max(32, Math.round(size2d * 2 * RES_IMAGEM_VR));
+    const canvas = document.createElement("canvas");
+    canvas.width = lado;
+    canvas.height = lado;
+    const ctx = canvas.getContext("2d");
+    const cx = lado / 2, cy = lado / 2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, lado / 2, 0, 2 * Math.PI);
+    ctx.clip();
+    const drawLado = lado * 1.25; // igual a size*2.5 do 2D, ampliado para o canvas
+    ctx.drawImage(img, cx - drawLado / 2, cy - drawLado / 2, drawLado, drawLado);
+    ctx.restore();
+
+    return finalizarTexturaVR(new THREE.CanvasTexture(canvas));
+}
+
+// Saturno: anéis transparentes no PNG, desenha-se a imagem inteira sem recorte.
+function texturaAstroCompleta(img, size2d) {
+    const lado = Math.max(32, Math.round(size2d * 2.2 * RES_IMAGEM_VR));
+    const canvas = document.createElement("canvas");
+    canvas.width = lado;
+    canvas.height = lado;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, lado, lado);
+
+    return finalizarTexturaVR(new THREE.CanvasTexture(canvas));
+}
+
+function desenharAstrosVR(dados) {
+    dadosVRAtuais = dados;         // guarda para reconstruir quando as imagens chegarem
+    reconstruirAstrosVR();
+}
+
+function reconstruirAstrosVR() {
+    // Remove o grupo anterior (se existir) para não acumular sprites duplicados
+    // sempre que uma imagem termina de carregar.
+    if (vrGrupoAstros) {
+        vrScene.remove(vrGrupoAstros);
+        vrGrupoAstros.traverse(obj => {
+            if (obj.material) {
+                if (obj.material.map) obj.material.map.dispose();
+                obj.material.dispose();
+            }
         });
     }
 
-    const geometria = new THREE.BufferGeometry();
-    geometria.setAttribute("position", new THREE.Float32BufferAttribute(posicoes, 3));
-
-    const material = new THREE.LineBasicMaterial({
-        color: 0x6eb8ff,
-        transparent: true,
-        opacity: 0.45
-    });
-
-    vrScene.add(new THREE.LineSegments(geometria, material));
-}
-
-// ── Sol, Lua e Planetas em 3D (sprites com as mesmas imagens do Observatório 2D) ──
-// Escalas em unidades do mundo, com o céu a RAIO_CEU_VR=500 do observador.
-const IMAGENS_ASTROS_VR = {
-    "Sol":      { src: "/static/images/sun.png",         escala: 12 },
-    "Lua":      { src: "/static/images/moon_render.png", escala: 5 },
-    "Mercúrio": { src: "/static/images/mercury.png",     escala: 2.2 },
-    "Vénus":    { src: "/static/images/venus.png",       escala: 3.4 },
-    "Marte":    { src: "/static/images/mars.png",        escala: 2.6 },
-    "Júpiter":  { src: "/static/images/jupiter.png",     escala: 6.5 },
-    "Saturno":  { src: "/static/images/saturn.png",      escala: 6.0 },
-    "Úrano":    { src: "/static/images/uranus.png",      escala: 4.4 },
-    "Neptuno":  { src: "/static/images/neptune.png",     escala: 4.2 }
-};
-
-function desenharAstrosVR(dados) {
     const grupo = new THREE.Group();
-    const loader = new THREE.TextureLoader();
+    vrGrupoAstros = grupo;
 
-    dados.astros.forEach(astro => {
+    dadosVRAtuais.astros.forEach(astro => {
         if (!astro.visivel) return; // astros abaixo do horizonte não aparecem
 
-        const cfg = IMAGENS_ASTROS_VR[astro.nome] ||
-            IMAGENS_ASTROS_VR[astro.nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "")];
+        const cfg = astroCfg(astro.nome);
         if (!cfg) return;
 
-        loader.load(cfg.src, (textura) => {
-            const material = new THREE.SpriteMaterial({
-                map: textura,
-                transparent: true,
-                depthWrite: false,
-                depthTest: true
-            });
-            if (astro.tipo === "sol") {
-                // Sol com brilho forte — mistura aditiva
-                material.blending = THREE.AdditiveBlending;
-                material.opacity = 0.95;
-            }
+        // Só desenha quando a imagem já está pronta; senão aguarda o onload do
+        // pré-carregamento, que voltará a chamar esta função.
+        const img = imagemAstroVR(astro.nome);
+        if (!img) return;
 
-            const sprite = new THREE.Sprite(material);
-            const p = altAzParaXYZ(astro.altitude, astro.azimute, RAIO_CEU_VR);
-            sprite.position.copy(p);
-            const s = cfg.escala;
-            sprite.scale.set(s, s, 1);
-            grupo.add(sprite);
+        const ehSaturno = astroCfg(astro.nome) === IMAGENS_ASTROS_VR["Saturno"];
+        const textura = ehSaturno
+            ? texturaAstroCompleta(img, cfg.size)
+            : texturaAstroCircular(img, cfg.size);
+
+        const material = new THREE.SpriteMaterial({
+            map: textura,
+            transparent: true,
+            depthWrite: false,
+            depthTest: true
         });
+        if (astro.tipo === "sol") {
+            // Sol com brilho forte — mistura aditiva
+            material.blending = THREE.AdditiveBlending;
+            material.opacity = 0.95;
+        }
+
+        const sprite = new THREE.Sprite(material);
+        sprite.position.copy(altAzParaXYZ(astro.altitude, astro.azimute, RAIO_CEU_VR));
+
+        // Largura do sprite = diâmetro do disco no mundo. Saturno conta com
+        // os anéis (size*2.2, tal como no 2D).
+        const largura = ehSaturno
+            ? cfg.size * 2.2 * FATOR_ESCALA_VR
+            : cfg.size * 2 * FATOR_ESCALA_VR;
+        sprite.scale.set(largura, largura, 1);
+        grupo.add(sprite);
     });
 
     vrScene.add(grupo);
