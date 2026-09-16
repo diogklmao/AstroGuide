@@ -1147,6 +1147,85 @@ body.vr-ativo #btn-voltar {
     display: none;
 }
 
+/* ── Menu de entrada no VR (Meta Quest) ─────────────────────────────── */
+.vr-menu {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 55;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 24px;
+    background: rgba(2, 4, 8, 0.65);
+    border: 1px solid rgba(206, 147, 216, 0.35);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transition: opacity 0.4s ease;
+}
+
+#btn-iniciar-vr {
+    background: rgba(206, 147, 216, 0.2);
+    border: 1px solid rgba(206, 147, 216, 0.55);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 14px 28px;
+    border-radius: 12px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
+    white-space: nowrap;
+}
+
+#btn-iniciar-vr:hover:not(:disabled) {
+    background: rgba(206, 147, 216, 0.4);
+    box-shadow: 0 0 24px rgba(206, 147, 216, 0.45);
+    transform: translateY(-2px);
+}
+
+#btn-iniciar-vr:disabled,
+#btn-iniciar-vr.indisponivel {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+#vr-ajuda {
+    margin: 0;
+    font-size: 0.8rem;
+    color: rgba(200, 220, 255, 0.75);
+    text-align: center;
+    max-width: 320px;
+    line-height: 1.4;
+}
+
+/* Durante uma sessão de headset, esconde a interface flutuante — só o céu */
+body.vr-sessao .vr-menu,
+body.vr-sessao #btn-sair-vr {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Reduz o tamanho em ecrãs pequenos (telefone/tablet) */
+@media (max-width: 600px) {
+    .vr-menu {
+        bottom: 24px;
+        padding: 12px 16px;
+    }
+
+    #btn-iniciar-vr {
+        font-size: 0.9rem;
+        padding: 12px 20px;
+    }
+}
+
 /* ── Botão flutuante "🔴 Night Mode (Red Velvet)" no Observatório ── */
 #btn-night-mode {
     position: absolute;

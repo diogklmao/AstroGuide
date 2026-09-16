@@ -81,6 +81,8 @@ function mudarEcra(nome) {
     if (nome === "observatorio") {
         document.body.classList.add("observatorio-ativo");
         document.body.classList.remove("vr-ativo");
+        // Se estivermos numa sessão de headset, termina-a ao voltar ao Observatório 2D
+        if (typeof sairSessaoVR === "function") sairSessaoVR();
         setTimeout(redimensionarCanvas, 50);
     } else if (nome === "vr") {
         document.body.classList.add("vr-ativo");
@@ -88,6 +90,7 @@ function mudarEcra(nome) {
         setTimeout(redimensionarCanvasVR, 50);
     } else {
         document.body.classList.remove("observatorio-ativo", "vr-ativo");
+        if (typeof sairSessaoVR === "function") sairSessaoVR();
     }
 
     // Carrega os dados do ecrã que ficou ativo
