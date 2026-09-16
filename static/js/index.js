@@ -1056,12 +1056,12 @@ function desenharObservatorio() {
                     const drawH = size * 2.2;
                     ctx.drawImage(imgAstro, pos.x - drawW / 2, pos.y - drawH / 2, drawW, drawH);
                 } else {
-                    // Recorta a imagem em círculo perfeito e ajusta as dimensões sem bordas pretas
+                    // Recorta a imagem em círculo e aplica zoom para eliminar quaisquer bordas
                     ctx.save();
                     ctx.beginPath();
                     ctx.arc(pos.x, pos.y, size, 0, 2 * Math.PI);
                     ctx.clip();
-                    const drawSize = size * 2.05;
+                    const drawSize = size * 2.5;
                     ctx.drawImage(imgAstro, pos.x - drawSize / 2, pos.y - drawSize / 2, drawSize, drawSize);
                     ctx.restore();
                 }
