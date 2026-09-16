@@ -310,7 +310,9 @@ const IMAGENS_ASTROS = {
     "Vénus": { src: "/static/images/venus.png", size: 20 },
     "Marte": { src: "/static/images/mars.png", size: 15 },
     "Júpiter": { src: "/static/images/jupiter.png", size: 37 },
-    "Saturno": { src: "/static/images/saturn.png", size: 34 }
+    "Saturno": { src: "/static/images/saturn.png", size: 34 },
+    "Úrano": { src: "/static/images/uranus.png", size: 25 },
+    "Neptuno": { src: "/static/images/neptune.png", size: 24 },
 };
 
 const imgsAstros = {};
@@ -322,12 +324,16 @@ Object.entries(IMAGENS_ASTROS).forEach(([nome, cfg]) => {
 });
 
 function imagemAstro(nome) {
-    const img = imgsAstros[nome];
+    if (!nome) return null;
+    const nomeSemAcento = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const img = imgsAstros[nome] || imgsAstros[nomeSemAcento];
     return (img && img.complete && img.naturalWidth > 0) ? img : null;
 }
 
 function tamanhoAstro(nome) {
-    return IMAGENS_ASTROS[nome]?.size ?? 6.5;
+    if (!nome) return 6.5;
+    const nomeSemAcento = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return IMAGENS_ASTROS[nome]?.size ?? IMAGENS_ASTROS[nomeSemAcento]?.size ?? 6.5;
 }
 
 // Estado de Arrastamento para a Câmara 360°
@@ -1044,14 +1050,21 @@ function desenharObservatorio() {
             const size = tamanhoAstro(astro.nome);
 
             if (imgAstro) {
-                // Recorta a imagem em círculo para parecer uma esfera
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, size, 0, 2 * Math.PI);
-                ctx.clip();
-                const drawSize = size * 2.5; // Zoom ligeiramente para eliminar bordas pretas
-                ctx.drawImage(imgAstro, pos.x - drawSize / 2, pos.y - drawSize / 2, drawSize, drawSize);
-                ctx.restore();
+                if (astro.nome === "Saturno") {
+                    // Saturno possui anéis transparentes em PNG — desenhar diretamente sem recorte circular
+                    const drawW = size * 2.2;
+                    const drawH = size * 2.2;
+                    ctx.drawImage(imgAstro, pos.x - drawW / 2, pos.y - drawH / 2, drawW, drawH);
+                } else {
+                    // Recorta a imagem em círculo perfeito e ajusta as dimensões sem bordas pretas
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, size, 0, 2 * Math.PI);
+                    ctx.clip();
+                    const drawSize = size * 2.05;
+                    ctx.drawImage(imgAstro, pos.x - drawSize / 2, pos.y - drawSize / 2, drawSize, drawSize);
+                    ctx.restore();
+                }
             } else {
                 let corHalo = "rgba(255, 255, 255, 0.15)";
                 let corAstro = "#ffffff";

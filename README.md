@@ -133,11 +133,9 @@ astroguide/
     │   │                    (mitologia), mostradas no painel
     │   │                    de detalhes do Observatório.
     │   │
-    │   ├── mercury.png, venus.png, mars.png, jupiter.png
-    │   │                  → Imagens reais dos planetas,
-    │   │                    usadas no Observatório em vez de
-    │   │                    círculos de cor (Saturno ainda
-    │   │                    usa círculo — sem imagem própria).
+    │   ├── mercury.png, venus.png, mars.png, jupiter.png, saturn.png, uranus.png, neptune.png
+    │   │                  → Imagens reais dos planetas do Sistema Solar,
+    │   │                    usadas no Observatório.
     │   │
     │   ├── moon_render.png, sun.png → Imagens da Lua e Sol.
     │   │
@@ -388,8 +386,7 @@ DRY (Don't Repeat Yourself)
   [x] Estrelas reais com magnitude e posição calculada
   [x] Constelações com linhas e nomes (nomenclatura latina/IAU)
   [x] Curiosidades e ilustrações por constelação (ao clicar)
-  [x] Sol, Lua e planetas no mapa celeste, com imagem real
-      (exceto Saturno, que usa círculo de cor)
+  [x] Sol, Lua e todos os planetas no mapa celeste, com imagens reais
   [x] Silhueta de montanhas no horizonte (gerada por código)
   [x] Fundo panorâmico real da Via Láctea, com parallax
   [x] Clique num astro/estrela/constelação para ver detalhes
