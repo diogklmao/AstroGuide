@@ -1146,3 +1146,125 @@ body.vr-ativo nav.glass-nav {
 body.vr-ativo #btn-voltar {
     display: none;
 }
+
+/* ── Botão flutuante "🔴 Night Mode (Red Velvet)" no Observatório ── */
+#btn-night-mode {
+    position: absolute;
+    top: 14px;
+    right: 85px;
+    z-index: 5;
+    background: rgba(30, 4, 8, 0.7);
+    border: 1px solid rgba(255, 60, 80, 0.45);
+    color: #ff7085;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+#btn-night-mode:hover {
+    background: rgba(255, 40, 60, 0.25);
+    border-color: rgba(255, 80, 100, 0.8);
+    color: #ffa8b5;
+    box-shadow: 0 0 16px rgba(255, 40, 60, 0.4);
+}
+
+#btn-night-mode.ativo,
+body.red-velvet-mode #btn-night-mode {
+    background: rgba(210, 15, 45, 0.4);
+    border-color: #ff2a4d;
+    color: #ffffff;
+    box-shadow: 0 0 20px rgba(255, 30, 60, 0.65), inset 0 0 10px rgba(255, 30, 60, 0.35);
+    animation: pulseRedVelvet 2s infinite ease-in-out;
+}
+
+@keyframes pulseRedVelvet {
+    0%, 100% {
+        box-shadow: 0 0 14px rgba(255, 30, 60, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 24px rgba(255, 40, 70, 0.8);
+    }
+}
+
+/* ── Modo Noturno: Red Velvet (Astronomia) ────────────────────────── */
+body.red-velvet-mode #observatorio-canvas,
+body.red-velvet-mode #vr-canvas {
+    filter: grayscale(100%) brightness(0.95) sepia(100%) hue-rotate(315deg) saturate(900%) contrast(1.18);
+}
+
+body.red-velvet-mode .observatorio-mapa-wrapper {
+    border-color: rgba(255, 40, 65, 0.45) !important;
+    box-shadow: 0 0 35px rgba(220, 20, 50, 0.2), inset 0 0 25px rgba(255, 20, 50, 0.06) !important;
+}
+
+body.red-velvet-mode .observatorio-controlos,
+body.red-velvet-mode #observatorio-detalhes,
+body.red-velvet-mode #observatorio-ajuda {
+    border-color: rgba(255, 40, 65, 0.35) !important;
+    background: rgba(22, 3, 7, 0.65) !important;
+    box-shadow: 0 8px 32px rgba(255, 15, 45, 0.15), inset 0 1px 0 rgba(255, 100, 120, 0.18) !important;
+}
+
+body.red-velvet-mode .observatorio-controlos .card-titulo,
+body.red-velvet-mode #observatorio-detalhes .detalhe-titulo,
+body.red-velvet-mode .obs-tempo-titulo {
+    color: #ff3355 !important;
+    text-shadow: 0 0 10px rgba(255, 51, 85, 0.65) !important;
+}
+
+body.red-velvet-mode .config-linha label,
+body.red-velvet-mode .config-linha-check label,
+body.red-velvet-mode #observatorio-ajuda {
+    color: #ff8595 !important;
+}
+
+body.red-velvet-mode #observatorio-ajuda strong {
+    color: #ff4d66 !important;
+}
+
+body.red-velvet-mode .glass-select,
+body.red-velvet-mode .obs-input,
+body.red-velvet-mode .obs-btn-agora,
+body.red-velvet-mode #btn-toggle-painel {
+    border-color: rgba(255, 60, 80, 0.45) !important;
+    color: #ffb8c3 !important;
+    background: rgba(35, 5, 10, 0.65) !important;
+}
+
+body.red-velvet-mode .obs-btn-agora:hover,
+body.red-velvet-mode #btn-toggle-painel:hover {
+    background: rgba(255, 40, 65, 0.3) !important;
+    color: #fff !important;
+    box-shadow: 0 0 14px rgba(255, 40, 65, 0.5) !important;
+}
+
+body.red-velvet-mode input[type="range"] {
+    accent-color: #ff2a4a;
+}
+
+body.red-velvet-mode input[type="checkbox"] {
+    accent-color: #ff1e40;
+}
+
+body.red-velvet-mode #lbl-mag,
+body.red-velvet-mode #obs-hora-label {
+    color: #ff4760 !important;
+}
+
+@media (max-width: 600px) {
+    #btn-night-mode {
+        top: 10px;
+        right: 75px;
+        padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+}

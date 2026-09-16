@@ -123,6 +123,10 @@
                                 oninput="document.getElementById('lbl-mag').textContent = parseFloat(this.value).toFixed(1); desenharObservatorio()">
                             <span id="lbl-mag">5.0</span>
                         </div>
+                        <div class="config-linha-check" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                            <input type="checkbox" id="chk-night-mode" onchange="toggleNightMode(this.checked)">
+                            <label for="chk-night-mode" style="color: #ff7085; font-weight: 600;">🔴 Night Mode (Red Velvet)</label>
+                        </div>
                     </div>
                     <!-- Painel de Detalhes -->
                     <div id="observatorio-detalhes" class="glass-panel">
@@ -142,6 +146,7 @@
                 </div>
                 <!-- Mapa Celeste -->
                 <div class="observatorio-mapa-wrapper glass-panel">
+                    <button id="btn-night-mode" onclick="toggleNightMode()" class="btn-night-mode" title="Modo Noturno (Red Velvet) para preservar a visão noturna">🔴 Night Mode (Red Velvet)</button>
                     <button id="btn-entrar-vr" onclick="mudarEcra('vr')" title="Abrir Observatório VR">🥽 VR</button>
                     <canvas id="observatorio-canvas" width="800" height="800"></canvas>
                 </div>

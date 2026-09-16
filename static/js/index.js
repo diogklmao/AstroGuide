@@ -301,11 +301,6 @@ const imgCeuFundo = new Image();
 imgCeuFundo.src = "/static/images/space.jpg";
 imgCeuFundo.onload = () => desenharObservatorio(); // redesenha assim que a imagem estiver pronta
 
-// Imagem de relva para o chão
-const imgRelva = new Image();
-imgRelva.src = "/static/images/grass.jpg";
-imgRelva.onload = () => desenharObservatorio();
-
 
 // Imagens e tamanhos relativos dos astros no observatório
 const IMAGENS_ASTROS = {
@@ -372,6 +367,39 @@ window.addEventListener("resize", () => {
         redimensionarCanvas();
     }
 });
+
+// ── Modo Noturno (Red Velvet) ──────────────────────────────────────────
+let modoNightModeAtivo = false;
+
+function toggleNightMode(forcarEstado) {
+    if (typeof forcarEstado === "boolean") {
+        modoNightModeAtivo = forcarEstado;
+    } else {
+        modoNightModeAtivo = !modoNightModeAtivo;
+    }
+
+    const body = document.body;
+    const btnCanvas = document.getElementById("btn-night-mode");
+    const chkControlo = document.getElementById("chk-night-mode");
+
+    if (modoNightModeAtivo) {
+        body.classList.add("red-velvet-mode");
+        if (btnCanvas) {
+            btnCanvas.classList.add("ativo");
+            btnCanvas.title = "Desativar Modo Noturno (Red Velvet)";
+        }
+        if (chkControlo) chkControlo.checked = true;
+    } else {
+        body.classList.remove("red-velvet-mode");
+        if (btnCanvas) {
+            btnCanvas.classList.remove("ativo");
+            btnCanvas.title = "Ativar Modo Noturno (Red Velvet) para preservar a visão noturna";
+        }
+        if (chkControlo) chkControlo.checked = false;
+    }
+
+    desenharObservatorio();
+}
 
 function alterarModoVisao() {
     const modoSelect = document.getElementById("sel-modo-visao");
@@ -738,8 +766,7 @@ function desenharObservatorio() {
         if (horizonPoints.length > 0) {
             const horizY = horizonPoints[Math.floor(horizonPoints.length / 2)].y;
 
-            // ── Solo: gradiente escuro e neutro (deixa de ser verde vivo,
-            // que destoava da foto real da Via Láctea) ───────────────────
+            // ── Solo: gradiente escuro e limpo ───────────────────
             ctx.beginPath();
             ctx.moveTo(horizonPoints[0].x, horizonPoints[0].y);
             for (let i = 1; i < horizonPoints.length; i++) {
@@ -749,45 +776,13 @@ function desenharObservatorio() {
             ctx.lineTo(0, height);
             ctx.closePath();
 
-            if (imgRelva.complete && imgRelva.naturalWidth > 0) {
-                ctx.save();
-                ctx.clip(); // Limita o desenho à área do chão
-                
-                // Cria padrão que se repete e desloca-se de acordo com o azimute da câmara
-                const padraoRelva = ctx.createPattern(imgRelva, "repeat");
-                // Escalar um pouco e mover com o azimute
-                const escalaRelva = 0.5;
-                const deslocamento = -((cameraAzimuth / 360) * imgRelva.naturalWidth * 3) % imgRelva.naturalWidth;
-                
-                ctx.translate(deslocamento, 0);
-                // Também aplicar escala ao contexto para textura ficar mais densa
-                ctx.scale(escalaRelva, escalaRelva);
-                
-                ctx.fillStyle = padraoRelva;
-                ctx.fillRect(-imgRelva.naturalWidth/escalaRelva, horizY/escalaRelva, (width + imgRelva.naturalWidth * 2)/escalaRelva, (height - horizY)/escalaRelva);
-                
-                // Repor matriz para gradiente
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
-                
-                // Aplicar sombreamento no relvado (mais escuro na distância)
-                const escurecimento = ctx.createLinearGradient(0, horizY, 0, height);
-                escurecimento.addColorStop(0, "rgba(4, 6, 12, 0.95)"); // Horizonte quase preto
-                escurecimento.addColorStop(0.3, "rgba(4, 6, 12, 0.7)");
-                escurecimento.addColorStop(0.8, "rgba(4, 6, 12, 0.3)"); // Relva visível perto
-                escurecimento.addColorStop(1, "rgba(4, 6, 12, 0.1)");
-                ctx.fillStyle = escurecimento;
-                ctx.fill();
-                
-                ctx.restore();
-            } else {
-                const gradGround = ctx.createLinearGradient(0, horizY, 0, height);
-                gradGround.addColorStop(0, "rgba(9, 11, 17, 0.97)");
-                gradGround.addColorStop(0.3, "rgba(7, 9, 14, 0.98)");
-                gradGround.addColorStop(0.65, "rgba(5, 6, 10, 0.99)");
-                gradGround.addColorStop(1, "rgba(2, 2, 4, 1.00)");
-                ctx.fillStyle = gradGround;
-                ctx.fill();
-            }
+            const gradGround = ctx.createLinearGradient(0, horizY, 0, height);
+            gradGround.addColorStop(0, "rgba(9, 11, 17, 0.97)");
+            gradGround.addColorStop(0.3, "rgba(7, 9, 14, 0.98)");
+            gradGround.addColorStop(0.65, "rgba(5, 6, 10, 0.99)");
+            gradGround.addColorStop(1, "rgba(2, 2, 4, 1.00)");
+            ctx.fillStyle = gradGround;
+            ctx.fill();
 
             // Silhueta de montanhas removida a pedido do utilizador
 

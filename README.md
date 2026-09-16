@@ -6,6 +6,9 @@
 O AstroGuide é uma aplicação web de astronomia que mostra
 dados reais do céu em tempo real, calculados com efemérides
 oficiais da NASA, para a localização de Vila Nova de Gaia.
+Inclui também um Observatório 3D em desenvolvimento (WebXR,
+compatível com Meta Quest 3) e a Imagem Astronómica do Dia
+da NASA (APOD).
 
 ---
 
@@ -38,10 +41,18 @@ astroguide/
 │                            qualquer momento (passado/futuro).
 │
 ├── eventos.py             → Base de dados de eventos
-│                            Chuvas de meteoros e eclipses.
+│                            Chuvas de meteoros e eclipses
+│                            (inclui eclipses de 2026 e 2027).
 │
 ├── estrelas.py            → Base de dados de estrelas e
 │                            constelações para o Observatório.
+│                            Nomes das constelações em Latim
+│                            (nomenclatura oficial da IAU).
+│
+├── apod.py                → Imagem Astronómica do Dia (NASA)
+│                            Vai buscar a APOD à API pública
+│                            da NASA, com cache diário em
+│                            memória para poupar pedidos.
 │
 ├── config.py              → Configurações globais
 │                            Localização, nome, versão,
@@ -59,12 +70,14 @@ astroguide/
 │
 ├── templates/
 │   ├── menu.html          → Menu de entrada (Landing Page)
-│   │                        Com animações espaciais e
-│   │                        configurações de áudio.
+│   │                        Com animações espaciais,
+│   │                        configurações de áudio e os
+│   │                        4 cartões de acesso rápido.
 │   │
 │   └── index.html         → Interface principal da app
-│                            Céu Agora, Observatório e
-│                            Calendário Lunar.
+│                            Céu Agora, Observatório,
+│                            Calendário Lunar, NASA - Imagem
+│                            do Dia, e Observatório VR.
 │
 └── static/
     ├── css/
@@ -80,7 +93,7 @@ astroguide/
     │   │
     │   └── index.css      → Estilos da app principal
     │                        (céu agora, calendário, dados,
-    │                        observatório e painel de tempo).
+    │                        observatório, APOD e VR).
     │
     ├── js/
     │   ├── three-bg.js    → Fundo 3D partilhado (Three.js)
@@ -94,12 +107,43 @@ astroguide/
     │   ├── menu.js        → Lógica do menu: deteção de
     │   │                    localização e ícones Canvas
     │   │                    desenhados à mão (estrela,
-    │   │                    lua crescente, telescópio).
+    │   │                    lua crescente, telescópio, jornal).
     │   │
-    │   └── index.js       → Lógica da app: navegação SPA,
-    │                        dados do céu, calendário lunar,
-    │                        observatório interativo (canvas
-    │                        360°/2D) e auto-refresh a cada 30s.
+    │   ├── index.js       → Lógica da app: navegação SPA,
+    │   │                    dados do céu, calendário lunar,
+    │   │                    APOD, e o Observatório interativo
+    │   │                    (canvas 360°/2D) com estrelas,
+    │   │                    constelações, planetas com imagem
+    │   │                    real, silhueta de montanhas e
+    │   │                    auto-refresh a cada 30s.
+    │   │
+    │   └── vr-observatorio.js → Observatório VR (Fase 1)
+    │                        Cena 3D em Three.js — reutiliza
+    │                        os dados de /api/observatorio
+    │                        (zero duplicação da lógica
+    │                        astronómica). Estrelas e linhas
+    │                        de constelações posicionadas por
+    │                        altitude/azimute reais à volta
+    │                        do observador. Navegação por
+    │                        arrasto do rato (WebXR/Quest 3
+    │                        ainda por implementar — Fase 2).
+    │
+    ├── images/
+    │   ├── constelacoes/  → Ilustrações de cada constelação
+    │   │                    (mitologia), mostradas no painel
+    │   │                    de detalhes do Observatório.
+    │   │
+    │   ├── mercury.png, venus.png, mars.png, jupiter.png
+    │   │                  → Imagens reais dos planetas,
+    │   │                    usadas no Observatório em vez de
+    │   │                    círculos de cor (Saturno ainda
+    │   │                    usa círculo — sem imagem própria).
+    │   │
+    │   ├── moon_render.png, sun.png → Imagens da Lua e Sol.
+    │   │
+    │   └── space.jpg      → Panorâmica da Via Láctea, usada
+    │                        como fundo do céu no Observatório
+    │                        360° (com efeito parallax).
     │
     ├── audio/
     │   └── musica.mp3     → Música ambiente relaxante
@@ -115,13 +159,23 @@ A aplicação usa um sistema de rotas simples:
   /ceu         → Ecrã Céu Agora
   /calendario  → Ecrã Calendário Lunar
   /observatorio → Ecrã Observatório Astronómico
+  /apod        → Ecrã NASA - Imagem do Dia
+
+(O Observatório VR não tem rota própria — abre-se a partir
+de um botão dentro do Observatório, dentro da mesma SPA.)
 
 Rotas da API (devolvem JSON para o JavaScript):
   /api/ceu                         → Sol, Lua e 7 planetas em tempo real
   /api/calendario/ano/mes          → Fases da lua e eventos do mês
+                                      (valida mês entre 1 e 12)
   /api/dia/ano/mes/dia             → Detalhes de um dia específico
-  /api/observatorio                → Estrelas, constelações e astros (tempo real)
+                                      (valida a data completa)
+  /api/observatorio                → Estrelas, constelações e astros
+                                      (tempo real) — usado tanto pelo
+                                      Observatório 2D como pelo VR
   /api/observatorio?data=&hora=    → Idem para uma data/hora específica
+  /api/apod                        → Imagem Astronómica do Dia da NASA
+                                      (título, explicação, imagem/vídeo)
 
 ---
 
@@ -130,7 +184,8 @@ Rotas da API (devolvem JSON para o JavaScript):
 PYTHON (Backend)
   Responsável por todos os cálculos astronómicos e pelo
   servidor. Nunca é visível para o utilizador.
-  Ficheiros: server.py, sky_engine.py, eventos.py, config.py, estrelas.py
+  Ficheiros: server.py, sky_engine.py, eventos.py, config.py,
+             estrelas.py, apod.py
 
 HTML (Estrutura)
   Define a estrutura das páginas e as secções da app.
@@ -145,10 +200,10 @@ CSS (Estilo)
 JavaScript (Interatividade)
   Gere o estado da aplicação no browser. Comunica com o
   Python via API (fetch). Desenha o mapa celeste em Canvas
-  com projeção 360° e 2D (planisfério). Renderiza o fundo
-  3D com Three.js.
+  com projeção 360° e 2D (planisfério), e uma versão 3D real
+  em WebGL (Three.js) no Observatório VR.
   Ficheiros: three-bg.js, shared-ui-controls.js,
-             menu.js, index.js
+             menu.js, index.js, vr-observatorio.js
 
 ---
 
@@ -173,21 +228,33 @@ tzdata (pip install tzdata)
   para hora local (Europe/Lisbon).
   Incluído no requirements.txt.
 
+requests (pip install requests)
+  Biblioteca para pedidos HTTP.
+  Usada em apod.py para ir buscar a Imagem Astronómica do
+  Dia à API pública da NASA (api.nasa.gov).
+
 ## BIBLIOTECAS JAVASCRIPT USADAS
 
 Three.js (via CDN)
   Biblioteca de gráficos 3D baseada em WebGL.
-  Usada para o fundo animado partilhado entre páginas:
-  campo de 3500 estrelas coloridas, 3 planetas em órbita
-  com parallax suave controlado pelo movimento do rato.
+  Usada em dois sítios:
+  1) Fundo animado partilhado entre páginas (three-bg.js):
+     campo de 3500 estrelas coloridas, 3 planetas em órbita
+     com parallax suave controlado pelo movimento do rato.
+  2) Observatório VR (vr-observatorio.js): cena 3D real com
+     estrelas (THREE.Points) e linhas de constelações
+     (THREE.LineSegments) posicionadas pelas coordenadas
+     astronómicas reais devolvidas pela API.
   Versão: r160 — cdn.jsdelivr.net/npm/three@0.160.0
 
 Canvas API (nativa do browser)
-  Usada para desenhar o mapa celeste do Observatório.
+  Usada para desenhar o mapa celeste do Observatório 2D.
   Suporta dois modos: Vista 360° (projeção perspetiva 3D
-  com rotação de câmara por arrasto) e Planisfério (vista
-  zenital 2D clássica). Permite clicar em astros e
-  estrelas para ver detalhes.
+  com rotação de câmara por arrasto, fundo panorâmico da
+  Via Láctea, silhueta de montanhas gerada por código, e
+  planetas com imagem real) e Planisfério (vista zenital 2D
+  clássica). Permite clicar em astros, estrelas e
+  constelações para ver detalhes, curiosidades e imagens.
 
 ---
 
@@ -226,11 +293,40 @@ Glassmorphism
   complexos como o starfield Three.js.
 
 Projeção Perspetiva 3D (Vista 360°)
-  O Observatório usa geometria de câmara virtual com
+  O Observatório 2D usa geometria de câmara virtual com
   rotação Yaw (azimute) e Pitch (altitude) e campo de
   visão (FOV) variável via scroll. Cada estrela/astro
   é projetado no plano do ecrã com divisão pela
   profundidade (z), criando a ilusão de perspetiva real.
+
+WebGL / Three.js (Observatório VR)
+  Ao contrário do Observatório 2D (Canvas achatado com
+  matemática de projeção manual), o Observatório VR cria
+  uma cena 3D real — a câmara existe genuinamente no
+  espaço 3D, e o WebGL trata da projeção e profundidade.
+  Isto é o que permite, na Fase 2, ligar o WebXR e usar o
+  tracking real da cabeça de um headset como o Meta Quest 3.
+
+Coordenadas Horizontais (Altitude/Azimute)
+  Sistema de coordenadas usado em todo o projeto — 2D, 360°
+  e VR — porque é relativo ao observador (ao contrário de
+  RA/Dec, que são coordenadas absolutas do céu). Permite
+  reutilizar exatamente os mesmos dados da API em três
+  motores de renderização diferentes sem duplicar cálculos.
+
+Geração Procedural
+  Conteúdo criado por código/matemática em vez de imagens
+  ou ficheiros externos. Usado na silhueta de montanhas do
+  Observatório (soma de ondas sinusoidais) — garante um
+  perfil sempre consistente à volta dos 360°, sem precisar
+  de nenhum ficheiro de imagem novo.
+
+Degradação Graciosa (Graceful Degradation)
+  Padrão usado nas imagens de constelações e de planetas:
+  se uma imagem não existir ou falhar a carregar, a app não
+  parte — mostra automaticamente um resultado alternativo
+  (texto sem imagem, ou o círculo de cor original) em vez de
+  um ícone de imagem partida.
 
 Altitude
   Ângulo em graus acima do horizonte.
@@ -252,13 +348,15 @@ DRY (Don't Repeat Yourself)
   Princípio de programação aplicado no projeto:
   glass.css centraliza o design system, three-bg.js é
   partilhado entre páginas, shared-ui-controls.js evita
-  repetição de lógica de música e configurações.
+  repetição de lógica de música e configurações, e o
+  Observatório VR reutiliza a mesma API do Observatório 2D
+  em vez de recalcular posições astronómicas.
 
 ---
 
 ## FUNCIONALIDADES IMPLEMENTADAS
 
-  [x] Landing Page interativa com menu dinâmico
+  [x] Landing Page interativa com menu dinâmico (4 cartões)
   [x] Fundo 3D com Three.js — estrelas, planetas, parallax
   [x] Fundo Three.js partilhado entre menu e app
   [x] Design system glassmorphism (glass.css)
@@ -270,7 +368,10 @@ DRY (Don't Repeat Yourself)
   [x] Fase da Lua em tempo real com emoji
   [x] Calendário lunar com fases calculadas pela NASA
   [x] Eventos astronómicos — chuvas de meteoros e eclipses
+      (2026 e 2027, incluindo o eclipse solar de 2/8/2027)
   [x] Detalhe do dia — nascer/pôr do sol, fase da lua
+  [x] Validação de datas nas rotas da API (mês/dia inválidos)
+  [x] NASA - Imagem do Dia (APOD) com cache diário
   [x] Painel de configurações com controlo de volume
   [x] Música ambiente com persistência entre páginas
   [x] Deteção automática de localização no menu
@@ -285,24 +386,37 @@ DRY (Don't Repeat Yourself)
   [x] Vista 360° com câmara virtual (arrastar + zoom)
   [x] Vista Planisfério (2D zenital clássico)
   [x] Estrelas reais com magnitude e posição calculada
-  [x] Constelações com linhas e nomes
-  [x] Sol, Lua e planetas no mapa celeste
-  [x] Clique num astro/estrela para ver detalhes
+  [x] Constelações com linhas e nomes (nomenclatura latina/IAU)
+  [x] Curiosidades e ilustrações por constelação (ao clicar)
+  [x] Sol, Lua e planetas no mapa celeste, com imagem real
+      (exceto Saturno, que usa círculo de cor)
+  [x] Silhueta de montanhas no horizonte (gerada por código)
+  [x] Fundo panorâmico real da Via Láctea, com parallax
+  [x] Clique num astro/estrela/constelação para ver detalhes
   [x] Painel de filtros — constelações, nomes, magnitude
   [x] Painel lateral com scroll independente
   [x] Viagem no Tempo — simular o céu em qualquer data/hora
   [x] Botão "↺ Tempo Real" para voltar ao céu atual
   [x] Auto-refresh desativado automaticamente em simulação
   [x] Conversão automática hora local → UTC (hora de verão)
+  [x] Observatório VR — Fase 1: cena 3D com Three.js,
+      reutilizando os dados do Observatório 2D, com estrelas
+      e constelações reais e navegação por arrasto do rato
 
 ---
 
 ## ROADMAP — PRÓXIMAS FUNCIONALIDADES
 
+  [ ] Observatório VR — Fase 2: suporte WebXR para Meta
+      Quest 3 (tracking real da cabeça, em vez de arrasto
+      do rato)
+  [ ] Observatório VR — Sol, Lua e planetas na cena 3D
+      (atualmente só tem estrelas e constelações)
   [ ] Catálogo de estrelas alargado (Hipparcos — 117k estrelas)
   [ ] Hosting online com URL público
   [ ] Versão mobile (React Native ou Capacitor)
-  [ ] Ligação a telescópio via Arduino (Fase 2)
+  [ ] Ligação a telescópio via Arduino — figura física que
+      aponta para a estrela selecionada (Fase 2 do hardware)
 
 ---
 
@@ -321,5 +435,3 @@ DRY (Don't Repeat Yourself)
   Escola: Escola Profissional de Gaia
   Curso: Programador de Informática
   Ano: 2025/2026
-
-# ============================================================
