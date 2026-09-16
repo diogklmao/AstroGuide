@@ -11,6 +11,10 @@ let vrSessaoAtiva = false; // true enquanto uma sessão XR (headset) está abert
 let dadosVRAtuais = null;
 let vrGrupoAstros = null;
 
+// Grupo do "céu fixo" (estrelas + linhas de constelações + etiquetas).
+// É descartado e recriado em cada atualização para não acumular duplicados.
+let vrGrupoCeu = null;
+
 // Garante que o THREE está disponível, independentemente de outros scripts
 // o terem carregado ou não. Se já existir globalmente, usa-o; senão, carrega o CDN.
 function garantirTHREE(callback) {
@@ -170,8 +174,27 @@ async function carregarDadosVR() {
     try {
         const res = await fetch("/api/observatorio");
         const dados = await res.json();
-        desenharEstrelasVR(dados);
-        desenharConstelacoesVR(dados);
+
+        // Descarta o "céu" anterior (estrelas, linhas e etiquetas) para não
+        // acumular duplicados a cada atualização.
+        if (vrGrupoCeu) {
+            vrScene.remove(vrGrupoCeu);
+            vrGrupoCeu.traverse(obj => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) {
+                    if (obj.material.map) obj.material.map.dispose();
+                    obj.material.dispose();
+                }
+            });
+            vrGrupoCeu = null;
+        }
+
+        const grupoCeu = new THREE.Group();
+        grupoCeu.add(desenharEstrelasVR(dados));
+        grupoCeu.add(desenharConstelacoesVR(dados));
+        vrGrupoCeu = grupoCeu;
+        vrScene.add(grupoCeu);
+
         desenharAstrosVR(dados);
     } catch (err) {
         console.error("Erro ao carregar dados do Observatório VR:", err);
@@ -180,6 +203,7 @@ async function carregarDadosVR() {
 
 // ── Estrelas ────────────────────────────────────────────────────────────────
 function desenharEstrelasVR(dados) {
+    const grupo = new THREE.Group();
     const posicoes = [];
     const cores = [];
     for (const id in dados.estrelas) {
@@ -204,7 +228,8 @@ function desenharEstrelasVR(dados) {
         opacity: 0.95
     });
 
-    vrScene.add(new THREE.Points(geometria, material));
+    grupo.add(new THREE.Points(geometria, material));
+    return grupo;
 }
 
 // ── Constelações ────────────────────────────────────────────────────────────
@@ -274,6 +299,7 @@ function criarEtiquetaConstelacao(nome, posicao) {
 }
 
 function desenharConstelacoesVR(dados) {
+    const grupo = new THREE.Group();
     const estrelas = dados.estrelas;
     const geometriasGlowExterior = [];
     const geometriasGlowInterior = [];
@@ -334,14 +360,15 @@ function desenharConstelacoesVR(dados) {
         });
         const malha = new THREE.Mesh(fundirPosicoes(geometrias), material);
         malha.renderOrder = renderOrder; // negativo: desenha atrás das estrelas/astros
-        vrScene.add(malha);
+        grupo.add(malha);
     };
 
     adicionarCamada(geometriasGlowExterior, 0x3f9cff, 0.10, true, -3);
     adicionarCamada(geometriasGlowInterior, 0x6ec8ff, 0.26, true, -2);
     adicionarCamada(geometriasNucleo, 0xaedcff, 0.92, false, -1);
 
-    etiquetas.forEach(e => vrScene.add(e));
+    etiquetas.forEach(e => grupo.add(e));
+    return grupo;
 }
 
 // ── Sol, Lua e Planetas em 3D (mesmas imagens e tamanhos do Observatório 2D) ──
@@ -655,3 +682,17 @@ function carregarVR() {
         garantirTHREE(iniciarCenaVR);
     }
 }
+
+// Atualização ao vivo, como o Observatório 2D (re-fetch a cada 30s), mas só
+// quando o separador VR está ativo. O 2D usa index.js:autoRefresh(); aqui o
+// ciclo é interno ao VR para não depender do ecrã "observatorio" clássico.
+function vrAutoRefresh() {
+    setTimeout(() => {
+        const ecraVR = document.getElementById("ecra-vr");
+        if (ecraVR && ecraVR.classList.contains("ativo")) {
+            carregarDadosVR();
+        }
+        vrAutoRefresh();
+    }, 30000);
+}
+vrAutoRefresh();
