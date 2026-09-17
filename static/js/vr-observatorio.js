@@ -290,9 +290,12 @@ function criarEtiquetaConstelacao(nome, posicao) {
     }));
     sprite.renderOrder = 1; // por cima das linhas e estrelas, para ser legível
 
-    // Escala proporcional ao comprimento do nome — etiquetas legíveis na cúpula
+    // Tamanho base fixo + componente proporcional pequena: garante que nomes
+    // curtos (Leo, Ara) não ficam muito mais pequenos que nomes longos (Ursa Maior).
     const larguraTexto = ctx.measureText(nome).width;
-    const escalaX = RAIO_CEU_VR * 0.095 * (larguraTexto / 220);
+    const escalaBase = RAIO_CEU_VR * 0.110;                        // mínimo garantido
+    const escalaExtra = RAIO_CEU_VR * 0.045 * (larguraTexto / 300); // variação suave
+    const escalaX = escalaBase + escalaExtra;
     sprite.scale.set(escalaX, escalaX * (altura / largura), 1);
     sprite.position.copy(posicao);
     return sprite;
