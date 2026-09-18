@@ -169,11 +169,48 @@ function altAzParaXYZ(altGraus, azGraus, raio) {
     return new THREE.Vector3(x, y, z);
 }
 
+// ── Tempo simulado (partilhado com o Observatório 2D) ───────────────────────
+// A data/hora escolhida no Observatório 2D vive no index.js (tempoSimuladoObs).
+// O VR lê-a por aqui, para mostrar SEMPRE o mesmo céu que o Observatório normal
+// — seja em tempo real, seja numa simulação. As guardas "typeof" evitam erros
+// se este ficheiro for usado sem o index.js carregado.
+function tempoSimuladoVR() {
+    return (typeof tempoSimuladoObs !== "undefined") ? tempoSimuladoObs : null;
+}
+
+function urlApiObservatorioVR() {
+    if (typeof urlApiObservatorio === "function") return urlApiObservatorio();
+    return "/api/observatorio";
+}
+
+// Linha de estado no menu do VR: diz se o céu é o real ou um simulado.
+// (Durante uma sessão de headset o menu está escondido — só o céu é visível.)
+function atualizarTempoExibidoVR() {
+    const el = document.getElementById("vr-tempo");
+    if (!el) return;
+
+    const simulado = tempoSimuladoVR();
+    if (simulado) {
+        const [ano, mes, dia] = simulado.data.split("-");
+        el.textContent = `⏱ Céu simulado: ${dia}/${mes}/${ano} às ${simulado.hora}`;
+    } else {
+        el.textContent = "🕐 Céu em tempo real";
+    }
+    el.classList.toggle("simulado", !!simulado);
+}
+
 // ── Dados reais do céu ──────────────────────────────────────────────────────
+let vrPedidoAtual = 0; // nº do último pedido — descarta respostas que cheguem fora de tempo
+
 async function carregarDadosVR() {
+    const pedido = ++vrPedidoAtual;
     try {
-        const res = await fetch("/api/observatorio");
+        const res = await fetch(urlApiObservatorioVR());
         const dados = await res.json();
+
+        // Se entretanto já foi feito um pedido mais recente (ex: mudaste a hora no
+        // Observatório), esta resposta é antiga e é ignorada.
+        if (pedido !== vrPedidoAtual) return;
 
         // Descarta o "céu" anterior (estrelas, linhas e etiquetas) para não
         // acumular duplicados a cada atualização.
@@ -679,11 +716,27 @@ function vrAnimar() {
     vrRenderer.render(vrScene, vrCamera);
 }
 
+let vrAIniciar = false; // true enquanto a cena está a ser criada (evita inícios duplicados)
+
 // Chamado pelo mudarEcra() do index.js quando o utilizador abre a aba VR
 function carregarVR() {
+    atualizarTempoExibidoVR();
+
     if (!vrIniciado) {
-        garantirTHREE(iniciarCenaVR);
+        // A cena ainda não existe. O garantirTHREE pode demorar (CDN), por isso
+        // marca-se o início em curso para não a criar duas vezes.
+        if (vrAIniciar) return;
+        vrAIniciar = true;
+        garantirTHREE(() => {
+            vrAIniciar = false;
+            iniciarCenaVR(); // já traz os dados do céu
+        });
+        return;
     }
+
+    // Cena já criada: recarrega os dados, porque a hora simulada pode ter sido
+    // mudada no Observatório 2D desde a última vez que estivemos no VR.
+    carregarDadosVR();
 }
 
 // Atualização ao vivo, como o Observatório 2D (re-fetch a cada 30s), mas só

@@ -1206,6 +1206,21 @@ body.vr-ativo #btn-voltar {
     line-height: 1.4;
 }
 
+/* Linha de estado do tempo mostrado no VR (real vs. simulado no Observatório) */
+#vr-tempo {
+    margin: 0;
+    font-size: 0.78rem;
+    font-family: 'Courier New', monospace;
+    color: rgba(200, 220, 255, 0.7);
+    text-align: center;
+    transition: color 0.3s ease;
+}
+
+#vr-tempo.simulado {
+    color: rgba(206, 147, 216, 0.95);
+    font-weight: 600;
+}
+
 /* Durante uma sessão de headset, esconde a interface flutuante — só o céu */
 body.vr-sessao .vr-menu,
 body.vr-sessao #btn-sair-vr {

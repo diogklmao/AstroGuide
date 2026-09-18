@@ -127,6 +127,10 @@ astroguide/
     │                        do observador. Navegação por
     │                        arrasto do rato (WebXR/Quest 3
     │                        ainda por implementar — Fase 2).
+    │                        Segue a data/hora do seletor do
+    │                        Observatório 2D (tempo real ou
+    │                        simulado), para os dois mostrarem
+    │                        sempre o mesmo céu.
     │
     ├── images/
     │   ├── constelacoes/  → Ilustrações de cada constelação
@@ -399,6 +403,9 @@ DRY (Don't Repeat Yourself)
   [x] Observatório VR — Fase 1: cena 3D com Three.js,
       reutilizando os dados do Observatório 2D, com estrelas
       e constelações reais e navegação por arrasto do rato
+  [x] Hora simulada partilhada entre o Observatório 2D e o
+      Observatório VR — o VR mostra sempre o mesmo céu, e a
+      hora escolhida mantém-se ao voltar do VR ao Observatório
 
 ---
 

@@ -272,6 +272,21 @@ function mesSeguinte() {
 let observatorioDados = null;
 let objetoSelecionado = null;
 
+// ── Tempo simulado, partilhado com o Observatório VR ─────────────────────────
+// Guarda a data/hora escolhida no seletor "Simular Data/Hora" do Observatório.
+// O VR lê este mesmo estado (pela urlApiObservatorio), por isso mostra SEMPRE o
+// mesmo céu que o 2D — e a escolha mantém-se quando se volta do VR para o
+// Observatório normal. null = céu em tempo real (sem simulação).
+let tempoSimuladoObs = null; // { data: "YYYY-MM-DD", hora: "HH:MM" }
+
+// URL de /api/observatorio com o tempo simulado ativo. Sem simulação, o URL vai
+// sem parâmetros e o servidor devolve o céu de agora.
+function urlApiObservatorio() {
+    if (!tempoSimuladoObs) return "/api/observatorio";
+    const { data, hora } = tempoSimuladoObs;
+    return `/api/observatorio?data=${encodeURIComponent(data)}&hora=${encodeURIComponent(hora)}`;
+}
+
 // ── Variáveis da Câmara 360° ──────────────────────────────────────
 let cameraAzimuth = 0;   // 0° = Norte, 90° = Este, 180° = Sul, 270° = Oeste
 let cameraAltitude = 15;  // Altitude em graus (-85° a 85°)
@@ -428,7 +443,7 @@ function alterarModoVisao() {
     }
 }
 
-async function carregarObservatorio(data, hora) {
+async function carregarObservatorio() {
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas) return;
 
@@ -452,14 +467,9 @@ async function carregarObservatorio(data, hora) {
         canvas.dataset.eventsConfigured = "true";
     }
 
-    // Construir URL com ou sem parâmetros de data/hora
-    let url = "/api/observatorio";
-    if (data && hora) {
-        url += `?data=${encodeURIComponent(data)}&hora=${encodeURIComponent(hora)}`;
-    }
-
+    // O URL leva a data/hora simulada, se houver uma escolhida (ver urlApiObservatorio)
     try {
-        const res = await fetch(url);
+        const res = await fetch(urlApiObservatorio());
         const apiData = await res.json();
         observatorioDados = apiData;
 
@@ -474,19 +484,43 @@ async function carregarObservatorio(data, hora) {
 }
 
 // ── Seletor de Hora do Observatório ──────────────────────────────────────────
+// Preenche os campos do seletor. Se já houver uma simulação ativa, mantém a
+// data/hora escolhida (é o que faz a hora sobreviver a uma ida ao VR); caso
+// contrário, começa na data/hora reais.
 function inicializarSeletorHora() {
     const inputData = document.getElementById("obs-data");
     const inputHora = document.getElementById("obs-hora");
     if (!inputData || !inputHora) return;
 
-    const agora = new Date();
-    inputData.value = agora.toLocaleDateString("sv-SE");   // formato YYYY-MM-DD
-    const hh = String(agora.getHours()).padStart(2, "0");
-    const mm = String(agora.getMinutes()).padStart(2, "0");
-    inputHora.value = `${hh}:${mm}`;
+    if (tempoSimuladoObs) {
+        inputData.value = tempoSimuladoObs.data;
+        inputHora.value = tempoSimuladoObs.hora;
+    } else {
+        const agora = new Date();
+        inputData.value = agora.toLocaleDateString("sv-SE");   // formato YYYY-MM-DD
+        const hh = String(agora.getHours()).padStart(2, "0");
+        const mm = String(agora.getMinutes()).padStart(2, "0");
+        inputHora.value = `${hh}:${mm}`;
+    }
 
+    atualizarLabelTempoSimulado();
+}
+
+// Rótulo por baixo do seletor: "⏱ dd/mm/ano às hh:mm". Fica vazio quando
+// estamos em tempo real, por isso serve também de aviso visual de simulação.
+function atualizarLabelTempoSimulado() {
     const label = document.getElementById("obs-hora-label");
-    if (label) label.textContent = "";
+    if (!label) return;
+
+    if (!tempoSimuladoObs) {
+        label.textContent = "";
+        label.classList.remove("ativa");
+        return;
+    }
+
+    const [ano, mes, dia] = tempoSimuladoObs.data.split("-");
+    label.textContent = `⏱ ${dia}/${mes}/${ano} às ${tempoSimuladoObs.hora}`;
+    label.classList.add("ativa");
 }
 
 function atualizarObservatorioComHora() {
@@ -501,21 +535,17 @@ function atualizarObservatorioComHora() {
     const dataAtual = agora.toLocaleDateString("sv-SE");
     const horaAtual = String(agora.getHours()).padStart(2, "0") + ":" + String(agora.getMinutes()).padStart(2, "0");
 
-    const label = document.getElementById("obs-hora-label");
-    if (data === dataAtual && hora === horaAtual) {
-        if (label) { label.textContent = ""; label.classList.remove("ativa"); }
-        carregarObservatorio();
-    } else {
-        const [ano, mes, dia] = data.split("-");
-        if (label) { label.textContent = `⏱ ${dia}/${mes}/${ano} às ${hora}`; label.classList.add("ativa"); }
-        carregarObservatorio(data, hora);
-    }
+    // Escolher exatamente a data/hora atuais quer dizer "voltar ao tempo real";
+    // qualquer outro valor passa a ser o tempo simulado partilhado com o VR.
+    tempoSimuladoObs = (data === dataAtual && hora === horaAtual) ? null : { data, hora };
+
+    atualizarLabelTempoSimulado();
+    carregarObservatorio();
 }
 
 function repoeHoraAtual() {
-    inicializarSeletorHora();
-    const label = document.getElementById("obs-hora-label");
-    if (label) { label.textContent = ""; label.classList.remove("ativa"); }
+    tempoSimuladoObs = null;      // céu em tempo real, no 2D e no VR
+    inicializarSeletorHora();     // repõe os campos e limpa o rótulo
     carregarObservatorio();
 }
 
@@ -1269,10 +1299,9 @@ function autoRefresh() {
     if (document.getElementById("ecra-ceu").classList.contains("ativo")) {
         carregarCeu();
     } else if (document.getElementById("ecra-observatorio").classList.contains("ativo")) {
-        // Só auto-atualiza se não há simulação ativa
-        const label = document.getElementById("obs-hora-label");
-        const emSimulacao = label && label.textContent.trim() !== "";
-        if (!emSimulacao) carregarObservatorio();
+        // Só auto-atualiza em tempo real — numa simulação o céu é fixo,
+        // e esse mesmo céu simulado é o que o VR está a mostrar.
+        if (!tempoSimuladoObs) carregarObservatorio();
     }
     setTimeout(autoRefresh, 30000);
 }
