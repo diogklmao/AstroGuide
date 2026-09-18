@@ -758,6 +758,18 @@ nav button:hover:not(.ativo) {
     box-shadow: 0 0 8px rgba(206, 147, 216, 0.15);
 }
 
+/* Navegação por teclado: como o outline foi anulado acima, o foco tem de
+   ficar bem visível de outra forma — anel sólido em vez do brilho ténue. */
+.obs-input:focus-visible {
+    border-color: rgba(206, 147, 216, 0.9);
+    box-shadow: 0 0 0 3px rgba(206, 147, 216, 0.3);
+}
+
+#sel-modo-visao:focus-visible {
+    outline: 2px solid rgba(110, 184, 255, 0.85);
+    outline-offset: 2px;
+}
+
 /* Forçar cor do picker em navegadores Chromium */
 .obs-input::-webkit-calendar-picker-indicator {
     filter: invert(0.7) sepia(1) saturate(3) hue-rotate(250deg);

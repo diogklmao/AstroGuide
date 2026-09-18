@@ -9,6 +9,7 @@ from skyfield.api import load, wgs84, N, W, Star  # load = carrega dados NASA | 
 from skyfield import almanac                      # funções de astronomia: nascer/pôr do sol, fases da lua, etc.
 from zoneinfo import ZoneInfo                    # converte horas UTC para hora local com suporte a hora de verão
 import datetime                                  # manipulação de datas e horas
+import math                                      # cálculo do disco iluminado da Lua
 
 # --- Módulos internos ---
 from config import LOCATION                      # localização definida em config.py
@@ -127,15 +128,11 @@ def get_lua(momento=None, centro=None):
 
 # ── Funções de calendário ─────────────────────────────────────────────────────
 
-def get_fase_lua_dia(ano, mes, dia):
-    import math
-
-    t = ts.utc(ano, mes, dia, 12)
-    fase_graus = almanac.moon_phase(eph, t).degrees
-    fase_norm  = fase_graus / 360.0
-
-    # Iluminação real do disco 
-    iluminacao = round((1 - math.cos(math.radians(fase_graus))) / 2 * 100, 1)
+def _descrever_fase(fase_graus):
+    # Traduz o ângulo da fase (0-360°) no nome, emoji e % de iluminação.
+    # É a tabela de limiares partilhada pelo Calendário e pelo Observatório,
+    # para os dois nunca discordarem sobre o que é "Lua Cheia".
+    fase_norm = fase_graus / 360.0
 
     if   fase_norm < 0.0625 or fase_norm >= 0.9375: nome, emoji = "Lua Nova",         "🌑"
     elif fase_norm < 0.1875:                         nome, emoji = "Crescente",         "🌒"
@@ -147,10 +144,22 @@ def get_fase_lua_dia(ano, mes, dia):
     else:                                            nome, emoji = "Minguante",         "🌘"
 
     return {
-        "iluminacao": iluminacao,  # % real do disco iluminado
+        "iluminacao": round((1 - math.cos(math.radians(fase_graus))) / 2 * 100, 1),  # % real do disco
         "nome":       nome,
         "emoji":      emoji,
     }
+
+def get_fase_lua_instante(momento):
+    # Fase da Lua no instante exato pedido (objeto Time do Skyfield).
+    # Usada pelo Observatório: a fase mostrada é a do céu que está a ser
+    # desenhado, seja em tempo real seja numa data simulada.
+    return _descrever_fase(almanac.moon_phase(eph, momento).degrees)
+
+def get_fase_lua_dia(ano, mes, dia):
+    # Fase da Lua num dia do calendário (usada pelo Calendário Lunar).
+    # Amostra o meio-dia UTC desse dia — uma fase por dia, como o calendário
+    # apresenta. Para a fase de um instante exato, ver get_fase_lua_instante().
+    return _descrever_fase(almanac.moon_phase(eph, ts.utc(ano, mes, dia, 12)).degrees)
 
 def get_nascer_por_sol(ano, mes, dia):
     # Calcula o nascer e pôr do sol para um dia específico.
@@ -277,12 +286,10 @@ def get_observatorio(timestamp_utc=None):
         "tipo": "sol"
     })
     
-    # Adicionar Lua com o seu emoji correto da fase para o instante pedido
-    if timestamp_utc is not None:
-        ref_dt = timestamp_utc
-    else:
-        ref_dt = datetime.datetime.now()
-    fase_lua = get_fase_lua_dia(ref_dt.year, ref_dt.month, ref_dt.day)
+    # Fase da Lua no instante exato que está a ser mostrado — o mesmo `agora`
+    # usado para as posições. Antes usava-se a data local em tempo real e a
+    # data UTC em simulação, o que dava dias diferentes perto da meia-noite.
+    fase_lua = get_fase_lua_instante(agora)
     
     astros.append({
         "id": "lua",

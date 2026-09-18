@@ -191,8 +191,12 @@ function atualizarTempoExibidoVR() {
 
     const simulado = tempoSimuladoVR();
     if (simulado) {
-        const [ano, mes, dia] = simulado.data.split("-");
-        el.textContent = `⏱ Céu simulado: ${dia}/${mes}/${ano} às ${simulado.hora}`;
+        // Formato esperado: "YYYY-MM-DD". Se vier outra coisa, mostra o valor
+        // tal como está — nunca "undefined/undefined/undefined".
+        const dataLegivel = /^\d{4}-\d{2}-\d{2}$/.test(simulado.data)
+            ? simulado.data.split("-").reverse().join("/")
+            : simulado.data;
+        el.textContent = `⏱ Céu simulado: ${dataLegivel} às ${simulado.hora}`;
     } else {
         el.textContent = "🕐 Céu em tempo real";
     }

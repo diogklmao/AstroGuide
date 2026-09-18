@@ -276,7 +276,11 @@ let tempoSimuladoObs = null; // { data: "YYYY-MM-DD", hora: "HH:MM" }
 // URL de /api/observatorio com o tempo simulado ativo. Sem simulação, o URL vai
 // sem parâmetros e o servidor devolve o céu de agora.
 function urlApiObservatorio() {
-    if (!tempoSimuladoObs) return "/api/observatorio";
+    // Estado incompleto (sem data ou sem hora) não é simulável — devolve o céu
+    // de agora em vez de mandar parâmetros vazios ao servidor.
+    if (!tempoSimuladoObs || !tempoSimuladoObs.data || !tempoSimuladoObs.hora) {
+        return "/api/observatorio";
+    }
     const { data, hora } = tempoSimuladoObs;
     return `/api/observatorio?data=${encodeURIComponent(data)}&hora=${encodeURIComponent(hora)}`;
 }
@@ -490,8 +494,13 @@ function atualizarLabelTempoSimulado() {
         return;
     }
 
-    const [ano, mes, dia] = tempoSimuladoObs.data.split("-");
-    label.textContent = `⏱ ${dia}/${mes}/${ano} às ${tempoSimuladoObs.hora}`;
+    // Formato esperado: "YYYY-MM-DD". Se vier outra coisa, mostra o valor tal
+    // como está — nunca "undefined/undefined/undefined".
+    const dataLegivel = /^\d{4}-\d{2}-\d{2}$/.test(tempoSimuladoObs.data)
+        ? tempoSimuladoObs.data.split("-").reverse().join("/")
+        : tempoSimuladoObs.data;
+
+    label.textContent = `⏱ ${dataLegivel} às ${tempoSimuladoObs.hora}`;
     label.classList.add("ativa");
 }
 
@@ -502,6 +511,14 @@ function atualizarObservatorioComHora() {
 
     const data = inputData.value;
     const hora = inputHora.value;
+
+    // Campo apagado: não há instante para simular. Sinónimo de "↺ Tempo Real" —
+    // repõe os campos e volta ao céu de agora, para o ecrã e o servidor não
+    // ficarem a dizer coisas diferentes.
+    if (!data || !hora) {
+        repoeHoraAtual();
+        return;
+    }
 
     const agora = new Date();
     const dataAtual = agora.toLocaleDateString("sv-SE");

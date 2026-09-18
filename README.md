@@ -6,9 +6,9 @@
 O AstroGuide é uma aplicação web de astronomia que mostra
 dados reais do céu em tempo real, calculados com efemérides
 oficiais da NASA, para a localização de Vila Nova de Gaia.
-Inclui também um Observatório 3D em desenvolvimento (WebXR,
-compatível com Meta Quest 3) e a Imagem Astronómica do Dia
-da NASA (APOD).
+Inclui também um Observatório 3D com suporte WebXR
+(compatível com Meta Quest 3, com tracking real da cabeça)
+e a Imagem Astronómica do Dia da NASA (APOD).
 
 ---
 
@@ -111,16 +111,17 @@ astroguide/
     │   │                    constelações, planetas com imagem
     │   │                    real e auto-refresh a cada 30s.
     │   │
-    │   └── vr-observatorio.js → Observatório VR (Fase 1)
+    │   └── vr-observatorio.js → Observatório VR
     │                        Cena 3D em Three.js — reutiliza
     │                        os dados de /api/observatorio
     │                        (zero duplicação da lógica
-    │                        astronómica). Estrelas e linhas
-    │                        de constelações posicionadas por
-    │                        altitude/azimute reais à volta
-    │                        do observador. Navegação por
-    │                        arrasto do rato (WebXR/Quest 3
-    │                        ainda por implementar — Fase 2).
+    │                        astronómica). Estrelas, constelações,
+    │                        Sol, Lua e planetas posicionados por
+    │                        altitude/azimute reais à volta do
+    │                        observador. Navegação por arrasto do
+    │                        rato no PC, e sessão WebXR imersiva
+    │                        (immersive-vr) com tracking real da
+    │                        cabeça num Meta Quest 3.
     │                        Segue a data/hora do seletor do
     │                        Observatório 2D (tempo real ou
     │                        simulado), para os dois mostrarem
@@ -299,8 +300,9 @@ WebGL / Three.js (Observatório VR)
   matemática de projeção manual), o Observatório VR cria
   uma cena 3D real — a câmara existe genuinamente no
   espaço 3D, e o WebGL trata da projeção e profundidade.
-  Isto é o que permite, na Fase 2, ligar o WebXR e usar o
-  tracking real da cabeça de um headset como o Meta Quest 3.
+  É isto que permite ligar o WebXR e usar o tracking real
+  da cabeça de um headset como o Meta Quest 3, em vez de
+  uma rotação de câmara simulada pelo arrasto do rato.
 
 Coordenadas Horizontais (Altitude/Azimute)
   Sistema de coordenadas usado em todo o projeto — 2D, 360°
@@ -397,16 +399,15 @@ DRY (Don't Repeat Yourself)
   [x] Hora simulada partilhada entre o Observatório 2D e o
       Observatório VR — o VR mostra sempre o mesmo céu, e a
       hora escolhida mantém-se ao voltar do VR ao Observatório
+  [x] Observatório VR — Fase 2: sessão WebXR imersiva
+      (immersive-vr) com tracking real da cabeça num Meta
+      Quest 3, mantendo o arrasto do rato no PC
+  [x] Observatório VR — Sol, Lua e planetas na cena 3D
 
 ---
 
 ## ROADMAP — PRÓXIMAS FUNCIONALIDADES
 
-  [ ] Observatório VR — Fase 2: suporte WebXR para Meta
-      Quest 3 (tracking real da cabeça, em vez de arrasto
-      do rato)
-  [ ] Observatório VR — Sol, Lua e planetas na cena 3D
-      (atualmente só tem estrelas e constelações)
   [ ] Catálogo de estrelas alargado (Hipparcos — 117k estrelas)
   [ ] Hosting online com URL público
   [ ] Versão mobile (React Native ou Capacitor)

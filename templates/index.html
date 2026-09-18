@@ -95,7 +95,7 @@
                             <label for="sel-modo-visao">📍 Modo de Visão</label>
                             <select id="sel-modo-visao" onchange="alterarModoVisao(); desenharObservatorio()"
                                 class="glass-select"
-                                style="width: 100%; margin-top: 5px; background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(110, 184, 255, 0.3); border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; outline: none; cursor: pointer; transition: border-color 0.3s ease;">
+                                style="width: 100%; margin-top: 5px; background: rgba(0,0,0,0.45); color: #fff; border: 1px solid rgba(110, 184, 255, 0.3); border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; cursor: pointer; transition: border-color 0.3s ease;">
                                 <option value="360" selected>Vista 360° (Primeira Pessoa)</option>
                                 <option value="2d">Planisfério (Vista Zenital)</option>
                             </select>
@@ -173,7 +173,8 @@
         </div>
     </div>
 
-    <div id="btn-config" onclick="toggleConfig()">⚙️</div>
+    <button id="btn-config" type="button" onclick="toggleConfig()" aria-label="Configurações"
+        aria-controls="painel-config" aria-expanded="false" title="Configurações">⚙️</button>
 
     <div id="painel-config" class="glass-panel">
         <div class="config-titulo">⚙ CONFIGURAÇÕES</div>

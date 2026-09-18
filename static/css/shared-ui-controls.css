@@ -62,12 +62,22 @@ body {
 
 
 /* ── Botão de configurações (canto inferior direito) ──────────────── */
+/* É um <button> a sério (alcançável por teclado). As primeiras linhas
+   anulam os estilos que o browser aplica aos botões por omissão —
+   padding, tipo de letra, cor e aparência nativa — para o aspeto
+   continuar exatamente igual ao que era quando era uma <div>. */
 #btn-config {
     position: fixed;        /* sempre visível, independente do scroll */
     bottom: 24px;
     right: 24px;
     width: 48px;
     height: 48px;
+    padding: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: inherit;
+    color: inherit;
+    line-height: 1;
     background: #0a0a20;
     border: 1px solid #1a1a3e;
     border-radius: 50%;     /* forma circular */
@@ -83,6 +93,14 @@ body {
 #btn-config:hover {
     border-color: #4fc3f7;
     box-shadow: 0 0 15px rgba(79, 195, 247, 0.2); /* brilho azul ao passar o rato */
+}
+
+/* Navegação por teclado: anel de foco explícito, na cor do hover */
+#btn-config:focus-visible {
+    outline: 2px solid #4fc3f7;
+    outline-offset: 3px;
+    border-color: #4fc3f7;
+    box-shadow: 0 0 15px rgba(79, 195, 247, 0.35);
 }
 
 

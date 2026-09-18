@@ -75,7 +75,11 @@
   window.toggleConfig = function toggleConfig() {
     const painel = document.getElementById("painel-config");
     if (!painel) return;
-    painel.classList.toggle("visivel");
+    const aberto = painel.classList.toggle("visivel");
+
+    // Anuncia o novo estado a leitores de ecrã — o botão controla o painel.
+    const botao = document.getElementById("btn-config");
+    if (botao) botao.setAttribute("aria-expanded", aberto ? "true" : "false");
   };
 
   // ── Controlo de volume ───────────────────────────────────────────
