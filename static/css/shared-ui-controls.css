@@ -35,6 +35,9 @@ body {
     background: white;
     border-radius: 50%;                             /* forma circular */
     animation: twinkle var(--dur) infinite ease-in-out; /* duração vem do JS via CSS variable */
+    /* Nota: a cintilação é desligada para quem tem "menos movimento" ativo no
+       sistema — a regra está no bloco @media (prefers-reduced-motion) do
+       glass.css, junto com as restantes animações infinitas. */
 }
 
 /* Animação de brilho das estrelas */
@@ -46,17 +49,6 @@ body {
     50% {
         opacity: 1;             /* totalmente visível a meio da animação */
         transform: scale(1.4);  /* ligeiramente maior a meio */
-    }
-}
-
-
-/* ── Animação de brilho (usada nos títulos das páginas) ───────────── */
-@keyframes glow {
-    0%, 100% {
-        text-shadow: 0 0 20px rgba(79, 195, 247, 0.4); /* brilho suave */
-    }
-    50% {
-        text-shadow: 0 0 60px rgba(79, 195, 247, 0.9); /* brilho intenso a meio */
     }
 }
 

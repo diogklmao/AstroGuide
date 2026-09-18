@@ -2,7 +2,6 @@
 
 :root {
     --glass-bg: rgba(10, 14, 32, 0.52);
-    --glass-bg-light: rgba(255, 255, 255, 0.06);
     --glass-border: rgba(255, 255, 255, 0.14);
     --glass-border-top: rgba(255, 255, 255, 0.28);
     --glass-blur: 22px;
@@ -10,7 +9,6 @@
     --accent: #6eb8ff;
     --accent-soft: rgba(110, 184, 255, 0.25);
     --accent-glow: rgba(110, 184, 255, 0.45);
-    --violet-glow: rgba(180, 120, 255, 0.35);
     --content-z: 2;
 }
 
@@ -119,8 +117,42 @@
     z-index: var(--content-z);
 }
 
+/* Acessibilidade: quem pediu "menos movimento" no sistema operativo não deve
+   levar com animações decorativas em ciclo infinito — são precisamente as que
+   incomodam. Desligam-se todas as que repetem para sempre.
+   Ficam de fora, de propósito:
+     · as animações de entrada (durar menos de um segundo e apresentam o
+       conteúdo — não são movimento contínuo);
+     · o spinner de carregamento, que não é decoração: é a indicação de que
+       algo está a acontecer. Um spinner parado parece um ecrã bloqueado. */
 @media (prefers-reduced-motion: reduce) {
-  .glass-shimmer::after {
+    .glass-shimmer::after {
+        animation: none;
+    }
+
+    /* Campo de estrelas do menu e da app (o estilo .star está em
+       shared-ui-controls.css) — sem a cintilação ficam pontos fixos. A
+       opacidade de 70% aproxima o aspeto do valor por onde a animação passa
+       na maior parte do tempo; sem ela, as estrelas ficariam todas no brilho
+       máximo, que é o pico da animação e não o repouso. */
+    .star {
+        animation: none;
+        opacity: 0.7;
+    }
+
+    /* Cartão do título do menu: flutuação e brilho da borda */
+    .frosted-card {
+        animation: none;
+    }
+
+    /* Fotografias de fundo dos cartões do menu: zoom lento de 8s */
+    .card-imagem {
+        animation: none;
+    }
+
+    /* Botão do Night Mode aceso */
+    #btn-night-mode.ativo,
+    body.red-velvet-mode #btn-night-mode {
         animation: none;
     }
 }

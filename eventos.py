@@ -57,7 +57,7 @@ EVENTOS = [
         "descricao": "A mais popular do ano. Até 100 meteoros/hora no pico.",
     },
     {
-        "nome":      "Oriônidas",
+        "nome":      "Oriónidas",
         "tipo":      "meteoros",
         "emoji":     "☄️",
         "mes":       10,                        # outubro
@@ -105,7 +105,7 @@ EVENTOS = [
     # Calculados com precisão — datas específicas de 2026/2027.
 
     {
-        "nome":      "Eclipse Solar Total",
+        "nome":      "Eclipse Solar",
         "tipo":      "eclipse_solar",
         "emoji":     "🌑",
         "ano":       2026,
@@ -114,7 +114,7 @@ EVENTOS = [
         "hora_ini":  "17:00",
         "hora_fim":  "20:00",
         "hora_pico": "18:30",
-        "descricao": "Eclipse solar total visível em Espanha e norte de Portugal. Evento raro!",
+        "descricao": "Total em Espanha; em Portugal vê-se parcial. Evento raro!",
     },
     {
         "nome":      "Eclipse Lunar Penumbral",
@@ -192,9 +192,3 @@ def get_eventos_do_mes(ano, mes):
         # eclipses têm "ano" específico.
         and ("ano" not in e or e["ano"] == ano)
     ]
-
-def tem_evento(ano, mes, dia):
-    """
-    Verificação rápida (True/False) se um dia tem algum evento registado.
-    """
-    return len(get_eventos_do_dia(ano, mes, dia)) > 0

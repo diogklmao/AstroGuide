@@ -3,12 +3,8 @@
 #  Este ficheiro não executa nada por si só.
 #  É um dicionário central de definições que os outros
 #  ficheiros importam. Se precisares de mudar a localização
-#  ou o nome da app, é aqui que o fazes.
+#  do observador, é aqui que o fazes.
 # ============================================================
-
-APP_NAME    = "AstroGuide"      # nome da aplicação — aparece no título do browser e na interface
-APP_VERSION = "0.1.0"           # versão no formato major.minor.patch
-                                # 0.x.x = em desenvolvimento | 1.0.0 = versão final completa
 
 LOCATION = {                                    # dicionário com os dados da localização do observador
     "nome":      "Vila Nova de Gaia",           # nome legível — aparece na interface com o ícone 📍

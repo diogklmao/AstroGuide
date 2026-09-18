@@ -38,15 +38,6 @@ header.glass-header {
     }
 }
 
-header h1 {
-    font-size: 2.8rem;
-    font-weight: 700;
-    color: #4fc3f7;
-    letter-spacing: 2px;
-    animation: glow 3s infinite ease-in-out;
-    /* animação definida no shared */
-}
-
 /* Texto secundário abaixo do título */
 header .subtitulo {
     color: rgba(200, 220, 255, 0.75);
