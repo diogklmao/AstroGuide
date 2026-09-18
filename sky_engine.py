@@ -39,19 +39,29 @@ PLANETAS = {                            # mapeamento de nomes internos NASA para
 
 # ── Funções de posição (suportam instante personalizado) ──────────────────────
 
-def get_planeta(chave, momento=None):
+def _centro_em(momento):
+    # Posição do observador (Terra + Gaia) no instante pedido.
+    # É o passo mais caro do cálculo — interpola as efemérides da NASA e a
+    # rotação da Terra — mas só depende do INSTANTE e do LOCAL, nunca do
+    # alvo que estamos a observar. Por isso calcula-se uma vez por pedido
+    # e reutiliza-se para todas as estrelas e astros.
+    return (eph["earth"] + observador).at(momento)
+
+def get_planeta(chave, momento=None, centro=None):
     # Calcula a posição de um planeta visto de Vila Nova de Gaia.
     # Recebe a chave interna ex: "saturn barycenter"
     # momento: objeto Time do Skyfield; se None usa ts.now() (tempo real)
+    # centro:  posição do observador já calculada (opcional) — permite
+    #          reutilizar o mesmo cálculo entre vários astros do mesmo instante
     # Devolve dicionário com altitude, azimute, distância e visibilidade.
 
     t = momento if momento is not None else ts.now()   # usa o instante pedido ou o atual
-    terra = eph["earth"]        # objeto Terra nas efemérides
+    if centro is None:
+        centro = _centro_em(t)
     planeta = eph[chave]        # objeto do planeta pedido nas efemérides
 
-    posicao = (terra + observador).at(t).observe(planeta).apparent()
-    # terra + observador → posiciona o observador em Gaia especificamente
-    # .at(t)             → define o instante de cálculo
+    posicao = centro.observe(planeta).apparent()
+    # centro             → onde estamos (Terra + Gaia) no instante de cálculo
     # .observe(planeta)  → calcula o vetor de direção Gaia → planeta
     # .apparent()        → aplica correções atmosféricas para posição aparente real
 
@@ -65,20 +75,22 @@ def get_planeta(chave, momento=None):
         "visivel": bool(alt.degrees > 0)                # True se acima do horizonte
     }
 
-def get_todos_planetas(momento=None):
+def get_todos_planetas(momento=None, centro=None):
     # Devolve lista com os 7 planetas de uma vez.
     # List comprehension — chama get_planeta() para cada chave do dicionário PLANETAS.
-    return [get_planeta(chave, momento) for chave in PLANETAS]
+    # O centro é calculado uma única vez e partilhado pelos 7 planetas.
+    return [get_planeta(chave, momento, centro) for chave in PLANETAS]
 
-def get_sol(momento=None):
+def get_sol(momento=None, centro=None):
     # Calcula a posição do Sol num dado instante (ou agora se None).
     # Distância em UA e km porque faz sentido para uma estrela.
 
     t = momento if momento is not None else ts.now()
-    terra = eph["earth"]
+    if centro is None:
+        centro = _centro_em(t)
     sol = eph["sun"]            # "sun" = nome do Sol nas efemérides NASA
 
-    posicao = (terra + observador).at(t).observe(sol).apparent()
+    posicao = centro.observe(sol).apparent()
     alt, az, dist = posicao.altaz()
 
     km = round(float(dist.au) * 149597870.7, 0)    # converte UA para km (1 UA = 149.597.870,7 km)
@@ -91,15 +103,16 @@ def get_sol(momento=None):
         "visivel": bool(alt.degrees > 0)
     }
 
-def get_lua(momento=None):
+def get_lua(momento=None, centro=None):
     # Calcula a posição da Lua num dado instante (ou agora se None).
     # Distância só em km — UA seria "0.0026", pouco intuitivo.
 
     t = momento if momento is not None else ts.now()
-    terra = eph["earth"]
+    if centro is None:
+        centro = _centro_em(t)
     lua = eph["moon"]           # "moon" = nome da Lua nas efemérides NASA
 
-    posicao = (terra + observador).at(t).observe(lua).apparent()
+    posicao = centro.observe(lua).apparent()
     alt, az, dist = posicao.altaz()
 
     km = round(float(dist.au) * 149597870.7, 0)    # converte UA para km
@@ -217,8 +230,10 @@ def get_observatorio(timestamp_utc=None):
         agora = ts.from_datetime(timestamp_utc)  # converte datetime Python → Time Skyfield
     else:
         agora = ts.now()                         # tempo real
-    terra = eph["earth"]
-    observador_pos = terra + observador
+    # Posição do observador (Terra + Gaia) no instante pedido.
+    # Calculada UMA vez e reutilizada por todas as estrelas, pelo Sol,
+    # pela Lua e pelos 7 planetas — em vez de a recalcular a cada um.
+    centro = _centro_em(agora)
     
     estrelas_calculadas = {}
     
@@ -228,7 +243,7 @@ def get_observatorio(timestamp_utc=None):
         estrela_sf = Star(ra_hours=dados["ra"], dec_degrees=dados["dec"])
         
         # Calcular posição horizontal (Alt/Az)
-        posicao = observador_pos.at(agora).observe(estrela_sf).apparent()
+        posicao = centro.observe(estrela_sf).apparent()
         alt, az, _ = posicao.altaz()
         
         alt_deg = round(float(alt.degrees), 2)
@@ -245,9 +260,9 @@ def get_observatorio(timestamp_utc=None):
         }
         
     # Obter posições do Sol, Lua e Planetas para o instante pedido
-    sol_dados = get_sol(agora)
-    lua_dados = get_lua(agora)
-    planetas_dados = get_todos_planetas(agora)
+    sol_dados = get_sol(agora, centro)
+    lua_dados = get_lua(agora, centro)
+    planetas_dados = get_todos_planetas(agora, centro)
     
     # Adicionar astros à lista de planetas/luminares
     astros = []
