@@ -35,9 +35,10 @@ body {
     background: white;
     border-radius: 50%;                             /* forma circular */
     animation: twinkle var(--dur) infinite ease-in-out; /* duração vem do JS via CSS variable */
-    /* Nota: a cintilação é desligada para quem tem "menos movimento" ativo no
-       sistema — a regra está no bloco @media (prefers-reduced-motion) do
-       glass.css, junto com as restantes animações infinitas. */
+    /* Nota: para quem tem "menos movimento" ativo no sistema a cintilação não
+       é desligada — é trocada por uma versão só de opacidade, mais lenta e sem
+       o transform: scale. A regra está no bloco @media (prefers-reduced-motion)
+       do glass.css, junto com as restantes animações infinitas. */
 }
 
 /* Animação de brilho das estrelas */

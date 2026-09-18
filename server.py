@@ -17,7 +17,7 @@ from sky_engine import (
 from eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
 from apod import get_imagem_do_dia                           # importa Imagem Astronómica do Dia (NASA)
 from config import LOCATION                                  # importa localização
-import datetime                                              # para obter a hora atual
+import datetime                                              # conversão e validação de datas/horas
 from zoneinfo import ZoneInfo                                # conversão de fuso horário
 from flask import request                                    # para ler query parameters
 
@@ -73,7 +73,6 @@ def api_ceu():
         "sol":      get_sol(),                      # chama sky_engine e obtém dados do Sol
         "lua":      get_lua(),                      # idem para a Lua
         "planetas": get_todos_planetas(),           # lista com os 7 planetas
-        "hora":     datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),  # hora atual formatada
         "location": LOCATION["nome"],               # nome da localização para mostrar na interface
     })
 

@@ -131,13 +131,26 @@
     }
 
     /* Campo de estrelas do menu e da app (o estilo .star está em
-       shared-ui-controls.css) — sem a cintilação ficam pontos fixos. A
-       opacidade de 70% aproxima o aspeto do valor por onde a animação passa
-       na maior parte do tempo; sem ela, as estrelas ficariam todas no brilho
-       máximo, que é o pico da animação e não o repouso. */
+       shared-ui-controls.css) — aqui a cintilação não é desligada, é trocada.
+       O que o "menos movimento" visa evitar é movimento, e no @keyframes
+       twinkle original é o transform: scale que o faz (as estrelas a crescer
+       e a encolher). Um simples esbatimento de opacidade não provoca esse
+       efeito, por isso mantém-se a cintilação sem o "zoom" — e com o dobro da
+       duração, para ser mais calma. O animation-delay de cada estrela é posto
+       pelo JS no style inline, por isso continua a valer e elas não ficam
+       todas sincronizadas. */
     .star {
-        animation: none;
-        opacity: 0.7;
+        animation-name: twinkle-calmo;
+        animation-duration: calc(var(--dur) * 2);
+    }
+
+    @keyframes twinkle-calmo {
+        0%, 100% {
+            opacity: 0.35;
+        }
+        50% {
+            opacity: 1;
+        }
     }
 
     /* Cartão do título do menu: flutuação e brilho da borda */
