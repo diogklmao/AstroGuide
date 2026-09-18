@@ -38,12 +38,6 @@ body.page-menu {
     pointer-events: none;
 }
 
-/* Estrelas/planetas 3D sem tapar a foto */
-.page-menu #three-bg {
-    z-index: 1;
-    opacity: 0.5;
-}
-
 /* Vinheta mais leve no menu para a foto respirar */
 .page-menu .bg-vignette {
     z-index: 1;

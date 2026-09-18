@@ -45,12 +45,6 @@ const IMAGENS_CONSTELACOES = {
 function criarEstrelas() {
     const container = document.getElementById("stars");
     if (!container) return;
-    const threeAtivo = document.getElementById("three-bg") &&
-        !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (threeAtivo) {
-        container.classList.add("stars--hidden");
-        return;
-    }
     for (let i = 0; i < 150; i++) {
         const star = document.createElement("div");
         star.className = "star";

@@ -96,11 +96,6 @@ astroguide/
     │                        observatório, APOD e VR).
     │
     ├── js/
-    │   ├── three-bg.js    → Fundo 3D partilhado (Three.js)
-    │   │                    Campo de estrelas, planetas em
-    │   │                    órbita e parallax com o rato.
-    │   │                    Usado no menu e na app.
-    │   │
     │   ├── shared-ui-controls.js → Funções partilhadas
     │   │                    (música, volume, configurações).
     │   │
@@ -204,8 +199,8 @@ JavaScript (Interatividade)
   Python via API (fetch). Desenha o mapa celeste em Canvas
   com projeção 360° e 2D (planisfério), e uma versão 3D real
   em WebGL (Three.js) no Observatório VR.
-  Ficheiros: three-bg.js, shared-ui-controls.js,
-             menu.js, index.js, vr-observatorio.js
+  Ficheiros: shared-ui-controls.js, menu.js,
+             index.js, vr-observatorio.js
 
 ---
 
@@ -239,14 +234,12 @@ requests (pip install requests)
 
 Three.js (via CDN)
   Biblioteca de gráficos 3D baseada em WebGL.
-  Usada em dois sítios:
-  1) Fundo animado partilhado entre páginas (three-bg.js):
-     campo de 3500 estrelas coloridas, 3 planetas em órbita
-     com parallax suave controlado pelo movimento do rato.
-  2) Observatório VR (vr-observatorio.js): cena 3D real com
-     estrelas (THREE.Points) e linhas de constelações
-     (THREE.LineSegments) posicionadas pelas coordenadas
-     astronómicas reais devolvidas pela API.
+  Usada no Observatório VR (vr-observatorio.js): cena 3D
+  real com estrelas (THREE.Points) e linhas de constelações
+  (THREE.LineSegments) posicionadas pelas coordenadas
+  astronómicas reais devolvidas pela API.
+  O carregamento é garantido por garantirTHREE(), que
+  reutiliza o THREE já presente ou o vai buscar ao CDN.
   Versão: r160 — cdn.jsdelivr.net/npm/three@0.160.0
 
 Canvas API (nativa do browser)
@@ -292,7 +285,8 @@ Glassmorphism
   Estilo visual de painéis translúcidos com desfoque de
   fundo (backdrop-filter: blur). Cria profundidade e
   elegância mantendo o conteúdo legível sobre fundos
-  complexos como o starfield Three.js.
+  complexos como o campo de estrelas e a fotografia
+  do menu.
 
 Projeção Perspetiva 3D (Vista 360°)
   O Observatório 2D usa geometria de câmara virtual com
@@ -348,19 +342,18 @@ sessionStorage
 
 DRY (Don't Repeat Yourself)
   Princípio de programação aplicado no projeto:
-  glass.css centraliza o design system, three-bg.js é
-  partilhado entre páginas, shared-ui-controls.js evita
-  repetição de lógica de música e configurações, e o
-  Observatório VR reutiliza a mesma API do Observatório 2D
-  em vez de recalcular posições astronómicas.
+  glass.css centraliza o design system,
+  shared-ui-controls.js evita repetição de lógica de música
+  e configurações, e o Observatório VR reutiliza a mesma
+  API do Observatório 2D em vez de recalcular posições
+  astronómicas.
 
 ---
 
 ## FUNCIONALIDADES IMPLEMENTADAS
 
   [x] Landing Page interativa com menu dinâmico (4 cartões)
-  [x] Fundo 3D com Three.js — estrelas, planetas, parallax
-  [x] Fundo Three.js partilhado entre menu e app
+  [x] Campo de estrelas animado em CSS (menu e app)
   [x] Design system glassmorphism (glass.css)
   [x] Animações Canvas — ícones desenhados à mão no menu
   [x] Favicon SVG personalizado
