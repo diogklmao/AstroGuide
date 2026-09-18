@@ -419,9 +419,15 @@ function alterarModoVisao() {
     }
 }
 
-async function carregarObservatorio() {
+async function carregarObservatorio(animar = false) {
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas) return;
+
+    // Uma transição a decorrer é cancelada já: vamos substituir o céu
+    // inteiro, e ela estaria a escrever em objetos que ninguém vai desenhar.
+    // Fica reposta no destino exato que tinha — o ponto de partida da
+    // transição seguinte tem de ser um estado verdadeiro, não um meio caminho.
+    cancelarTransicaoCeu();
 
     // Configurar interatividade de clique e arrasto no canvas caso ainda não tenha sido configurada
     if (!canvas.dataset.eventsConfigured) {
@@ -443,21 +449,340 @@ async function carregarObservatorio() {
         canvas.dataset.eventsConfigured = "true";
     }
 
+    // O céu que está agora no ecrã, copiado ANTES do fetch: é o ponto de
+    // partida da transição. Copiar é mesmo copiar — durante a animação as
+    // posições dentro de observatorioDados são substituídas frame a frame,
+    // por isso guardar uma referência não servia de nada.
+    const anterior = animar ? guardarCeu() : null;
+
     // O URL leva a data/hora simulada, se houver uma escolhida (ver urlApiObservatorio)
     try {
         const res = await fetch(urlApiObservatorio());
         const apiData = await res.json();
+
+        // Os valores exatos do instante de chegada, guardados enquanto ainda
+        // estão intactos: a animação escreve por cima deles em observatorioDados
+        // e no último frame repõe-nos, para o céu acabar sempre no resultado do
+        // servidor e nunca num valor interpolado.
+        const exato = anterior ? guardarCeu(apiData) : null;
+
         observatorioDados = apiData;
+
+        // Escrever já as posições antigas no céu que acabou de chegar: as duas
+        // linhas abaixo redesenham de forma síncrona, e sem isto via-se um
+        // frame do destino antes de a transição arrancar — um piscar de um
+        // frame, do género que se nota sem se perceber de onde vem.
+        if (anterior) reporCeu(anterior);
 
         // Atualiza a localização no cabeçalho
         document.getElementById("localizacao").textContent = "📍 Vila Nova de Gaia";
 
         alterarModoVisao();
         redimensionarCanvas();
+
+        // Só no fim de tudo estar montado, e a partir do céu que acabou de ser
+        // desenhado.
+        if (anterior) animarTransicaoCeu(anterior, exato, apiData);
     } catch (err) {
         console.error("Erro ao carregar observatório:", err);
     }
 }
+
+// ── Transição animada ao mudar a hora ────────────────────────────────────────
+// Mudar a hora simulada não devia fazer o céu saltar: devia vê-lo viajar até à
+// posição nova, cada astro pelo seu arco, durante meio segundo.
+//
+// A forma de o fazer com exatidão é animar o TEMPO, e não as coordenadas. O
+// servidor envia o RA/Dec aparente de cada estrela (na época da data) e o
+// tempo sideral do instante; aqui calcula-se a posição para um instante
+// intermédio em cada frame. Assim o destino é exato — é o mesmo cálculo do
+// servidor, só que para outro momento — e cada estrela segue a sua trajetória
+// verdadeira no céu, em vez de uma reta entre o princípio e o fim.
+
+// Estado da transição em curso (ambos null quando não há nenhuma a decorrer):
+//   idTransicaoCeu  — o pedido de frame, para a poder cancelar
+//   fimTransicaoCeu — o instante de chegada, para a poder repor nele
+let idTransicaoCeu = null;
+let fimTransicaoCeu = null;
+
+// Cópia de um céu (por omissão, o que está no ecrã): as posições de cada
+// objecto — altitude, azimute e visibilidade — e também o RA/Dec aparente, que
+// é por onde a transição pega. Leva ainda o tempo sideral e a latitude, de que
+// ela precisa. Quem escreve isto de volta num céu é o reporCeu, e esse só
+// escreve as posições.
+function guardarCeu(ceu = observatorioDados) {
+    if (!ceu || !ceu.estrelas) return null;
+
+    const estrelas = {};
+    for (const id in ceu.estrelas) {
+        const e = ceu.estrelas[id];
+        estrelas[id] = {
+            altitude: e.altitude, azimute: e.azimute, visivel: e.visivel,
+            ra_aparente: e.ra_aparente, dec_aparente: e.dec_aparente
+        };
+    }
+
+    const astros = {};
+    for (const a of ceu.astros || []) {
+        astros[a.id] = {
+            altitude: a.altitude, azimute: a.azimute, visivel: a.visivel,
+            ra_aparente: a.ra_aparente, dec_aparente: a.dec_aparente
+        };
+    }
+
+    return {
+        estrelas: estrelas,
+        astros: astros,
+        tempo_sideral: ceu.tempo_sideral,
+        latitude: ceu.latitude
+    };
+}
+
+// Escreve uma cópia de volta no céu que está em observatorioDados.
+function reporCeu(copia) {
+    if (!observatorioDados || !copia) return;
+
+    for (const id in copia.estrelas) {
+        const alvo = observatorioDados.estrelas[id];
+        if (!alvo) continue;
+        const valores = copia.estrelas[id];
+        alvo.altitude = valores.altitude;
+        alvo.azimute = valores.azimute;
+        alvo.visivel = valores.visivel;
+    }
+
+    for (const astro of observatorioDados.astros || []) {
+        const valores = copia.astros[astro.id];
+        if (!valores) continue;
+        astro.altitude = valores.altitude;
+        astro.azimute = valores.azimute;
+        astro.visivel = valores.visivel;
+    }
+}
+
+// Diferença entre dois ângulos pelo caminho curto: entre −180° e +180°. Sem
+// isto, um astro que passasse de 359° para 1° dava uma volta completa ao céu.
+function diferencaAngular(de, para) {
+    return ((para - de + 540) % 360) - 180;
+}
+
+const GRAU = Math.PI / 180;   // graus → radianos
+
+// Ascensão Reta e Declinação → altitude e azimute, para um dado tempo sideral
+// local (em graus). É trigonometria esférica simples: o ângulo horário
+// H = tempo sideral − RA diz quanto o céu já rodou desde que a estrela passou
+// o meridiano, e com H, a declinação e a latitude saem as duas fórmulas abaixo.
+// Azimute medido a partir do Norte e a crescer para leste (0° = N, 90° = E) —
+// a convenção do Skyfield e a que o obterRosaDosVentos() já assume.
+// Devolve os valores por arredondar, de propósito: a comparação de
+// verificarAltAz() com os valores do servidor (arredondados a 2 casas) conta
+// com isso. Se houvesse arredondamento aqui, a tolerância de 0,01° seria
+// metade arredondamento e metade erro verdadeiro, e não provava nada.
+function altAzDe(raHoras, decGraus, latitudeGraus, tempoSideralGraus) {
+    const H = (tempoSideralGraus - raHoras * 15) * GRAU;
+    const dec = decGraus * GRAU;
+    const lat = latitudeGraus * GRAU;
+
+    // O max/min protege o asin de um 1.0000000001 vindo do arredondamento.
+    const senAlt = Math.sin(dec) * Math.sin(lat) + Math.cos(dec) * Math.cos(lat) * Math.cos(H);
+    const altitude = Math.asin(Math.max(-1, Math.min(1, senAlt))) / GRAU;
+    const azimute = Math.atan2(
+        -Math.cos(dec) * Math.sin(H),
+        Math.sin(dec) * Math.cos(lat) - Math.cos(dec) * Math.sin(lat) * Math.cos(H)
+    ) / GRAU;
+
+    return { altitude: altitude, azimute: (azimute + 360) % 360 };
+}
+
+// Prepara um objecto do céu para a transição: junta o objecto onde as posições
+// vão ser escritas ao RA/Dec de partida e ao quanto ele muda no intervalo. Vale
+// tanto para uma estrela como para o Sol, a Lua ou um planeta.
+// Devolve null quando falta algum dos dados (uma resposta de uma versão
+// anterior do servidor, por exemplo) — nesse caso o objecto fica quieto durante
+// a transição e é reposto no destino no último frame.
+function montarEntrada(alvo, antes, depois) {
+    if (!alvo || !antes || !depois) return null;
+    if (antes.ra_aparente == null || depois.ra_aparente == null) return null;
+
+    // A Ascensão Reta dá a volta às 24 h (23,9 h → 0,1 h são 0,2 h de diferença,
+    // não 23,8): a diferença tem de ir pelo caminho curto, senão o astro dava
+    // uma volta ao céu ao contrário. O ×15 é porque a função trabalha em graus
+    // e 1 h = 15°.
+    const deltaRa = diferencaAngular(antes.ra_aparente * 15, depois.ra_aparente * 15) / 15;
+
+    return {
+        alvo: alvo,
+        ra: antes.ra_aparente,
+        deltaRa: deltaRa,
+        dec: antes.dec_aparente,
+        deltaDec: depois.dec_aparente - antes.dec_aparente
+    };
+}
+
+function cancelarTransicaoCeu() {
+    if (idTransicaoCeu === null) return;
+
+    cancelAnimationFrame(idTransicaoCeu);
+    idTransicaoCeu = null;
+
+    // O céu fica já no destino exato que a transição tinha, e não a meio: as
+    // posições em observatorioDados têm de corresponder sempre ao tempo
+    // sideral que lá está guardado, porque é isso que a transição seguinte
+    // assume ao calcular o seu próprio ponto de partida.
+    reporCeu(fimTransicaoCeu);
+    fimTransicaoCeu = null;
+}
+
+// `inicio` e `fim` são cópias feitas com guardarCeu(); `destino` é o céu que
+// está em observatorioDados — os próprios objectos onde as posições vão ser
+// escritas, para o desenho os ler no frame seguinte.
+function animarTransicaoCeu(inicio, fim, destino) {
+    // Sem os dados de que a transição precisa não há transição possível — é o
+    // caso de uma resposta de uma versão anterior do servidor que tenha ficado
+    // em cache. O céu novo já está carregado e desenhado, por isso saltar é
+    // apenas o comportamento de antes, que é melhor do que um céu avariado.
+    if (inicio.tempo_sideral == null || fim.tempo_sideral == null) return;
+    if (destino.latitude == null) return;
+
+    cancelarTransicaoCeu();
+
+    // Quanto o céu roda, em tempo sideral, pelo caminho curto. É daqui que sai
+    // a duração: um salto de 8 h roda ~120° (uma viagem que se vê), meia hora
+    // roda ~7,5° (quase nada). O tecto evita que um salto de meses fique a
+    // animar durante uma eternidade.
+    const deltaLst = diferencaAngular(inicio.tempo_sideral, fim.tempo_sideral);
+    const horasSiderais = Math.abs(deltaLst) / 15.041067;   // 1 h sideral = 15,041067°
+    const duracaoMs = Math.min(1100, 400 + 60 * horasSiderais);
+
+    const latitude = destino.latitude;
+
+    // Todos os objectos do céu — estrelas, Sol, Lua e planetas — vão pelo mesmo
+    // caminho: em cada frame a posição sai do RA/Dec e do tempo sideral desse
+    // instante. Nas estrelas o RA/Dec é sempre o mesmo (o que muda é o tempo
+    // sideral); nos astros vai variando devagar, e por isso vai interpolado
+    // entre os dois extremos.
+    //
+    // É esta a diferença que se vê. Quem manda no movimento é a rotação do céu,
+    // que num salto de 8 h ronda os 120°, e essa é calculada a rigor. O
+    // movimento próprio de cada astro nesse intervalo — a Lua, a mais rápida,
+    // anda uns 4° — é pequeno ao pé disso. Uma lista e um cálculo só, em vez de
+    // um método para as estrelas e outro para os astros, evita que o mesmo
+    // desenho tenha dois comportamentos diferentes.
+    const objetos = [];
+
+    for (const id in destino.estrelas) {
+        const entrada = montarEntrada(destino.estrelas[id], inicio.estrelas[id], fim.estrelas[id]);
+        if (entrada) objetos.push(entrada);
+    }
+
+    for (const astro of destino.astros) {
+        const entrada = montarEntrada(astro, inicio.astros[astro.id], fim.astros[astro.id]);
+        if (entrada) objetos.push(entrada);
+    }
+
+    const inicioMs = performance.now();
+    fimTransicaoCeu = fim;
+
+    function frame(agoraMs) {
+        // O max/min é para o primeiro frame poder chegar com um instante
+        // anterior ao arranque (a marca do requestAnimationFrame é a do início
+        // do frame, não a do momento em que o pedimos) e para o último não
+        // passar de 1.
+        const f = Math.min(1, Math.max(0, (agoraMs - inicioMs) / duracaoMs));
+
+        // easeInOutCubic: arranca devagar, acelera, trava no fim. É a diferença
+        // entre "a rodar" e "a chegar ao sítio".
+        const suave = f < 0.5 ? 4 * f * f * f : 1 - Math.pow(-2 * f + 2, 3) / 2;
+
+        // O tempo sideral avança a ritmo constante, por isso interpolá-lo é o
+        // mesmo que interpolar o tempo — e é daí que vem a exatidão: em cada
+        // frame a posição é calculada para um instante que existiu mesmo.
+        const lst = inicio.tempo_sideral + deltaLst * suave;
+
+        for (const objeto of objetos) {
+            const posicao = altAzDe(objeto.ra + objeto.deltaRa * suave,
+                                    objeto.dec + objeto.deltaDec * suave,
+                                    latitude, lst);
+
+            // Arredondado a 2 casas como o servidor, para os números do painel
+            // de detalhes não aparecerem com catorze casas decimais a quem
+            // clique a meio da transição. O cálculo em si é que não é
+            // arredondado — é o que o verificarAltAz() compara.
+            objeto.alvo.altitude = Math.round(posicao.altitude * 100) / 100;
+            objeto.alvo.azimute = Math.round(posicao.azimute * 100) / 100;
+            // Recalculado em cada frame: sem isto, o que nasça a meio da
+            // transição só apareceria no fim, de repente.
+            objeto.alvo.visivel = posicao.altitude > 0;
+        }
+
+        const terminou = f >= 1;
+
+        // Último frame: os valores exatos do servidor, a partir da cópia. A
+        // transição nunca é a última palavra — mesmo que houvesse um erro na
+        // matemática, o céu acaba sempre no resultado do cálculo astronómico.
+        if (terminou) {
+            reporCeu(fim);
+            idTransicaoCeu = null;
+            fimTransicaoCeu = null;
+        }
+
+        agendarDesenhoObservatorio();
+
+        if (!terminou) idTransicaoCeu = requestAnimationFrame(frame);
+    }
+
+    idTransicaoCeu = requestAnimationFrame(frame);
+}
+
+// Verificação da conversão RA/Dec → Alt/Az. Não corre sozinha, só quando
+// chamada na consola do browser, com o Observatório aberto e em repouso.
+// Compara, para tudo o que tem RA/Dec — estrelas, Sol, Lua e planetas —, a
+// posição que este cálculo dá com a que veio do servidor para o mesmo instante.
+// Coincidirem é a prova de que a conversão está certa — e a animação é exata
+// por construção, porque usa exatamente este cálculo em cada frame.
+window.verificarAltAz = function () {
+    if (!observatorioDados || observatorioDados.tempo_sideral == null) {
+        console.warn("Ainda não há dados do observatório — abre o ecrã do Observatório primeiro.");
+        return;
+    }
+    if (idTransicaoCeu !== null) {
+        console.warn("Há uma transição a decorrer — espera que acabe e repete.");
+        return;
+    }
+
+    let piorAltitude = 0;
+    let piorAzimute = 0;
+    let quantas = 0;
+
+    // Estrelas e astros, os dois: o cálculo em que a animação se apoia é o
+    // mesmo para todos, e uma verificação que só cobrisse metade deles podia
+    // passar com a outra metade avariada. Nos astros é até mais útil — têm
+    // paralaxe (a Lua, sobretudo), que é onde uma conversão mal feita se
+    // notaria primeiro.
+    const objetos = [];
+    for (const id in observatorioDados.estrelas) objetos.push(observatorioDados.estrelas[id]);
+    for (const astro of observatorioDados.astros || []) objetos.push(astro);
+
+    for (const objeto of objetos) {
+        if (objeto.ra_aparente == null) continue;
+
+        const posicao = altAzDe(objeto.ra_aparente, objeto.dec_aparente,
+                                observatorioDados.latitude, observatorioDados.tempo_sideral);
+
+        // Azimute pelo caminho curto: 359,9° e 0,1° distam 0,2°, não 359,8°.
+        piorAltitude = Math.max(piorAltitude, Math.abs(posicao.altitude - objeto.altitude));
+        piorAzimute = Math.max(piorAzimute, Math.abs(diferencaAngular(objeto.azimute, posicao.azimute)));
+        quantas++;
+    }
+
+    console.log(`${quantas} objectos comparados (estrelas e astros). Pior diferença: ` +
+                `altitude ${piorAltitude.toFixed(4)}°, azimute ${piorAzimute.toFixed(4)}°.`);
+    console.log(piorAltitude < 0.01 && piorAzimute < 0.01
+        ? "✅ Dentro do esperado (< 0,01°) — a conversão está certa e a animação é exata."
+        : "❌ Fora do esperado — alguma coisa não bate certo.");
+
+    return { piorAltitude: piorAltitude, piorAzimute: piorAzimute, quantas: quantas };
+};
 
 // ── Seletor de Hora do Observatório ──────────────────────────────────────────
 // Preenche os campos do seletor. Se já houver uma simulação ativa, mantém a
@@ -529,13 +854,18 @@ function atualizarObservatorioComHora() {
     tempoSimuladoObs = (data === dataAtual && hora === horaAtual) ? null : { data, hora };
 
     atualizarLabelTempoSimulado();
-    carregarObservatorio();
+
+    // Com transição: é uma mudança de hora pedida pelo utilizador, e é isso
+    // que se quer ver acontecer. A actualização automática de 30 em 30
+    // segundos (autoRefresh) e a entrada no ecrã ficam sem transição — movem o
+    // céu 0,125° e animar isso seria só ruído.
+    carregarObservatorio(true);
 }
 
 function repoeHoraAtual() {
     tempoSimuladoObs = null;      // céu em tempo real, no 2D e no VR
     inicializarSeletorHora();     // repõe os campos e limpa o rótulo
-    carregarObservatorio();
+    carregarObservatorio(true);   // voltar ao tempo real também é uma viagem
 }
 
 // ── Controlos de Arrastar e Zoom ──────────────────────────────────

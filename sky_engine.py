@@ -67,11 +67,14 @@ def get_planeta(chave, momento=None, centro=None):
     # .apparent()        → aplica correções atmosféricas para posição aparente real
 
     alt, az, dist = posicao.altaz()     # decompõe em altitude, azimute e distância
+    ra_ap, dec_ap, _ = posicao.radec(epoch="date")   # RA/Dec aparentes na época da data
 
     return {
         "nome": PLANETAS[chave],                        # nome em português ex: "Saturno"
         "altitude": round(float(alt.degrees), 2),       # graus acima do horizonte
         "azimute": round(float(az.degrees), 2),         # direção em graus (0=Norte, 90=Este...)
+        "ra_aparente": round(float(ra_ap.hours), 6),    # para o frontend animar a mudança de hora
+        "dec_aparente": round(float(dec_ap.degrees), 6),
         "distancia": round(float(dist.au), 4),          # distância em Unidades Astronómicas
         "visivel": bool(alt.degrees > 0)                # True se acima do horizonte
     }
@@ -93,6 +96,7 @@ def get_sol(momento=None, centro=None):
 
     posicao = centro.observe(sol).apparent()
     alt, az, dist = posicao.altaz()
+    ra_ap, dec_ap, _ = posicao.radec(epoch="date")   # RA/Dec aparentes na época da data
 
     km = round(float(dist.au) * 149597870.7, 0)    # converte UA para km (1 UA = 149.597.870,7 km)
 
@@ -100,6 +104,8 @@ def get_sol(momento=None, centro=None):
         "nome": "Sol",
         "altitude": round(float(alt.degrees), 2),
         "azimute": round(float(az.degrees), 2),
+        "ra_aparente": round(float(ra_ap.hours), 6),    # para o frontend animar a mudança de hora
+        "dec_aparente": round(float(dec_ap.degrees), 6),
         "distancia": f"{round(float(dist.au), 4)} UA ({km:,.0f} km)",  # ex: "0.9942 UA (148,732,816 km)"
         "visivel": bool(alt.degrees > 0)
     }
@@ -115,6 +121,7 @@ def get_lua(momento=None, centro=None):
 
     posicao = centro.observe(lua).apparent()
     alt, az, dist = posicao.altaz()
+    ra_ap, dec_ap, _ = posicao.radec(epoch="date")   # RA/Dec aparentes na época da data
 
     km = round(float(dist.au) * 149597870.7, 0)    # converte UA para km
 
@@ -122,6 +129,8 @@ def get_lua(momento=None, centro=None):
         "nome": "Lua",
         "altitude": round(float(alt.degrees), 2),
         "azimute": round(float(az.degrees), 2),
+        "ra_aparente": round(float(ra_ap.hours), 6),    # para o frontend animar a mudança de hora
+        "dec_aparente": round(float(dec_ap.degrees), 6),
         "distancia": f"{km:,.0f} km",               # ex: "384,400 km"
         "visivel": bool(alt.degrees > 0)
     }
@@ -254,7 +263,16 @@ def get_observatorio(timestamp_utc=None):
         # Calcular posição horizontal (Alt/Az)
         posicao = centro.observe(estrela_sf).apparent()
         alt, az, _ = posicao.altaz()
-        
+
+        # Ascensão Reta e Declinação APARENTES na época da data — não as do
+        # catálogo (dados["ra"]/dados["dec"]). O `.apparent()` de cima já lhes
+        # aplicou a precessão, a nutação e a aberração; usar as do catálogo
+        # punha o céu do browser ~0,4° ao lado deste e a transição animada
+        # acabava com um salto visível no último frame. Vão para o frontend
+        # para ele poder passar de RA/Dec a Alt/Az em qualquer instante
+        # intermédio (ver animarTransicaoCeu, no index.js).
+        ra_ap, dec_ap, _ = posicao.radec(epoch="date")
+
         alt_deg = round(float(alt.degrees), 2)
         az_deg = round(float(az.degrees), 2)
         
@@ -264,6 +282,8 @@ def get_observatorio(timestamp_utc=None):
             "nome": dados["nome"],
             "altitude": alt_deg,
             "azimute": az_deg,
+            "ra_aparente": round(float(ra_ap.hours), 6),
+            "dec_aparente": round(float(dec_ap.degrees), 6),
             "mag": dados["mag"],
             "visivel": alt_deg > 0
         }
@@ -277,11 +297,16 @@ def get_observatorio(timestamp_utc=None):
     astros = []
     
     # Adicionar Sol
+    # (o RA/Dec aparente acompanha cada astro, tal como nas estrelas, para o
+    #  frontend poder calcular a posição em qualquer instante intermédio — ver
+    #  animarTransicaoCeu, no index.js)
     astros.append({
         "id": "sol",
         "nome": "Sol",
         "altitude": sol_dados["altitude"],
         "azimute": sol_dados["azimute"],
+        "ra_aparente": sol_dados["ra_aparente"],
+        "dec_aparente": sol_dados["dec_aparente"],
         "visivel": sol_dados["visivel"],
         "tipo": "sol"
     })
@@ -296,6 +321,8 @@ def get_observatorio(timestamp_utc=None):
         "nome": "Lua",
         "altitude": lua_dados["altitude"],
         "azimute": lua_dados["azimute"],
+        "ra_aparente": lua_dados["ra_aparente"],
+        "dec_aparente": lua_dados["dec_aparente"],
         "visivel": lua_dados["visivel"],
         "tipo": "lua",
         "emoji": fase_lua["emoji"],
@@ -312,6 +339,8 @@ def get_observatorio(timestamp_utc=None):
             "nome": p["nome"],
             "altitude": p["altitude"],
             "azimute": p["azimute"],
+            "ra_aparente": p["ra_aparente"],
+            "dec_aparente": p["dec_aparente"],
             "visivel": p["visivel"],
             "tipo": "planeta"
         })
@@ -319,5 +348,15 @@ def get_observatorio(timestamp_utc=None):
     return {
         "estrelas": estrelas_calculadas,
         "constelacoes": CONSTELACOES_BD,
-        "astros": astros
+        "astros": astros,
+        # Dados que o browser precisa para animar a mudança de hora (ver
+        # animarTransicaoCeu, no index.js): a latitude do observador e o tempo
+        # sideral local deste instante, em graus. Com o RA/Dec aparente de cada
+        # estrela, é tudo o que falta para ele calcular a posição de qualquer
+        # instante intermédio. `gast` é uma propriedade (escreve-se sem
+        # parênteses) e vem em horas. A longitude segue a convenção positiva
+        # para leste (config.py), ou seja negativa em Gaia — que é o que faz o
+        # tempo sideral local ser menor que o de Greenwich, como deve ser.
+        "latitude": LOCATION["latitude"],
+        "tempo_sideral": (agora.gast * 15 + LOCATION["longitude"]) % 360
     }
