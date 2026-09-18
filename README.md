@@ -109,8 +109,7 @@ astroguide/
     │   │                    APOD, e o Observatório interativo
     │   │                    (canvas 360°/2D) com estrelas,
     │   │                    constelações, planetas com imagem
-    │   │                    real, silhueta de montanhas e
-    │   │                    auto-refresh a cada 30s.
+    │   │                    real e auto-refresh a cada 30s.
     │   │
     │   └── vr-observatorio.js → Observatório VR (Fase 1)
     │                        Cena 3D em Three.js — reutiliza
@@ -246,10 +245,10 @@ Canvas API (nativa do browser)
   Usada para desenhar o mapa celeste do Observatório 2D.
   Suporta dois modos: Vista 360° (projeção perspetiva 3D
   com rotação de câmara por arrasto, fundo panorâmico da
-  Via Láctea, silhueta de montanhas gerada por código, e
-  planetas com imagem real) e Planisfério (vista zenital 2D
-  clássica). Permite clicar em astros, estrelas e
-  constelações para ver detalhes, curiosidades e imagens.
+  Via Láctea e planetas com imagem real) e Planisfério
+  (vista zenital 2D clássica). Permite clicar em astros,
+  estrelas e constelações para ver detalhes, curiosidades
+  e imagens.
 
 ---
 
@@ -312,10 +311,10 @@ Coordenadas Horizontais (Altitude/Azimute)
 
 Geração Procedural
   Conteúdo criado por código/matemática em vez de imagens
-  ou ficheiros externos. Usado na silhueta de montanhas do
-  Observatório (soma de ondas sinusoidais) — garante um
-  perfil sempre consistente à volta dos 360°, sem precisar
-  de nenhum ficheiro de imagem novo.
+  ou ficheiros externos. Usado nos ícones do menu (estrela,
+  lua crescente, telescópio e jornal), desenhados com a
+  Canvas API — não ocupam espaço no repositório e mantêm
+  a nitidez em qualquer resolução.
 
 Degradação Graciosa (Graceful Degradation)
   Padrão usado nas imagens de constelações e de planetas:
@@ -384,7 +383,6 @@ DRY (Don't Repeat Yourself)
   [x] Constelações com linhas e nomes (nomenclatura latina/IAU)
   [x] Curiosidades e ilustrações por constelação (ao clicar)
   [x] Sol, Lua e todos os planetas no mapa celeste, com imagens reais
-  [x] Silhueta de montanhas no horizonte (gerada por código)
   [x] Fundo panorâmico real da Via Láctea, com parallax
   [x] Clique num astro/estrela/constelação para ver detalhes
   [x] Painel de filtros — constelações, nomes, magnitude

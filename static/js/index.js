@@ -286,28 +286,6 @@ let cameraAzimuth = 0;   // 0° = Norte, 90° = Este, 180° = Sul, 270° = Oeste
 let cameraAltitude = 15;  // Altitude em graus (-85° a 85°)
 let cameraFOV = 80;       // Campo de visão horizontal em graus
 
-// ── Silhueta de montanhas no horizonte ─────────────────────────────
-// Gerada uma vez por soma de ondas — dá um perfil irregular mas consistente
-// à volta dos 360°, para as montanhas não "saltarem" quando rodas a câmara.
-const PERFIL_MONTANHAS = (function gerarPerfilMontanhas() {
-    const perfil = [];
-    for (let az = 0; az < 360; az++) {
-        const rad = az * Math.PI / 180;
-        let altura =
-            2.2 * Math.sin(rad * 3 + 1.3) +
-            1.3 * Math.sin(rad * 7 + 0.4) +
-            0.8 * Math.sin(rad * 13 + 2.1) +
-            0.5 * Math.sin(rad * 23 + 0.9);
-        perfil.push(Math.max(0.3, altura + 2.6)); // altitude aparente entre ~0.3° e ~5.5°
-    }
-    return perfil;
-})();
-
-function alturaMontanha(az) {
-    const azNorm = ((az % 360) + 360) % 360;
-    return PERFIL_MONTANHAS[Math.floor(azNorm)];
-}
-
 // Imagem de fundo do céu (Via Láctea real) — dá um efeito panorâmico ao rodar a câmara
 const imgCeuFundo = new Image();
 imgCeuFundo.src = "/static/images/space.jpg";
@@ -784,16 +762,13 @@ function desenharObservatorio() {
             ctx.fillRect(0, 0, width, height);
         }
 
-        // Calcular linha do horizonte e o perfil das montanhas nessa mesma faixa
+        // Calcular a linha do horizonte nessa faixa
         let horizonPoints = [];
-        let montanhaPoints = [];
         const step = 2;
         for (let azOffset = -cameraFOV; azOffset <= cameraFOV; azOffset += step) {
             const az = (cameraAzimuth + azOffset + 360) % 360;
             const pos = projectar(0, az);
             if (pos) horizonPoints.push(pos);
-            const posMonte = projectar(alturaMontanha(az), az);
-            if (posMonte) montanhaPoints.push(posMonte);
         }
 
         if (horizonPoints.length > 0) {
@@ -817,9 +792,10 @@ function desenharObservatorio() {
             ctx.fillStyle = gradGround;
             ctx.fill();
 
-            // Silhueta de montanhas removida a pedido do utilizador
+            // Nota: não há silhueta de montanhas no horizonte — foi removida
+            // a pedido do utilizador. Não voltar a adicionar sem perguntar.
 
-            // Névoa suave no horizonte — tom frio, consistente com as montanhas
+            // Névoa suave no horizonte — tom frio
             const gradFog = ctx.createLinearGradient(0, horizY - 20, 0, horizY + 35);
             gradFog.addColorStop(0, "rgba(40, 55, 80, 0.0)");
             gradFog.addColorStop(0.45, "rgba(50, 65, 95, 0.16)");
