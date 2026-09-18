@@ -557,9 +557,23 @@ function guardarCeu(ceu = observatorioDados) {
         };
     }
 
+    // Os objetos de céu profundo são objectos fixos do céu como as estrelas, e
+    // por isso viajam com elas na transição da mudança de hora. Sem esta cópia
+    // eles ficavam parados no lugar novo enquanto o céu inteiro lhes rodava à
+    // volta — e uma nebulosa 120° ao lado das suas estrelas vê-se bem.
+    const ceuProfundo = {};
+    for (const id in ceu.ceu_profundo || {}) {
+        const d = ceu.ceu_profundo[id];
+        ceuProfundo[id] = {
+            altitude: d.altitude, azimute: d.azimute, visivel: d.visivel,
+            ra_aparente: d.ra_aparente, dec_aparente: d.dec_aparente
+        };
+    }
+
     return {
         estrelas: estrelas,
         astros: astros,
+        ceu_profundo: ceuProfundo,
         tempo_sideral: ceu.tempo_sideral,
         latitude: ceu.latitude
     };
@@ -584,6 +598,15 @@ function reporCeu(copia) {
         astro.altitude = valores.altitude;
         astro.azimute = valores.azimute;
         astro.visivel = valores.visivel;
+    }
+
+    for (const id in observatorioDados.ceu_profundo || {}) {
+        const valores = copia.ceu_profundo[id];
+        if (!valores) continue;
+        const alvo = observatorioDados.ceu_profundo[id];
+        alvo.altitude = valores.altitude;
+        alvo.azimute = valores.azimute;
+        alvo.visivel = valores.visivel;
     }
 }
 
@@ -686,11 +709,11 @@ function animarTransicaoCeu(inicio, fim, destino) {
 
     const latitude = destino.latitude;
 
-    // Todos os objectos do céu — estrelas, Sol, Lua e planetas — vão pelo mesmo
-    // caminho: em cada frame a posição sai do RA/Dec e do tempo sideral desse
-    // instante. Nas estrelas o RA/Dec é sempre o mesmo (o que muda é o tempo
-    // sideral); nos astros vai variando devagar, e por isso vai interpolado
-    // entre os dois extremos.
+    // Todos os objectos do céu — estrelas, céu profundo, Sol, Lua e planetas —
+    // vão pelo mesmo caminho: em cada frame a posição sai do RA/Dec e do tempo
+    // sideral desse instante. Nas estrelas e nos objetos de céu profundo o
+    // RA/Dec é sempre o mesmo (o que muda é o tempo sideral); nos astros vai
+    // variando devagar, e por isso vai interpolado entre os dois extremos.
     //
     // É esta a diferença que se vê. Quem manda no movimento é a rotação do céu,
     // que num salto de 8 h ronda os 120°, e essa é calculada a rigor. O
@@ -707,6 +730,12 @@ function animarTransicaoCeu(inicio, fim, destino) {
 
     for (const astro of destino.astros) {
         const entrada = montarEntrada(astro, inicio.astros[astro.id], fim.astros[astro.id]);
+        if (entrada) objetos.push(entrada);
+    }
+
+    for (const id in destino.ceu_profundo || {}) {
+        const entrada = montarEntrada(destino.ceu_profundo[id],
+                                      inicio.ceu_profundo[id], fim.ceu_profundo[id]);
         if (entrada) objetos.push(entrada);
     }
 
@@ -766,8 +795,9 @@ function animarTransicaoCeu(inicio, fim, destino) {
 
 // Verificação da conversão RA/Dec → Alt/Az. Não corre sozinha, só quando
 // chamada na consola do browser, com o Observatório aberto e em repouso.
-// Compara, para tudo o que tem RA/Dec — estrelas, Sol, Lua e planetas —, a
-// posição que este cálculo dá com a que veio do servidor para o mesmo instante.
+// Compara, para tudo o que tem RA/Dec — estrelas, objetos de céu profundo, Sol,
+// Lua e planetas —, a posição que este cálculo dá com a que veio do servidor
+// para o mesmo instante.
 // Coincidirem é a prova de que a conversão está certa — e a animação é exata
 // por construção, porque usa exatamente este cálculo em cada frame.
 window.verificarAltAz = function () {
@@ -784,14 +814,15 @@ window.verificarAltAz = function () {
     let piorAzimute = 0;
     let quantas = 0;
 
-    // Estrelas e astros, os dois: o cálculo em que a animação se apoia é o
-    // mesmo para todos, e uma verificação que só cobrisse metade deles podia
-    // passar com a outra metade avariada. Nos astros é até mais útil — têm
-    // paralaxe (a Lua, sobretudo), que é onde uma conversão mal feita se
-    // notaria primeiro.
+    // Estrelas, céu profundo e astros, todos: o cálculo em que a animação se
+    // apoia é o mesmo para todos, e uma verificação que só cobrisse metade
+    // deles podia passar com a outra metade avariada. Nos astros é até mais
+    // útil — têm paralaxe (a Lua, sobretudo), que é onde uma conversão mal
+    // feita se notaria primeiro.
     const objetos = [];
     for (const id in observatorioDados.estrelas) objetos.push(observatorioDados.estrelas[id]);
     for (const astro of observatorioDados.astros || []) objetos.push(astro);
+    for (const id in observatorioDados.ceu_profundo || {}) objetos.push(observatorioDados.ceu_profundo[id]);
 
     for (const objeto of objetos) {
         if (objeto.ra_aparente == null) continue;
@@ -805,7 +836,7 @@ window.verificarAltAz = function () {
         quantas++;
     }
 
-    console.log(`${quantas} objectos comparados (estrelas e astros). Pior diferença: ` +
+    console.log(`${quantas} objectos comparados (estrelas, céu profundo e astros). Pior diferença: ` +
                 `altitude ${piorAltitude.toFixed(4)}°, azimute ${piorAzimute.toFixed(4)}°.`);
     console.log(piorAltitude < 0.01 && piorAzimute < 0.01
         ? "✅ Dentro do esperado (< 0,01°) — a conversão está certa e a animação é exata."
@@ -1155,6 +1186,119 @@ function obterFundoCeuPreparado(alturaAlvo) {
     return tela;
 }
 
+// ── Objetos de céu profundo: apresentação ─────────────────────────
+// Tudo o que diz respeito a como um objeto de céu profundo se mostra no mapa
+// vive aqui, junto: o limite de brilho da camada, o nome de cada tipo e o
+// símbolo que lhe corresponde. O que vem do servidor é o tipo em cru
+// ("nebulosa_planetaria") e o tamanho em minutos de arco; a decisão de os
+// transformar num rótulo e numa forma é do browser.
+
+// Limite de brilho da camada. É SEPARADO do slider "Brilho (Mag ≤)" das
+// estrelas, e não é um capricho: a magnitude de uma galáxia está espalhada por
+// uma área enorme e a de uma estrela está concentrada num ponto, por isso os
+// dois números não são comparáveis e um limite só não serve para os dois.
+//
+// O 9 é o que os binóculos de 10×50 alcançam nestes objetos. Com 8 — que era a
+// ideia inicial — ficavam de fora a Nebulosa do Anel (8,8) e a Nebulosa do
+// Caranguejo (8,4), dois dos objetos mais conhecidos do céu, e um "ir para"
+// a eles dizia que estavam abaixo do filtro de brilho, o que seria falso:
+// estão acima do horizonte, são é fracos. Com este valor, nada do catálogo é
+// alguma vez escondido por ele — fica como guarda para o dia em que cresça.
+const MAG_LIMITE_CEU_PROFUNDO = 9;
+
+// O tipo que vem do catálogo → o que se lê no painel e na lista da pesquisa.
+// Cada tipo do ceu_profundo.py tem de ter a sua linha aqui; o fallback existe
+// para um tipo novo no catálogo não sair como um retângulo vazio no painel.
+const TIPOS_CEU_PROFUNDO = {
+    "galaxia": "Galáxia",
+    "nebulosa": "Nebulosa",
+    "nebulosa_planetaria": "Nebulosa planetária",
+    "resto_supernova": "Resto de supernova",
+    "enxame_aberto": "Enxame aberto",
+    "enxame_globular": "Enxame globular",
+    "estrela_dupla": "Estrela dupla",
+};
+
+// O tamanho do símbolo a partir do tamanho real do objeto (o eixo maior, em
+// minutos de arco). Dá uma NOÇÃO de escala, não é escala: na projeção 360° um
+// grau são uns 5 a 10 px, conforme o zoom, e M31 tem quase 3° — o símbolo dela
+// anda perto disso, mas os objetos pequenos são desenhados muito maiores do
+// que são, senão a Nebulosa do Anel (1,4′) não passava de um pixel e não havia
+// como lhe acertar com o rato. O tecto é para M31 e M45 não taparem Orion.
+//
+// Os números subiram uma vez, a pedido: com o mínimo em 4 o símbolo lia-se mal
+// no mapa, sobretudo no planisfério, e confundia-se com uma estrela. Como o
+// objectivo destes símbolos é exactamente o contrário — ver à primeira vista
+// que ali há uma nebulosa e não um ponto —, vale mais pecar por grandes. O
+// mínimo de 7 fica acima do maior ponto de estrela desenhado (4,5), e é isso
+// que os separa à vista.
+function raioSimboloCeuProfundo(dimensao) {
+    return Math.max(7, Math.min(18, 7 + (dimensao || 0) / 16));
+}
+
+// O símbolo de um objeto de céu profundo, todo a traço — não há uma única
+// imagem no projeto para nenhum deles, e não é preciso haver: cada tipo tem
+// uma forma que se reconhece sem legenda.
+// O contexto vem de fora já com a cor, a espessura e o brilho definidos; aqui
+// só se escolhe a forma, e ele fica como estava.
+function desenharSimboloCeuProfundo(ctx, x, y, raio, tipo) {
+    ctx.save();
+
+    switch (tipo) {
+        case "galaxia":
+            // Elipse muito achatada, como quase todas as galáxias se vêem.
+            ctx.beginPath();
+            ctx.ellipse(x, y, raio, raio * 0.55, -0.5, 0, 2 * Math.PI);
+            ctx.stroke();
+            break;
+
+        case "enxame_globular":
+            // Círculo com uma cruz lá dentro: uma bola de estrelas comprimida
+            // no meio, que é o que distingue um globular de um enxame aberto.
+            ctx.beginPath();
+            ctx.arc(x, y, raio, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x - raio, y); ctx.lineTo(x + raio, y);
+            ctx.moveTo(x, y - raio); ctx.lineTo(x, y + raio);
+            ctx.stroke();
+            break;
+
+        case "nebulosa":
+            // Quadrado tracejado: uma nuvem, que não tem forma que se lhe pegue.
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.rect(x - raio, y - raio, raio * 2, raio * 2);
+            ctx.stroke();
+            break;
+
+        case "nebulosa_planetaria":
+            // Anel de gás com a estrela que o expulsou ainda no centro — que é
+            // literalmente o que uma nebulosa planetária é.
+            ctx.beginPath();
+            ctx.arc(x, y, raio, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(x, y, Math.max(1.2, raio * 0.2), 0, 2 * Math.PI);
+            ctx.fillStyle = ctx.strokeStyle;
+            ctx.fill();
+            break;
+
+        default:
+            // Enxames abertos, e também os restos de supernova e as estrelas
+            // duplas: um círculo tracejado, que é o desenho de um punhado de
+            // estrelas espalhadas sem forma própria. Qualquer tipo novo que
+            // apareça no catálogo cai aqui em vez de não desenhar nada.
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.arc(x, y, raio, 0, 2 * Math.PI);
+            ctx.stroke();
+            break;
+    }
+
+    ctx.restore();
+}
+
 // ── Renderização do Observatório ──────────────────────────────────
 function desenharObservatorio() {
     const canvas = document.getElementById("observatorio-canvas");
@@ -1416,6 +1560,14 @@ function desenharObservatorio() {
     const showAstros = document.getElementById("chk-astros").checked;
     const magLimite = parseFloat(document.getElementById("rng-mag").value);
 
+    // A caixa dos objetos de céu profundo pode ainda não existir: o HTML é um
+    // template Jinja e o Flask guarda-o em cache, por isso uma página servida
+    // antes de o servidor ser reiniciado não a tem. Nesse caso a camada fica
+    // ligada, que é como ela nasce — e o céu sai inteiro em vez de rebentar
+    // com um getElementById a devolver null.
+    const caixaCeuProfundo = document.getElementById("chk-ceu-profundo");
+    const showCeuProfundo = caixaCeuProfundo ? caixaCeuProfundo.checked : true;
+
     const elementosNoEcra = [];
 
     // 2. Desenhar as linhas das constelações (se ativo)
@@ -1498,6 +1650,80 @@ function desenharObservatorio() {
         }
 
         ctx.shadowBlur = 0; // Limpar o efeito neon para não afetar as estrelas e outros elementos
+    }
+
+    // 2.5 Desenhar os objetos de céu profundo
+    // Esta passagem vem DEPOIS das constelações e ANTES das estrelas, e a
+    // ordem não é decorativa: o teste de clique percorre os elementos no ecrã
+    // pela ordem em que foram registados e fica com o primeiro que apanha, por
+    // isso uma estrela ganha o clique a um objeto de céu profundo que lhe
+    // esteja por cima. É o que se quer em M45, onde o símbolo do enxame envolve
+    // as Plêiades mas quem manda clicar ali é a estrela — exatamente a mesma
+    // razão por que uma constelação já perde para uma estrela.
+    const ceuProfundo = observatorioDados.ceu_profundo;
+
+    if (showCeuProfundo && ceuProfundo) {
+        // A cor, a espessura e o brilho são iguais para todos os símbolos,
+        // por isso definem-se uma vez em vez de uma vez por objeto. O dourado
+        // distingue-os das linhas azuis das constelações e dos pontos brancos
+        // das estrelas: ao olhar para o mapa, é a cor que diz "isto não é uma
+        // estrela". O brilho neon é o mesmo das constelações, mas mais curto —
+        // são uns 20 símbolos por frame, e não 15 linhas.
+        ctx.strokeStyle = "rgba(255, 214, 140, 0.85)";
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = "rgba(255, 200, 110, 0.9)";
+
+        // A fonte e o alinhamento dos rótulos são iguais para todos, por isso
+        // ficam aqui fora: ctx.font obriga o browser a analisar a string outra
+        // vez de cada vez que lhe é atribuída (o mesmo motivo do ciclo das
+        // estrelas). A cor do texto, essa, tem de ser reposta dentro do ciclo —
+        // o ponto ao centro da nebulosa planetária pinta-se com o fillStyle.
+        ctx.font = "9px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+
+        for (const dso_id in ceuProfundo) {
+            const dso = ceuProfundo[dso_id];
+            if (!dso.visivel) continue;
+            if (dso.mag > MAG_LIMITE_CEU_PROFUNDO) continue;
+
+            const pos = projectar(dso.altitude, dso.azimute);
+            if (!pos) continue; // fora do campo de visão, na projeção 360°
+
+            const raio = raioSimboloCeuProfundo(dso.dimensao);
+
+            desenharSimboloCeuProfundo(ctx, pos.x, pos.y, raio, dso.tipo);
+
+            // O rótulo é a parte curta do nome — "M42" em vez de "M42
+            // (Nebulosa de Orion)". O nome completo não caberia no mapa sem o
+            // encher de texto, e quem o quiser clica e lê-o no painel.
+            ctx.fillStyle = "rgba(255, 224, 170, 0.55)";
+            ctx.fillText(" " + dso.nome.split(" (")[0], pos.x + raio + 2, pos.y);
+
+            // Registar elemento para cliques. O raio é maior do que o símbolo:
+            // o desenho é a traço e com um buraco no meio, e quem clica acerta
+            // com o que vê — o alvo tem de ser a forma toda, não a risca.
+            elementosNoEcra.push({
+                id: dso_id,
+                nome: dso.nome,
+                x: pos.x,
+                y: pos.y,
+                raio: Math.max(10, raio + 3),
+                tipo: "ceu_profundo",
+                dso_tipo: dso.tipo,
+                constelacao: dso.constelacao,
+                dimensao: dso.dimensao,
+                nota: dso.nota,
+                mag: dso.mag.toFixed(1),
+                altitude: dso.altitude,
+                azimute: dso.azimute
+            });
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.setLineDash([]);
     }
 
     // 3. Desenhar as Estrelas
@@ -1714,7 +1940,7 @@ function tratarCliqueCanvas(e) {
         objetoSelecionado = null;
         painel.innerHTML = `
             <div class="detalhe-titulo">ℹ️ Detalhes</div>
-            <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">Clique num astro, estrela ou constelação no mapa celeste para ver os seus detalhes astronómicos.</p>
+            <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">Clique num astro, estrela, constelação ou objeto de céu profundo no mapa celeste para ver os seus detalhes astronómicos.</p>
         `;
         desenharObservatorio();
     }
@@ -1763,6 +1989,32 @@ function mostrarDetalhesDe(item, aviso) {
         // observatorioDados, não à cópia que aqui chegou, que fica
         // desatualizada mal a hora mude.
         mostrarDetalhesISS();
+    } else if (item.tipo === "ceu_profundo") {
+        // ── Detalhes de um Objeto de Céu Profundo ──
+        const tipo = TIPOS_CEU_PROFUNDO[item.dso_tipo] || "Objeto de céu profundo";
+
+        // O tamanho vem em minutos de arco, que é como os catálogos o dão.
+        // Acima de um grau passa a graus, senão M31 lia-se "178′", que não diz
+        // nada a quem não trabalhe com minutos de arco — e é o maior objeto
+        // desta lista, logo o que mais se olha.
+        const tamanho = item.dimensao >= 60
+            ? `${(item.dimensao / 60).toFixed(1)}°`
+            : `${item.dimensao}′`;
+
+        painel.innerHTML = `
+            <div class="detalhe-titulo">🌌 ${item.nome}</div>
+            ${avisoHTML}
+            <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:#ffd54f">${tipo.toUpperCase()}</span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">🔆</span><span class="detalhe-label">Magnitude</span><span class="detalhe-valor" style="font-family:monospace">${item.mag} <span style="color:#778899;font-size:0.75rem;">integrada</span></span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">📐</span><span class="detalhe-label">Tamanho</span><span class="detalhe-valor" style="font-family:monospace">${tamanho}</span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Constelação</span><span class="detalhe-valor" style="color:#9ed4ff">${item.constelacao}</span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">📈</span><span class="detalhe-label">Altitude</span><span class="detalhe-valor" style="font-family:monospace;color:#ffcc80">${item.altitude}°</span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">🧭</span><span class="detalhe-label">Azimute</span><span class="detalhe-valor" style="font-family:monospace;color:#ff8a65">${item.azimute}° (${obterRosaDosVentos(item.azimute)})</span></div>
+            <div class="dso-nota" style="margin-top:14px;padding:10px 12px;background:rgba(255,213,79,0.07);border-left:3px solid rgba(255,213,79,0.4);border-radius:6px;">
+                <div style="font-size:0.75rem;color:#ffd54f;margin-bottom:6px;font-weight:600;">💡 Sobre este objeto</div>
+                <p style="color:rgba(220,227,240,0.85);font-size:0.82rem;line-height:1.5;margin:0;">${item.nota}</p>
+            </div>
+        `;
     } else {
         // ── Detalhes de Estrela / Astro ──
         let extrasHTML = "";
@@ -1948,6 +2200,26 @@ function itemAstro(astro) {
     };
 }
 
+// Um objeto de céu profundo, na mesma forma. Leva o `mag` já formatado como as
+// estrelas (uma casa decimal a mais não serve de nada numa magnitude que se lê
+// de meio em meio ponto) e os quatro campos que só ele tem: o tipo do catálogo,
+// a constelação onde está, o tamanho em minutos de arco e a nota que o
+// ceu_profundo.py lhe dá. É tudo o que o ramo do céu profundo do painel lê.
+function itemCeuProfundo(dso_id, dso) {
+    return {
+        id: dso_id,
+        nome: dso.nome,
+        tipo: "ceu_profundo",
+        dso_tipo: dso.tipo,
+        constelacao: dso.constelacao,
+        dimensao: dso.dimensao,
+        nota: dso.nota,
+        mag: dso.mag.toFixed(1),
+        altitude: dso.altitude,
+        azimute: dso.azimute
+    };
+}
+
 function itemConstelacao(const_id, constelacao) {
     // As estrelas que a constelação toca — as mesmas que o desenho conta para o
     // "Estrelas: N" do painel (lá é um Set sobre os dois elementos de cada linha).
@@ -1967,7 +2239,7 @@ function itemConstelacao(const_id, constelacao) {
 }
 
 // O catálogo a que a pesquisa vai buscar, montado de fresco a cada tecla. Não
-// custa nada (são ~98 entradas) e evita o único erro que aqui importava: uma
+// custa nada (são ~134 entradas) e evita o único erro que aqui importava: uma
 // lista guardada a apontar para posições de há meia hora, depois de a
 // atualização automática de 30 em 30 segundos ter trocado o céu.
 function indicePesquisa() {
@@ -1982,6 +2254,20 @@ function indicePesquisa() {
             item: itemEstrela(est_id, est),
             nome: normalizarTexto(est.nome),
             id: normalizarTexto(est_id)
+        });
+    }
+
+    // Os objetos de céu profundo entram com o nome completo ("M42 (Nebulosa de
+    // Orion)"), por isso a pesquisa chega a eles tanto por "m42" como por
+    // "nebulosa de orion" — e o id ("m42") é procurado à parte, o que faz uma
+    // pesquisa por "m4" encontrar M4x sem precisar do parêntesis.
+    const ceuProfundo = observatorioDados.ceu_profundo || {};
+    for (const dso_id in ceuProfundo) {
+        const dso = ceuProfundo[dso_id];
+        indice.push({
+            item: itemCeuProfundo(dso_id, dso),
+            nome: normalizarTexto(dso.nome),
+            id: normalizarTexto(dso_id)
         });
     }
 
@@ -2095,6 +2381,16 @@ function posicaoAtualDe(item) {
         return { altitude: est.altitude, azimute: est.azimute, visivel: est.visivel, mag: est.mag };
     }
 
+    // Os objetos de céu profundo ao lado das estrelas, e não lá em baixo com os
+    // astros: não estão na lista "astros" e a busca por id que ali se faz
+    // devolvia null — e um null aqui é um "ir para" que abria o painel e não
+    // mexia a câmara, sem dizer porquê.
+    if (item.tipo === "ceu_profundo") {
+        const dso = observatorioDados.ceu_profundo ? observatorioDados.ceu_profundo[item.id] : null;
+        if (!dso) return null;
+        return { altitude: dso.altitude, azimute: dso.azimute, visivel: dso.visivel, mag: dso.mag };
+    }
+
     const astro = (observatorioDados.astros || []).find(a => a.id === item.id);
     if (!astro) return null;
     return { altitude: astro.altitude, azimute: astro.azimute, visivel: astro.visivel, mag: null };
@@ -2160,6 +2456,22 @@ function alvoDeApontar(item) {
                 curto: "escondida pelos filtros"
             };
         }
+    } else if (item.tipo === "ceu_profundo") {
+        // O limite de brilho desta camada é o dela, não o slider das estrelas
+        // (ver MAG_LIMITE_CEU_PROFUNDO): são grandezas que não se comparam.
+        const caixa = document.getElementById("chk-ceu-profundo");
+        if (caixa && !caixa.checked) {
+            return {
+                motivo: "Os objetos de céu profundo estão escondidos em Controlos → Objetos de Céu Profundo.",
+                curto: "escondido pelos filtros"
+            };
+        }
+        if (posicao.mag > MAG_LIMITE_CEU_PROFUNDO) {
+            return {
+                motivo: `É mais fraco do que o limite desta camada (Mag ≤ ${MAG_LIMITE_CEU_PROFUNDO}) e por isso não aparece no mapa.`,
+                curto: "escondido pelos filtros"
+            };
+        }
     } else {
         const caixa = document.getElementById("chk-astros");
         if (caixa && !caixa.checked) {
@@ -2181,6 +2493,10 @@ function rotuloTipo(item) {
         case "lua": return "Lua";
         case "planeta": return "Planeta";
         case "iss": return "ISS";
+        // Um objeto de céu profundo diz o que é — "Galáxia", "Nebulosa
+        // planetária" — e não "Céu profundo": quem procura M57 quer saber que
+        // encontrou um anel de gás, e é isso que o distingue de uma estrela.
+        case "ceu_profundo": return TIPOS_CEU_PROFUNDO[item.dso_tipo] || "Céu profundo";
         default: return item.tipo;
     }
 }

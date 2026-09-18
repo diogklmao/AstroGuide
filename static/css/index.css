@@ -1707,6 +1707,17 @@ body.red-velvet-mode .iss-aviso {
     color: #ffb8c3 !important;
 }
 
+/* A caixa da nota de um objeto de céu profundo. Leva !important porque o
+   fundo e a barra lateral vêm em estilo inline do index.js (é lá que a caixa
+   é montada, ao lado das outras linhas do painel) e um estilo inline só perde
+   para uma regra assim. A caixa da curiosidade das constelações, que é o
+   modelo desta, ficou de fora desta lista quando o Red Velvet foi feito e
+   ainda hoje aparece azul no meio de um céu vermelho. */
+body.red-velvet-mode .dso-nota {
+    background: rgba(255, 40, 65, 0.08) !important;
+    border-left-color: rgba(255, 60, 80, 0.55) !important;
+}
+
 body.red-velvet-mode input[type="range"] {
     accent-color: #ff2a4a;
 }

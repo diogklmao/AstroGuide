@@ -14,6 +14,7 @@ import math                                      # cálculo do disco iluminado d
 # --- Módulos internos ---
 from config import LOCATION                      # localização definida em config.py
 from estrelas import ESTRELAS_BD, CONSTELACOES_BD # base de dados de estrelas e constelações
+from ceu_profundo import CATALOGO_CEU_PROFUNDO    # base de dados de galáxias, nebulosas e enxames
 
 # ── Inicialização global ──────────────────────────────────────────────────────
 # Estas variáveis são criadas uma vez quando o ficheiro é carregado
@@ -248,6 +249,35 @@ def get_fases_mes(ano, mes):
 
     return resultado
 
+def _posicao_objeto_fixo(centro, ra_horas, dec_graus):
+    # Onde é que um objeto fixo do céu — uma estrela, uma galáxia, uma nebulosa,
+    # um enxame — está no instante que o `centro` representa, visto de Gaia.
+    #
+    # Existe para as estrelas e os objetos de céu profundo não terem duas
+    # cópias do mesmo cálculo. As posições que saem daqui têm de ser idênticas
+    # às que saíam do ciclo das estrelas, casa a casa: o frontend compara-as
+    # com as que ele próprio calcula (ver verificarAltAz, no index.js).
+    #
+    # A Ascensão Reta e a Declinação que se devolvem NÃO são as do catálogo
+    # (ra_horas/dec_graus), são as APARENTES na época da data: o `.apparent()`
+    # já lhes aplicou a precessão, a nutação e a aberração. Usar as do catálogo
+    # punha o céu do browser ~0,4° ao lado deste, e a transição animada da
+    # mudança de hora acabava com um salto visível no último frame. Vão para o
+    # frontend para ele poder passar de RA/Dec a Alt/Az em qualquer instante
+    # intermédio (ver animarTransicaoCeu, no index.js).
+    objeto = Star(ra_hours=ra_horas, dec_degrees=dec_graus)
+    posicao = centro.observe(objeto).apparent()
+    alt, az, _ = posicao.altaz()
+    ra_ap, dec_ap, _ = posicao.radec(epoch="date")
+
+    return {
+        "altitude": round(float(alt.degrees), 2),
+        "azimute": round(float(az.degrees), 2),
+        "ra_aparente": round(float(ra_ap.hours), 6),
+        "dec_aparente": round(float(dec_ap.degrees), 6),
+    }
+
+
 def get_observatorio(timestamp_utc=None):
     # Calcula a posição das estrelas, constelações e planetas
     # observáveis a partir de Vila Nova de Gaia.
@@ -260,38 +290,48 @@ def get_observatorio(timestamp_utc=None):
     centro = _centro_em(agora)
     
     estrelas_calculadas = {}
-    
+
     # Calcular posição das estrelas
     for star_id, dados in ESTRELAS_BD.items():
-        # Criar o objeto Star com as coordenadas de Ascensão Reta e Declinação
-        estrela_sf = Star(ra_hours=dados["ra"], dec_degrees=dados["dec"])
-        
-        # Calcular posição horizontal (Alt/Az)
-        posicao = centro.observe(estrela_sf).apparent()
-        alt, az, _ = posicao.altaz()
+        posicao = _posicao_objeto_fixo(centro, dados["ra"], dados["dec"])
 
-        # Ascensão Reta e Declinação APARENTES na época da data — não as do
-        # catálogo (dados["ra"]/dados["dec"]). O `.apparent()` de cima já lhes
-        # aplicou a precessão, a nutação e a aberração; usar as do catálogo
-        # punha o céu do browser ~0,4° ao lado deste e a transição animada
-        # acabava com um salto visível no último frame. Vão para o frontend
-        # para ele poder passar de RA/Dec a Alt/Az em qualquer instante
-        # intermédio (ver animarTransicaoCeu, no index.js).
-        ra_ap, dec_ap, _ = posicao.radec(epoch="date")
-
-        alt_deg = round(float(alt.degrees), 2)
-        az_deg = round(float(az.degrees), 2)
-        
         # Guardamos a informação. Enviamos todas para o frontend poder ligar
         # as linhas das constelações de forma contínua, mas marcamos a visibilidade.
         estrelas_calculadas[star_id] = {
             "nome": dados["nome"],
-            "altitude": alt_deg,
-            "azimute": az_deg,
-            "ra_aparente": round(float(ra_ap.hours), 6),
-            "dec_aparente": round(float(dec_ap.degrees), 6),
+            "altitude": posicao["altitude"],
+            "azimute": posicao["azimute"],
+            "ra_aparente": posicao["ra_aparente"],
+            "dec_aparente": posicao["dec_aparente"],
             "mag": dados["mag"],
-            "visivel": alt_deg > 0
+            "visivel": posicao["altitude"] > 0
+        }
+
+    # Calcular posição dos objetos de céu profundo (galáxias, nebulosas e
+    # enxames). São objetos fixos do céu tal como as estrelas, e por isso levam
+    # também o RA/Dec aparente: é isso que os faz acompanhar a transição
+    # animada da mudança de hora, em vez de ficarem quietos como a ISS, que não
+    # é um objeto fixo (ver animarTransicaoCeu, no index.js).
+    ceu_profundo_calculado = {}
+
+    for dso_id, dados in CATALOGO_CEU_PROFUNDO.items():
+        posicao = _posicao_objeto_fixo(centro, dados["ra"], dados["dec"])
+
+        ceu_profundo_calculado[dso_id] = {
+            "nome": dados["nome"],
+            "altitude": posicao["altitude"],
+            "azimute": posicao["azimute"],
+            "ra_aparente": posicao["ra_aparente"],
+            "dec_aparente": posicao["dec_aparente"],
+            "mag": dados["mag"],
+            "visivel": posicao["altitude"] > 0,
+            # O tipo, o tamanho, a constelação e a nota seguem como estão no
+            # catálogo, sem o Python lhes tocar: quem os mostra é o browser, e
+            # assim cada um destes textos tem uma única definição no projeto.
+            "tipo": dados["tipo"],
+            "constelacao": dados["constelacao"],
+            "dimensao": dados["dimensao"],
+            "nota": dados["nota"],
         }
         
     # Obter posições do Sol, Lua e Planetas para o instante pedido
@@ -353,6 +393,7 @@ def get_observatorio(timestamp_utc=None):
         
     return {
         "estrelas": estrelas_calculadas,
+        "ceu_profundo": ceu_profundo_calculado,
         "constelacoes": CONSTELACOES_BD,
         "astros": astros,
         # Dados que o browser precisa para animar a mudança de hora (ver

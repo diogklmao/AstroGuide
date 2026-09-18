@@ -132,6 +132,16 @@
                             <input type="checkbox" id="chk-astros" checked onchange="desenharObservatorio()">
                             <label for="chk-astros">Sol, Lua e Planetas</label>
                         </div>
+                        <!-- Fica com as outras camadas, antes do slider, porque
+                             também é uma camada. O slider do brilho NÃO a
+                             governa: uma galáxia tem o brilho espalhado por uma
+                             área e o de uma estrela está num ponto, e um limite
+                             só não serve para os dois (ver MAG_LIMITE_CEU_PROFUNDO,
+                             no index.js). -->
+                        <div class="config-linha-check">
+                            <input type="checkbox" id="chk-ceu-profundo" checked onchange="desenharObservatorio()">
+                            <label for="chk-ceu-profundo">🔭 Objetos de Céu Profundo</label>
+                        </div>
                         <div class="config-linha">
                             <label for="rng-mag">Brilho (Mag ≤)</label>
                             <input type="range" id="rng-mag" min="-1.5" max="5.0" step="0.5" value="5.0"
@@ -147,7 +157,7 @@
                     <div id="observatorio-detalhes" class="glass-panel">
                         <div class="detalhe-titulo">ℹ️ Detalhes</div>
                         <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">
-                            Clique num astro ou estrela no mapa celeste para ver os seus detalhes astronómicos.</p>
+                            Clique num astro, estrela, constelação ou objeto de céu profundo no mapa celeste para ver os seus detalhes astronómicos.</p>
                     </div>
                 </div>
                 <!-- Mapa Celeste -->
