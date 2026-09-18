@@ -76,6 +76,21 @@
                         title="Mostrar/Esconder Painel">
                         <span class="icon">◀</span>
                     </button>
+                    <!-- Pesquisa e Tour — no topo do painel de propósito: é o
+                         controlo mais usado e assim fica alcançável sem scroll. -->
+                    <div class="observatorio-pesquisa glass-panel">
+                        <div class="card-titulo" style="color:#ffcc02">🔎 Pesquisa</div>
+                        <input type="text" id="obs-pesquisa" class="obs-input" autocomplete="off"
+                            placeholder="Procurar estrela, constelação, planeta…"
+                            oninput="aoEscreverPesquisa()" onfocus="aoEscreverPesquisa()"
+                            onkeydown="tratarTeclaPesquisa(event)">
+                        <!-- A lista vive aqui dentro, em fluxo normal: o painel
+                             lateral já tem scroll próprio e uma caixa fixa
+                             partir-se-ia quando ele estivesse recolhido. -->
+                        <div id="obs-pesquisa-resultados" class="obs-resultados"></div>
+                        <button type="button" id="btn-tour" class="obs-btn-tour" onclick="iniciarTour()"
+                            title="Visita guiada às constelações que estão acima do horizonte">▶ Tour guiado</button>
+                    </div>
                     <!-- Controlos -->
                     <div class="observatorio-controlos glass-panel">
                         <div class="card-titulo" style="color:#ffcc02">⚙️ Controles</div>
@@ -148,8 +163,24 @@
                 <div class="observatorio-mapa-wrapper glass-panel">
                     <button id="btn-night-mode" onclick="toggleNightMode()" class="btn-night-mode" title="Modo Noturno (Red Velvet) para preservar a visão noturna">🔴 Night Mode (Red Velvet)</button>
                     <button id="btn-entrar-vr" onclick="mudarEcra('vr')" title="Abrir Observatório VR">🥽 VR</button>
+                    <button id="btn-iss" onclick="mostrarDetalhesISS()"
+                        title="Estação Espacial Internacional: ver onde ela está agora">🛰 ISS</button>
                     <canvas id="observatorio-canvas" width="800" height="800"></canvas>
                 </div>
+            </div>
+            <!-- Barra do tour guiado. Vive dentro do ecrã do Observatório, por
+                 isso desaparece sozinha ao mudar de ecrã — a paragem do tour no
+                 código é a rede de segurança, não a única defesa. -->
+            <div id="tour-barra" class="glass-panel">
+                <button type="button" class="tour-btn" id="btn-tour-anterior" onclick="paragemAnterior()"
+                    title="Paragem anterior">‹</button>
+                <button type="button" class="tour-btn" id="btn-tour-pausa" onclick="alternarPausaTour()"
+                    title="Pausar">⏸</button>
+                <span id="tour-estado" class="tour-estado"></span>
+                <button type="button" class="tour-btn" id="btn-tour-seguinte" onclick="paragemSeguinte()"
+                    title="Paragem seguinte">›</button>
+                <button type="button" class="tour-btn tour-btn-sair" id="btn-tour-sair" onclick="pararTour()"
+                    title="Sair do tour">✕</button>
             </div>
         </div>
 

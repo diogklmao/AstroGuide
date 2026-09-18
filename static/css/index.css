@@ -653,6 +653,161 @@ nav button:hover:not(.ativo) {
     border-radius: 4px;
 }
 
+/* ── Pesquisa do Observatório ──────────────────────────────────────────────
+   Primeiro bloco do painel lateral. O flex-shrink: 0 é o que garante que ele
+   não é comprimido quando o painel tem de rolar para caber no ecrã — sem isto
+   um painel cheio espremeria a caixa de pesquisa até ela desaparecer. */
+.observatorio-pesquisa {
+    padding: 16px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.observatorio-pesquisa .card-titulo {
+    margin-bottom: 0;
+}
+
+/* O campo é um .obs-input (logo, já vem tratado pelo modo noturno), mas não é
+   um seletor de data: o cursor de texto e a fonte de leitura ficam melhor. */
+#obs-pesquisa {
+    cursor: text;
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+
+#obs-pesquisa::placeholder {
+    color: rgba(232, 213, 240, 0.35);
+}
+
+.obs-resultados {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    /* Limitada e com scroll próprio: o painel lateral inteiro tem de continuar
+       a caber no ecrã, e uma lista longa empurrava os Controlos para fora. */
+    max-height: 190px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(110, 184, 255, 0.3) transparent;
+}
+
+.obs-resultados:empty {
+    display: none;
+}
+
+.obs-resultados::-webkit-scrollbar {
+    width: 4px;
+}
+
+.obs-resultados::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.obs-resultados::-webkit-scrollbar-thumb {
+    background: rgba(110, 184, 255, 0.3);
+    border-radius: 4px;
+}
+
+.obs-resultado {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    width: 100%;
+    text-align: left;
+    padding: 7px 10px;
+    background: rgba(110, 184, 255, 0.06);
+    border: 1px solid rgba(110, 184, 255, 0.18);
+    border-radius: 8px;
+    color: #dce3f0;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.obs-resultado:hover {
+    background: rgba(110, 184, 255, 0.16);
+    border-color: rgba(110, 184, 255, 0.45);
+}
+
+/* A linha escolhida pelo teclado. Tem de se distinguir do hover, porque com as
+   setas o rato não está em cima de nada. */
+.obs-resultado.ativo {
+    background: rgba(110, 184, 255, 0.2);
+    border-color: rgba(110, 184, 255, 0.7);
+}
+
+.obs-resultado:focus-visible {
+    outline: 2px solid rgba(110, 184, 255, 0.85);
+    outline-offset: 1px;
+}
+
+.obs-resultado-nome {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.obs-resultado-tipo {
+    font-size: 0.68rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: rgba(110, 184, 255, 0.75);
+}
+
+.obs-resultado-vazio {
+    margin: 0;
+    padding: 6px 2px;
+    font-size: 0.78rem;
+    color: rgba(220, 227, 240, 0.5);
+}
+
+.obs-btn-tour {
+    width: 100%;
+    padding: 8px 0;
+    background: rgba(206, 147, 216, 0.12);
+    color: #ce93d8;
+    border: 1px solid rgba(206, 147, 216, 0.3);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.obs-btn-tour:hover {
+    background: rgba(206, 147, 216, 0.25);
+    box-shadow: 0 0 14px rgba(206, 147, 216, 0.2);
+    transform: translateY(-1px);
+}
+
+.obs-btn-tour:active {
+    transform: translateY(0);
+}
+
+.obs-btn-tour:focus-visible {
+    outline: 2px solid rgba(206, 147, 216, 0.85);
+    outline-offset: 2px;
+}
+
+/* A razão por que o "ir para" não mexeu a câmara. Fica depois do painel de
+   detalhes, e não dentro dele, porque quem o escreve é o irPara() — o painel
+   já está feito quando se sabe se há para onde apontar. */
+.obs-aviso-ir {
+    margin: 12px 0 0;
+    padding: 9px 11px;
+    background: rgba(255, 204, 2, 0.08);
+    border-left: 3px solid rgba(255, 204, 2, 0.5);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: rgba(255, 226, 150, 0.9);
+}
+
 /* Evita que o label "Modo de Visão" parta para a linha seguinte */
 .config-linha label {
     white-space: nowrap;
@@ -807,6 +962,22 @@ nav button:hover:not(.ativo) {
 .obs-simulacao-label.ativa {
     max-height: 24px;
     padding-top: 2px;
+}
+
+
+/* ── Painel da ISS (Observatório) ──────────────────────────────────────── */
+
+/* Aviso: o que impede a posição de ser mostrada — sem elementos orbitais (não
+   houve rede) ou a ISS abaixo do horizonte. */
+.iss-aviso {
+    margin: 10px 0;
+    padding: 9px 11px;
+    background: rgba(110, 184, 255, 0.07);
+    border-left: 3px solid rgba(110, 184, 255, 0.4);
+    border-radius: 6px;
+    color: rgba(220, 227, 240, 0.85);
+    font-size: 0.78rem;
+    line-height: 1.45;
 }
 
 
@@ -1094,6 +1265,113 @@ body.observatorio-ativo #btn-toggle-painel {
     box-shadow: 0 0 16px rgba(206, 147, 216, 0.3);
 }
 
+/* Botão flutuante "🛰 ISS". Abre o painel da ISS a qualquer momento — e é
+   preciso: ela só está acima do horizonte cerca de 10% do tempo, por isso sem
+   este botão o painel dela ficaria quase sempre inalcançável. Fica na segunda
+   linha do canto superior direito, alinhado com o "🥽 VR" por baixo (top: 56px
+   = 14 do topo + ~34 de altura do botão de cima + 8 de folga). Não vai para a
+   primeira linha porque a largura do "🔴 Night Mode" muda com a fonte, e um
+   right fixo lá acertaria por sorte; e o canto inferior direito é do botão ⚙️
+   das configurações (shared-ui-controls.css). */
+#btn-iss {
+    position: absolute;
+    top: 56px;
+    right: 14px;
+    z-index: 5;
+    background: rgba(110, 184, 255, 0.15);
+    border: 1px solid rgba(110, 184, 255, 0.4);
+    color: #9ed4ff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
+}
+
+#btn-iss:hover {
+    background: rgba(110, 184, 255, 0.3);
+    box-shadow: 0 0 16px rgba(110, 184, 255, 0.3);
+}
+
+/* ── Barra do Tour guiado ──────────────────────────────────────────────────
+   Ao fundo e ao centro do mapa, que é a única zona livre do Observatório: o
+   cabeçalho flutua no topo com z-index 100 e o painel lateral ocupa a esquerda.
+   O z-index 60 fica entre os botões do mapa (5) e o cabeçalho (100) — por cima
+   do céu, por baixo do que é dele.
+
+   Escondida por omissão pela classe (e não pelo atributo [hidden]): o
+   .glass-panel define o seu próprio display, que ganharia ao [hidden]. */
+#tour-barra {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 14px;
+}
+
+#tour-barra.visivel {
+    display: flex;
+}
+
+.tour-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: rgba(110, 184, 255, 0.1);
+    border: 1px solid rgba(110, 184, 255, 0.3);
+    color: #9ed4ff;
+    font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.tour-btn:hover {
+    background: rgba(110, 184, 255, 0.28);
+    border-color: rgba(110, 184, 255, 0.6);
+    color: #fff;
+}
+
+.tour-btn:focus-visible {
+    outline: 2px solid rgba(110, 184, 255, 0.85);
+    outline-offset: 2px;
+}
+
+/* O ✕ sai do tour: a cor avisa que é o único botão da barra que não continua. */
+.tour-btn-sair {
+    background: rgba(255, 110, 130, 0.1);
+    border-color: rgba(255, 110, 130, 0.3);
+    color: #ff8a9c;
+}
+
+.tour-btn-sair:hover {
+    background: rgba(255, 110, 130, 0.25);
+    border-color: rgba(255, 110, 130, 0.6);
+    color: #fff;
+}
+
+.tour-estado {
+    min-width: 150px;
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #dce3f0;
+    white-space: nowrap;
+}
+
 /* O ecrã VR ocupa sempre o ecrã inteiro, sem painel nem cabeçalho — só o céu */
 body.vr-ativo header.glass-header,
 body.vr-ativo nav.glass-nav {
@@ -1303,15 +1581,34 @@ body.red-velvet-mode .observatorio-mapa-wrapper {
     box-shadow: 0 0 35px rgba(220, 20, 50, 0.2), inset 0 0 25px rgba(255, 20, 50, 0.06) !important;
 }
 
+/* O botão da ISS, que é azul, seria a única coisa dessa cor a sobrar no modo
+   noturno — e é exatamente o azul que ele existe para não haver. Aqui herda o
+   vermelho como o "🔴 Night Mode" ao lado. */
+body.red-velvet-mode #btn-iss {
+    background: rgba(30, 4, 8, 0.7);
+    border-color: rgba(255, 60, 80, 0.45);
+    color: #ff7085;
+}
+
+body.red-velvet-mode #btn-iss:hover {
+    background: rgba(255, 40, 60, 0.25);
+    border-color: rgba(255, 80, 100, 0.8);
+    color: #ffa8b5;
+    box-shadow: 0 0 16px rgba(255, 40, 60, 0.4);
+}
+
 body.red-velvet-mode .observatorio-controlos,
 body.red-velvet-mode #observatorio-detalhes,
-body.red-velvet-mode #observatorio-ajuda {
+body.red-velvet-mode #observatorio-ajuda,
+body.red-velvet-mode .observatorio-pesquisa,
+body.red-velvet-mode #tour-barra {
     border-color: rgba(255, 40, 65, 0.35) !important;
     background: rgba(22, 3, 7, 0.65) !important;
     box-shadow: 0 8px 32px rgba(255, 15, 45, 0.15), inset 0 1px 0 rgba(255, 100, 120, 0.18) !important;
 }
 
 body.red-velvet-mode .observatorio-controlos .card-titulo,
+body.red-velvet-mode .observatorio-pesquisa .card-titulo,
 body.red-velvet-mode #observatorio-detalhes .detalhe-titulo,
 body.red-velvet-mode .obs-tempo-titulo {
     color: #ff3355 !important;
@@ -1344,6 +1641,78 @@ body.red-velvet-mode #btn-toggle-painel:hover {
     box-shadow: 0 0 14px rgba(255, 40, 65, 0.5) !important;
 }
 
+/* ── Pesquisa e Tour no modo noturno ────────────────────────────────
+   Estas regras são à mão, como todas as do Red Velvet: não há aqui nenhuma
+   regra genérica que apanhe o que se acrescente a seguir, e sem isto a
+   pesquisa e a barra do tour ficavam azuis no meio de um céu vermelho — que é
+   precisamente o que este modo existe para não acontecer. */
+body.red-velvet-mode .obs-btn-tour,
+body.red-velvet-mode .tour-btn {
+    background: rgba(255, 40, 65, 0.12) !important;
+    border-color: rgba(255, 60, 80, 0.4) !important;
+    color: #ff8a9c !important;
+}
+
+body.red-velvet-mode .obs-btn-tour:hover,
+body.red-velvet-mode .tour-btn:hover {
+    background: rgba(255, 40, 65, 0.3) !important;
+    border-color: rgba(255, 80, 100, 0.8) !important;
+    color: #fff !important;
+    box-shadow: 0 0 14px rgba(255, 40, 65, 0.5) !important;
+}
+
+body.red-velvet-mode .obs-resultado {
+    background: rgba(255, 40, 65, 0.07) !important;
+    border-color: rgba(255, 60, 80, 0.22) !important;
+    color: #ffd9de !important;
+}
+
+body.red-velvet-mode .obs-resultado:hover {
+    background: rgba(255, 40, 65, 0.18) !important;
+    border-color: rgba(255, 60, 80, 0.5) !important;
+}
+
+body.red-velvet-mode .obs-resultado.ativo {
+    background: rgba(255, 40, 65, 0.28) !important;
+    border-color: rgba(255, 90, 110, 0.8) !important;
+}
+
+body.red-velvet-mode .obs-resultado-tipo {
+    color: rgba(255, 122, 140, 0.85) !important;
+}
+
+body.red-velvet-mode .obs-resultado-vazio {
+    color: rgba(255, 168, 181, 0.6) !important;
+}
+
+/* O amarelo do aviso não existe em mais lado nenhum do Red Velvet — e o aviso
+   tem de se ler como um aviso, não como uma cor emprestada. */
+body.red-velvet-mode .obs-aviso-ir {
+    background: rgba(255, 40, 65, 0.1) !important;
+    border-left-color: rgba(255, 60, 80, 0.6) !important;
+    color: #ffb8c3 !important;
+}
+
+body.red-velvet-mode #obs-pesquisa::placeholder {
+    color: rgba(255, 168, 181, 0.4) !important;
+}
+
+body.red-velvet-mode .tour-estado {
+    color: #ffc9d1 !important;
+}
+
+body.red-velvet-mode .tour-btn-sair {
+    background: rgba(255, 40, 65, 0.2) !important;
+    border-color: rgba(255, 70, 90, 0.55) !important;
+    color: #ff9fb0 !important;
+}
+
+body.red-velvet-mode .iss-aviso {
+    background: rgba(35, 5, 10, 0.65) !important;
+    border-left-color: rgba(255, 60, 80, 0.6) !important;
+    color: #ffb8c3 !important;
+}
+
 body.red-velvet-mode input[type="range"] {
     accent-color: #ff2a4a;
 }
@@ -1362,6 +1731,43 @@ body.red-velvet-mode #obs-hora-label {
         top: 10px;
         right: 75px;
         padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+
+    /* O botão de cima fica mais baixo neste tamanho, e este acompanha — senão
+       encostavam um ao outro. */
+    #btn-iss {
+        top: 52px;
+        padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+
+    /* Num telemóvel o painel lateral ocupa 310 dos ~380px do ecrã, por isso uma
+       barra centrada em baixo ficava escondida atrás dele (o painel está em
+       z-index 100). Fica por cima: durante um tour, a barra é o controlo que
+       interessa, e a alternativa era um botão invisível.
+       O right de 84px é para o botão ⚙️ das configurações, que é fixo no canto
+       inferior direito e tem z-index 9999 — num ecrã estreito a barra centrada
+       chegava-lhe por cima e o ✕ ficava por baixo dele. */
+    #tour-barra {
+        bottom: 12px;
+        left: 12px;
+        right: 84px;
+        transform: none;
+        padding: 6px 8px;
+        gap: 5px;
+        justify-content: center;
+        z-index: 110;
+    }
+
+    .tour-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 0.9rem;
+    }
+
+    .tour-estado {
+        min-width: 0;
         font-size: 0.75rem;
     }
 }

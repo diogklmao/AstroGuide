@@ -11,11 +11,12 @@ import os
 from sky_engine import (
     get_sol, get_lua, get_todos_planetas,
     get_fase_lua_dia, get_nascer_por_sol, get_fases_mes,
-    get_observatorio
+    get_observatorio, momento_de
 )
 
 from eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
 from apod import get_imagem_do_dia                           # importa Imagem Astronómica do Dia (NASA)
+from iss import get_posicao_iss                            # Estação Espacial Internacional (ISS)
 from config import LOCATION                                  # importa localização
 import datetime                                              # conversão e validação de datas/horas
 from zoneinfo import ZoneInfo                                # conversão de fuso horário
@@ -99,7 +100,22 @@ def api_observatorio():
             # o utilizador simplesmente recebe os dados em tempo real como fallback.
             app.logger.warning(f"Parâmetros data/hora inválidos ('{data_str}', '{hora_str}'): {e}")
 
-    return jsonify(get_observatorio(timestamp_utc))
+    ceu = get_observatorio(timestamp_utc)
+
+    # A ISS entra na lista dos astros para ser desenhada no céu tal como o Sol,
+    # a Lua e os planetas. Se não houver elementos orbitais (sem internet, por
+    # exemplo) não se acrescenta nada e o céu sai exatamente como saía antes:
+    # esta rota nunca pode falhar por causa do satélite.
+    try:
+        iss = get_posicao_iss(momento_de(timestamp_utc))
+    except Exception as e:
+        # Nem a propagação da órbita pode impedir o céu de ser desenhado.
+        app.logger.warning(f"Erro ao calcular a posição da ISS: {e}")
+        iss = None
+    if iss:
+        ceu["astros"].append(iss)
+
+    return jsonify(ceu)
 
 
 @app.route("/api/calendario/<int:ano>/<int:mes>")   # URL com parâmetros: ex: /api/calendario/2026/3

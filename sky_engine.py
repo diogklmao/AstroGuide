@@ -40,6 +40,15 @@ PLANETAS = {                            # mapeamento de nomes internos NASA para
 
 # ── Funções de posição (suportam instante personalizado) ──────────────────────
 
+def momento_de(timestamp_utc=None):
+    # Converte um datetime UTC (com tzinfo) no instante correspondente do
+    # Skyfield. Sem argumento, é o agora.
+    # Existe para o observatório e a ISS (iss.py) olharem para o MESMO instante
+    # sem cada um repetir a conversão por sua conta.
+    if timestamp_utc is not None:
+        return ts.from_datetime(timestamp_utc)
+    return ts.now()
+
 def _centro_em(momento):
     # Posição do observador (Terra + Gaia) no instante pedido.
     # É o passo mais caro do cálculo — interpola as efemérides da NASA e a
@@ -244,10 +253,7 @@ def get_observatorio(timestamp_utc=None):
     # observáveis a partir de Vila Nova de Gaia.
     # timestamp_utc: datetime UTC com tzinfo; se None usa o instante atual.
 
-    if timestamp_utc is not None:
-        agora = ts.from_datetime(timestamp_utc)  # converte datetime Python → Time Skyfield
-    else:
-        agora = ts.now()                         # tempo real
+    agora = momento_de(timestamp_utc)            # o instante pedido, ou o agora
     # Posição do observador (Terra + Gaia) no instante pedido.
     # Calculada UMA vez e reutilizada por todas as estrelas, pelo Sol,
     # pela Lua e pelos 7 planetas — em vez de a recalcular a cada um.

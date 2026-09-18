@@ -286,8 +286,15 @@ function urlApiObservatorio() {
 }
 
 // ── Variáveis da Câmara 360° ──────────────────────────────────────
-let cameraAzimuth = 0;   // 0° = Norte, 90° = Este, 180° = Sul, 270° = Oeste
-let cameraAltitude = 15;  // Altitude em graus (-85° a 85°)
+// A posição de início do Observatório, num sítio só: é onde a vista 360° começa
+// e onde o "voltar ao início" repõe a câmara — no reset do modo 2D
+// (alterarModoVisao) e na saída do tour guiado (pararTour). Antes disto os
+// mesmos dois números estavam escritos à mão em dois ficheiros diferentes.
+const CAMERA_AZ_INICIAL = 0;    // 0° = Norte
+const CAMERA_ALT_INICIAL = 15;  // 15° acima do horizonte
+
+let cameraAzimuth = CAMERA_AZ_INICIAL;   // 0° = Norte, 90° = Este, 180° = Sul, 270° = Oeste
+let cameraAltitude = CAMERA_ALT_INICIAL;  // Altitude em graus (-85° a 85°)
 let cameraFOV = 80;       // Campo de visão horizontal em graus
 
 // Imagem de fundo do céu (Via Láctea real) — dá um efeito panorâmico ao rodar a câmara
@@ -413,15 +420,27 @@ function alterarModoVisao() {
         canvas.classList.add("drag-mode");
     } else {
         canvas.classList.remove("drag-mode", "dragging");
-        // Reset da câmara ao voltar ao modo 2D
-        cameraAzimuth = 0;
-        cameraAltitude = 15;
+        // Reset da câmara ao voltar ao modo 2D. Uma viagem a meio é cancelada
+        // primeiro, senão continuava a correr contra este reset e a câmara
+        // voltava aos 360° já num sítio que ninguém escolheu.
+        cancelarAnimacaoCamera();
+        cameraAzimuth = CAMERA_AZ_INICIAL;
+        cameraAltitude = CAMERA_ALT_INICIAL;
     }
 }
 
 async function carregarObservatorio(animar = false) {
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas) return;
+
+    // `animar` é "o utilizador mudou a hora": é o que distingue este caminho da
+    // atualização automática de 30 em 30 segundos. E é por isso que o tour
+    // termina aqui, e não lá em cima no atualizarObservatorioComHora — assim
+    // também apanha o botão "↺ Tempo Real", que muda o céu pela mesma razão.
+    // Um tour a andar estava a mostrar um céu que deixou de ser o do ecrã, e
+    // saltar paragens que já não correspondem ao que se vê é pior do que parar:
+    // quem o quiser ver no céu novo carrega em ▶ e ele recomeça já certo.
+    if (animar) pararTour();
 
     // Uma transição a decorrer é cancelada já: vamos substituir o céu
     // inteiro, e ela estaria a escrever em objetos que ninguém vai desenhar.
@@ -467,6 +486,14 @@ async function carregarObservatorio(animar = false) {
         const exato = anterior ? guardarCeu(apiData) : null;
 
         observatorioDados = apiData;
+
+        // se o painel da ISS estiver aberto é atualizado aqui, antes do reporCeu() abaixo,
+        // que devolve ao céu as posições antigas para a transição ter de onde
+        // partir. O `anterior` faz as vezes de "a hora mudou por pedido do
+        // utilizador": na atualização automática de 30 em 30 segundos não há
+        // nada disto, e sem esse travão o painel reescrevia-se sozinho e
+        // perdia a posição de scroll a quem estivesse a ler.
+        if (anterior && objetoSelecionado && objetoSelecionado.tipo === "iss") painelISS();
 
         // Escrever já as posições antigas no céu que acabou de chegar: as duas
         // linhas abaixo redesenham de forma síncrona, e sem isto via-se um
@@ -602,6 +629,9 @@ function altAzDe(raHoras, decGraus, latitudeGraus, tempoSideralGraus) {
 // a transição e é reposto no destino no último frame.
 function montarEntrada(alvo, antes, depois) {
     if (!alvo || !antes || !depois) return null;
+    // Sem RA/Dec aparente não há transição para este objeto. É onde cai a ISS,
+    // e é de propósito: ela não é um objeto fixo do céu, o que a faz ficar
+    // quieta durante a animação e aparecer no lugar certo assim que ela acaba.
     if (antes.ra_aparente == null || depois.ra_aparente == null) return null;
 
     // A Ascensão Reta dá a volta às 24 h (23,9 h → 0,1 h são 0,2 h de diferença,
@@ -873,6 +903,11 @@ function iniciarArrasto(e) {
     const modoSelect = document.getElementById("sel-modo-visao");
     if (!modoSelect || modoSelect.value !== "360") return;
 
+    // Quem pega no rato manda: uma viagem do "ir para" a meio desistia aqui, e
+    // sem isto o arrasto e a animação ficavam os dois a escrever em
+    // cameraAzimuth no mesmo frame — o céu treme e volta para trás.
+    cancelarAnimacaoCamera();
+
     isDragging = true;
     draggedActive = false;
     startX = e.clientX;
@@ -926,6 +961,9 @@ function iniciarArrastoToque(e) {
     if (!modoSelect || modoSelect.value !== "360") return;
 
     if (e.touches.length === 1) {
+        // Ver o comentário no iniciarArrasto: quem toca no ecrã manda.
+        cancelarAnimacaoCamera();
+
         isDragging = true;
         draggedActive = false;
         startX = e.touches[0].clientX;
@@ -994,6 +1032,77 @@ function tratarScrollZoom(e) {
     cameraFOV = Math.max(35, Math.min(110, cameraFOV * factor));
 
     agendarDesenhoObservatorio();
+}
+
+// ── Viagem da câmara ("ir para") ──────────────────────────────────
+// Apontar a câmara a um objeto é escrever em cameraAzimuth e cameraAltitude —
+// mas escrevê-las de repente faz o céu saltar, e o salto não diz a quem olha de
+// onde é que o objeto veio. Esta animação leva-a lá pelo caminho, em 0,8 s.
+//
+// Não tem tratamento de prefers-reduced-motion, e é de propósito: a regra do
+// projeto (ver glass.css) desliga as animações contínuas e decorativas, e
+// mantém as curtas que apresentam conteúdo. Esta é das segundas — sem ela, o
+// "ir para" ou não se percebe, ou não se vê de todo.
+let idAnimacaoCamera = null;
+
+function cancelarAnimacaoCamera() {
+    // Só se cancela o pedido de frame; a câmara fica onde está. Ao contrário da
+    // transição do céu, não há aqui um "destino exato" a repor: a posição a que
+    // a viagem ia a meio é uma posição verdadeira, e é a que está no ecrã.
+    if (idAnimacaoCamera === null) return;
+    cancelAnimationFrame(idAnimacaoCamera);
+    idAnimacaoCamera = null;
+}
+
+function animarCameraPara(azAlvo, altAlvo) {
+    cancelarAnimacaoCamera();
+
+    // Em modo 2D não há câmara nenhuma para apontar: o planisfério desenha o
+    // hemisfério inteiro de uma só vez e as coordenadas no ecrã não dependem
+    // dela (ver projectar()). Isto é o travão, para o modo 2D não ficar com uma
+    // câmara mexida que só se notaria ao voltar aos 360°.
+    const modoSelect = document.getElementById("sel-modo-visao");
+    if (!modoSelect || modoSelect.value !== "360") return;
+
+    // O azimute vai pelo caminho curto: sem isto, um objeto a 350° visto de
+    // 10° levava o céu a rodar 340° pelo lado errado em vez dos 20° que faltam.
+    const deltaAz = diferencaAngular(cameraAzimuth, azAlvo);
+    const azInicial = cameraAzimuth;
+    const altInicial = cameraAltitude;
+    const altFinal = Math.max(-85, Math.min(85, altAlvo));
+
+    const duracaoMs = 800;
+    const inicioMs = performance.now();
+
+    function frame(agoraMs) {
+        // O max/min é para o primeiro frame poder chegar com um instante
+        // anterior ao arranque, e para o último não passar de 1.
+        const f = Math.min(1, Math.max(0, (agoraMs - inicioMs) / duracaoMs));
+
+        // O mesmo easeInOutCubic da transição do céu: arranca devagar, acelera,
+        // trava no fim. É a diferença entre "a rodar" e "a chegar ao sítio".
+        const suave = f < 0.5 ? 4 * f * f * f : 1 - Math.pow(-2 * f + 2, 3) / 2;
+
+        cameraAzimuth = (azInicial + deltaAz * suave + 360) % 360;
+        cameraAltitude = altInicial + (altFinal - altInicial) * suave;
+
+        const terminou = f >= 1;
+
+        if (terminou) {
+            // Os valores exatos no fim, e não o resultado da interpolação: o
+            // objeto tem de ficar mesmo ao centro do ecrã, sem um resto de meio
+            // grau que se nota no instante em que a viagem para.
+            cameraAzimuth = (azAlvo + 360) % 360;
+            cameraAltitude = altFinal;
+            idAnimacaoCamera = null;
+        }
+
+        agendarDesenhoObservatorio();
+
+        if (!terminou) idAnimacaoCamera = requestAnimationFrame(frame);
+    }
+
+    idAnimacaoCamera = requestAnimationFrame(frame);
 }
 
 // ── Renderização do Observatório ──────────────────────────────────
@@ -1495,6 +1604,7 @@ function desenharObservatorio() {
             } else {
                 let corHalo = "rgba(255, 255, 255, 0.15)";
                 let corAstro = "#ffffff";
+                let fatorHalo = 2.2;
 
                 if (astro.tipo === "planeta") {
                     if (astro.nome === "Saturno") {
@@ -1504,10 +1614,18 @@ function desenharObservatorio() {
                         corHalo = "rgba(110, 184, 255, 0.2)";
                         corAstro = "#4fc3f7";
                     }
+                } else if (astro.tipo === "iss") {
+                    // A ISS: um ponto quase branco com um halo azulado mais largo
+                    // do que o dos planetas. É o objeto que se anda à procura no
+                    // céu, por isso convém dar nas vistas — e, ao contrário do Sol
+                    // e da Lua, não precisa de imagem nenhuma para se reconhecer.
+                    corHalo = "rgba(158, 212, 255, 0.3)";
+                    corAstro = "#eaf6ff";
+                    fatorHalo = 3.0;
                 }
 
                 ctx.beginPath();
-                ctx.arc(pos.x, pos.y, size * 2.2, 0, 2 * Math.PI);
+                ctx.arc(pos.x, pos.y, size * fatorHalo, 0, 2 * Math.PI);
                 ctx.fillStyle = corHalo;
                 ctx.fill();
 
@@ -1590,52 +1708,7 @@ function tratarCliqueCanvas(e) {
 
     if (encontrado) {
         objetoSelecionado = encontrado;
-
-        if (encontrado.tipo === "constelacao") {
-            // ── Detalhes de Constelação ──
-            const curiosidade = CURIOSIDADES_CONSTELACOES[encontrado.const_id] || "Uma constelação fascinante do céu noturno.";
-            const imagemConst = IMAGENS_CONSTELACOES[encontrado.const_id];
-            const imagemHTML = imagemConst
-                ? `<img class="constelacao-img" src="${imagemConst}" alt="${encontrado.nome}" onerror="this.style.display='none'">`
-                : "";
-            painel.innerHTML = `
-                <div class="detalhe-titulo">⭐ ${encontrado.nome}</div>
-                ${imagemHTML}
-                <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:#6eb8ff">CONSTELAÇÃO</span></div>
-                <div class="detalhe-linha"><span class="detalhe-icon">🔤</span><span class="detalhe-label">Abreviatura</span><span class="detalhe-valor" style="font-family:monospace;color:#ce93d8">${encontrado.const_id}</span></div>
-                <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Estrelas</span><span class="detalhe-valor" style="font-family:monospace">${encontrado.numEstrelas}</span></div>
-                <div style="margin-top:14px;padding:10px 12px;background:rgba(110,184,255,0.07);border-left:3px solid rgba(110,184,255,0.4);border-radius:6px;">
-                    <div style="font-size:0.75rem;color:#6eb8ff;margin-bottom:6px;font-weight:600;">💡 Curiosidade</div>
-                    <p style="color:rgba(220,227,240,0.85);font-size:0.82rem;line-height:1.5;margin:0;">${curiosidade}</p>
-                </div>
-            `;
-        } else {
-            // ── Detalhes de Estrela / Astro ──
-            let extrasHTML = "";
-            if (encontrado.tipo === "lua" && encontrado.fase_nome) {
-                extrasHTML = `
-                    <div class="detalhe-linha"><span class="detalhe-icon">${encontrado.emoji}</span><span class="detalhe-label">Fase da Lua</span><span class="detalhe-valor" style="color:#ce93d8">${encontrado.fase_nome} (${encontrado.iluminacao}%)</span></div>
-                `;
-            } else if (encontrado.tipo === "estrela") {
-                const constName = encontrarConstelacaoDaEstrela(encontrado.id);
-                extrasHTML = `
-                    <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Constelação</span><span class="detalhe-valor" style="color:#9ed4ff">${constName}</span></div>
-                `;
-            }
-
-            const corTipo = encontrado.tipo === "sol" ? "#ff8f00" : (encontrado.tipo === "lua" ? "#b0bec5" : (encontrado.tipo === "estrela" ? "#4fc3f7" : "#ffd54f"));
-            const labelTipo = encontrado.tipo.toUpperCase();
-
-            painel.innerHTML = `
-                <div class="detalhe-titulo">🔭 ${encontrado.nome}</div>
-                <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:${corTipo}">${labelTipo}</span></div>
-                <div class="detalhe-linha"><span class="detalhe-icon">🔆</span><span class="detalhe-label">Magnitude</span><span class="detalhe-valor" style="font-family:monospace">${encontrado.mag}</span></div>
-                <div class="detalhe-linha"><span class="detalhe-icon">📈</span><span class="detalhe-label">Altitude</span><span class="detalhe-valor" style="font-family:monospace;color:#ffcc80">${encontrado.altitude}°</span></div>
-                <div class="detalhe-linha"><span class="detalhe-icon">🧭</span><span class="detalhe-label">Azimute</span><span class="detalhe-valor" style="font-family:monospace;color:#ff8a65">${encontrado.azimute}° (${obterRosaDosVentos(encontrado.azimute)})</span></div>
-                ${extrasHTML}
-            `;
-        }
-
+        mostrarDetalhesDe(encontrado);
         desenharObservatorio();
     } else {
         objetoSelecionado = null;
@@ -1645,6 +1718,141 @@ function tratarCliqueCanvas(e) {
         `;
         desenharObservatorio();
     }
+}
+
+// Escreve o painel de detalhes para um objeto do céu. O `item` tem a forma de
+// uma entrada de canvas.elementosNoEcra — é a mesma coisa que o clique lhe
+// passa —, o que quer dizer que um objeto que não esteja a ser desenhado (a
+// pesquisa encontra objetos que os filtros escondem) pode ser mostrado à mesma,
+// desde que traga os campos de que o painel precisa.
+//
+// `aviso` é a razão por que a câmara não foi a lado nenhum, quando há uma (ver
+// irPara). Vai LOGO ABAIXO DO TÍTULO, e não no fim: o painel tem altura máxima
+// com scroll, e com a imagem de uma constelação à frente uma nota no fim ficava
+// fora de vista — que é o mesmo que não existir.
+//
+// Quem chama já pôs objetoSelecionado; este painel só escreve.
+function mostrarDetalhesDe(item, aviso) {
+    const painel = document.getElementById("observatorio-detalhes");
+    if (!painel || !item) return;
+
+    const avisoHTML = aviso ? `<p class="obs-aviso-ir">⚠️ ${aviso}</p>` : "";
+
+    if (item.tipo === "constelacao") {
+        // ── Detalhes de Constelação ──
+        const curiosidade = CURIOSIDADES_CONSTELACOES[item.const_id] || "Uma constelação fascinante do céu noturno.";
+        const imagemConst = IMAGENS_CONSTELACOES[item.const_id];
+        const imagemHTML = imagemConst
+            ? `<img class="constelacao-img" src="${imagemConst}" alt="${item.nome}" onerror="this.style.display='none'">`
+            : "";
+        painel.innerHTML = `
+            <div class="detalhe-titulo">⭐ ${item.nome}</div>
+            ${avisoHTML}
+            ${imagemHTML}
+            <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:#6eb8ff">CONSTELAÇÃO</span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">🔤</span><span class="detalhe-label">Abreviatura</span><span class="detalhe-valor" style="font-family:monospace;color:#ce93d8">${item.const_id}</span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Estrelas</span><span class="detalhe-valor" style="font-family:monospace">${item.numEstrelas}</span></div>
+            <div style="margin-top:14px;padding:10px 12px;background:rgba(110,184,255,0.07);border-left:3px solid rgba(110,184,255,0.4);border-radius:6px;">
+                <div style="font-size:0.75rem;color:#6eb8ff;margin-bottom:6px;font-weight:600;">💡 Curiosidade</div>
+                <p style="color:rgba(220,227,240,0.85);font-size:0.82rem;line-height:1.5;margin:0;">${curiosidade}</p>
+            </div>
+        `;
+    } else if (item.tipo === "iss") {
+        // ── Detalhes da Estação Espacial ──
+        // Quem desenha o painel vai buscar a posição ao céu em
+        // observatorioDados, não à cópia que aqui chegou, que fica
+        // desatualizada mal a hora mude.
+        mostrarDetalhesISS();
+    } else {
+        // ── Detalhes de Estrela / Astro ──
+        let extrasHTML = "";
+        if (item.tipo === "lua" && item.fase_nome) {
+            extrasHTML = `
+                <div class="detalhe-linha"><span class="detalhe-icon">${item.emoji}</span><span class="detalhe-label">Fase da Lua</span><span class="detalhe-valor" style="color:#ce93d8">${item.fase_nome} (${item.iluminacao}%)</span></div>
+            `;
+        } else if (item.tipo === "estrela") {
+            const constName = encontrarConstelacaoDaEstrela(item.id);
+            extrasHTML = `
+                <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Constelação</span><span class="detalhe-valor" style="color:#9ed4ff">${constName}</span></div>
+            `;
+        }
+
+        const corTipo = item.tipo === "sol" ? "#ff8f00" : (item.tipo === "lua" ? "#b0bec5" : (item.tipo === "estrela" ? "#4fc3f7" : "#ffd54f"));
+        const labelTipo = item.tipo.toUpperCase();
+
+        painel.innerHTML = `
+            <div class="detalhe-titulo">🔭 ${item.nome}</div>
+            ${avisoHTML}
+            <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:${corTipo}">${labelTipo}</span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">🔆</span><span class="detalhe-label">Magnitude</span><span class="detalhe-valor" style="font-family:monospace">${item.mag}</span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">📈</span><span class="detalhe-label">Altitude</span><span class="detalhe-valor" style="font-family:monospace;color:#ffcc80">${item.altitude}°</span></div>
+            <div class="detalhe-linha"><span class="detalhe-icon">🧭</span><span class="detalhe-label">Azimute</span><span class="detalhe-valor" style="font-family:monospace;color:#ff8a65">${item.azimute}° (${obterRosaDosVentos(item.azimute)})</span></div>
+            ${extrasHTML}
+        `;
+    }
+}
+
+// ── Estação Espacial Internacional (ISS) ─────────────────────────────────────
+// A ISS chega do servidor dentro de observatorioDados.astros, com tipo "iss", e
+// é desenhada e clicada como o Sol e os planetas. Tudo o que este painel mostra
+// vem do céu que já está no ecrã — não pede nada a ninguém.
+// Chega-se a ela de duas maneiras: clicando na ISS quando ela está no céu, ou
+// pelo botão "🛰 ISS" no canto do mapa — que existe porque ela só está acima do
+// horizonte cerca de 10% do tempo, e sem ele o painel ficaria quase sempre fora
+// de alcance.
+// (Chegou a haver aqui uma lista das passagens visíveis dos próximos 7 dias,
+//  calculada no servidor. Foi retirada: nunca chegou a dar resultados.)
+
+function astroISS() {
+    // A ISS tal como está no céu de agora. A posição mostrada no painel sai
+    // daqui e não da cópia que o clique guardou: essa fica desatualizada mal a
+    // hora mude, e este painel é precisamente atualizado quando ela muda.
+    if (!observatorioDados || !observatorioDados.astros) return null;
+    return observatorioDados.astros.find(a => a.tipo === "iss") || null;
+}
+
+// Abre (ou reabre) o painel da ISS. É o que o botão "🛰 ISS" do mapa e o clique
+// na própria ISS chamam — sem argumentos de propósito: a posição vem do céu
+// atual, para o painel nunca mostrar um instante que já não é o do mapa.
+function mostrarDetalhesISS() {
+    objetoSelecionado = { id: "iss", tipo: "iss", nome: "ISS" };
+    painelISS();
+    agendarDesenhoObservatorio();   // desenhar o destaque à volta da ISS
+}
+
+function painelISS() {
+    const painel = document.getElementById("observatorio-detalhes");
+    if (!painel) return;
+
+    // A posição é lida do céu que está no ecrã — a mesma lista de astros que o
+    // mapa desenhou — e não de uma cópia guardada no clique, que fica velha mal
+    // a hora mude (e este painel é precisamente atualizado quando ela muda).
+    const issAgora = astroISS();
+
+    painel.innerHTML = `
+        <div class="detalhe-titulo">🛰 Estação Espacial (ISS)</div>
+        ${blocoPosicaoISS(issAgora)}`;
+}
+
+function blocoPosicaoISS(iss) {
+    if (!iss) {
+        // Sem elementos orbitais não há posição nenhuma — é o caso de não haver
+        // internet. Dizer isto é melhor do que mostrar números inventados.
+        return `<p class="iss-aviso">Sem elementos orbitais da ISS: o servidor não os conseguiu
+                obter. Verifica a ligação à internet e tenta outra vez.</p>`;
+    }
+
+    // Abaixo do horizonte um azimute não quer dizer nada de útil a quem olha
+    // para o céu, por isso o que aparece é a razão, não o número.
+    const direcao = iss.visivel
+        ? `${iss.azimute}° (${obterRosaDosVentos(iss.azimute)})`
+        : "abaixo do horizonte";
+
+    return `
+        <div class="detalhe-linha"><span class="detalhe-icon">📈</span><span class="detalhe-label">Altitude</span><span class="detalhe-valor" style="font-family:monospace;color:#ffcc80">${iss.altitude}°</span></div>
+        <div class="detalhe-linha"><span class="detalhe-icon">🧭</span><span class="detalhe-label">Direção</span><span class="detalhe-valor" style="font-family:monospace;color:#ff8a65">${direcao}</span></div>
+        <div class="detalhe-linha"><span class="detalhe-icon">📏</span><span class="detalhe-label">Distância</span><span class="detalhe-valor" style="font-family:monospace">${iss.distancia}</span></div>
+        ${iss.visivel ? "" : `<p class="iss-aviso">Neste instante a ISS está abaixo do horizonte.</p>`}`;
 }
 
 function encontrarConstelacaoDaEstrela(est_id) {
@@ -1686,6 +1894,632 @@ function obterRosaDosVentos(azimute) {
     return "N";
 }
 
+// ── Pesquisa com "ir para" ────────────────────────────────────────
+// O céu tem ~98 objetos e chegar a qualquer deles obrigava a encontrá-lo à
+// vista no mapa e a clicar-lhe. Num céu cheio de pontos isso deixa de fora
+// tudo o que está perto do horizonte, ou simplesmente fora do campo de visão.
+// Aqui escreve-se o nome, escolhe-se, e a câmara vai lá ter.
+//
+// A pesquisa abre SEMPRE o painel de detalhes, mesmo quando a câmara não pode
+// ir a lado nenhum (objeto abaixo do horizonte, escondido por um filtro): metade
+// da utilidade é chegar aos dados, e isso não depende de ele estar no céu. O que
+// não se faz é apontar em silêncio — quando não dá, o painel diz porquê.
+
+function normalizarTexto(texto) {
+    // Sem acentos e em minúsculas: quem procura "pleiades" tem de encontrar
+    // "Plêiades", e quem procura "Betelgeuse" tem de encontrar a mesma coisa
+    // que "betelgeuse". Mesma técnica do imagemAstro().
+    return (texto || "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .trim();
+}
+
+// Um objeto do céu com a forma de uma entrada de canvas.elementosNoEcra — é o
+// que o painel de detalhes sabe ler (ver mostrarDetalhesDe). Os campos x/y/raio
+// não entram: só servem para o desenho e para o clique no mapa, e nada disto é
+// desenhado por ser encontrado na pesquisa.
+function itemEstrela(est_id, est) {
+    return {
+        id: est_id,
+        nome: est.nome,
+        tipo: "estrela",
+        mag: est.mag.toFixed(2),
+        altitude: est.altitude,
+        azimute: est.azimute
+    };
+}
+
+function itemAstro(astro) {
+    return {
+        id: astro.id,
+        nome: astro.nome,
+        tipo: astro.tipo,
+        // A mesma regra do desenho: um planeta varia de brilho ao longo do ano e
+        // um número fixo para ele seria inventado. A Lua e a ISS também não têm
+        // magnitude no painel do desenho.
+        mag: astro.tipo === "sol" ? "-26.7" : (astro.tipo === "lua" ? "-12.5" : "Variável"),
+        altitude: astro.altitude,
+        azimute: astro.azimute,
+        emoji: astro.emoji || null,
+        fase_nome: astro.fase_nome || null,
+        iluminacao: astro.iluminacao || null
+    };
+}
+
+function itemConstelacao(const_id, constelacao) {
+    // As estrelas que a constelação toca — as mesmas que o desenho conta para o
+    // "Estrelas: N" do painel (lá é um Set sobre os dois elementos de cada linha).
+    const estrelasUnicas = new Set();
+    constelacao.linhas.forEach(linha => {
+        estrelasUnicas.add(linha[0]);
+        estrelasUnicas.add(linha[1]);
+    });
+
+    return {
+        id: "const_" + const_id,
+        nome: constelacao.nome,
+        tipo: "constelacao",
+        const_id: const_id,
+        numEstrelas: estrelasUnicas.size
+    };
+}
+
+// O catálogo a que a pesquisa vai buscar, montado de fresco a cada tecla. Não
+// custa nada (são ~98 entradas) e evita o único erro que aqui importava: uma
+// lista guardada a apontar para posições de há meia hora, depois de a
+// atualização automática de 30 em 30 segundos ter trocado o céu.
+function indicePesquisa() {
+    if (!observatorioDados) return [];
+
+    const indice = [];
+
+    const estrelas = observatorioDados.estrelas || {};
+    for (const est_id in estrelas) {
+        const est = estrelas[est_id];
+        indice.push({
+            item: itemEstrela(est_id, est),
+            nome: normalizarTexto(est.nome),
+            id: normalizarTexto(est_id)
+        });
+    }
+
+    const constelacoes = observatorioDados.constelacoes || {};
+    for (const const_id in constelacoes) {
+        const constelacao = constelacoes[const_id];
+        indice.push({
+            item: itemConstelacao(const_id, constelacao),
+            nome: normalizarTexto(constelacao.nome),
+            id: normalizarTexto(const_id)
+        });
+    }
+
+    // O Sol, a Lua, os planetas e a ISS, todos na mesma lista — é a lista
+    // "astros" que o servidor envia, e a ISS vem lá dentro como os outros.
+    (observatorioDados.astros || []).forEach(astro => {
+        indice.push({
+            item: itemAstro(astro),
+            nome: normalizarTexto(astro.nome),
+            id: normalizarTexto(astro.id)
+        });
+    });
+
+    return indice;
+}
+
+function procurarObjetos(termo) {
+    const t = normalizarTexto(termo);
+
+    // Com uma letra só, "a" traria meio catálogo e não ajudaria ninguém a
+    // escolher. Duas letras já separam Vega de Vénus.
+    if (t.length < 2) return [];
+
+    const encontrados = [];
+
+    for (const entrada of indicePesquisa()) {
+        // Procura-se pelo nome E pelo id: "gam_cas" e "Tsih" são a mesma
+        // estrela, e quem vem do Skyfield conhece-a pelo primeiro.
+        const posNome = entrada.nome.indexOf(t);
+        const pos = posNome >= 0 ? posNome : entrada.id.indexOf(t);
+        if (pos < 0) continue;
+
+        encontrados.push({
+            entrada: entrada,
+            // Começa-por ganha a contém em qualquer posição: quem escreve "veg"
+            // quer Vega à frente de tudo o que tenha "veg" a meio.
+            comecaPor: pos === 0 ? 0 : 1,
+            comprimento: entrada.nome.length
+        });
+    }
+
+    encontrados.sort((a, b) =>
+        a.comecaPor - b.comecaPor ||
+        a.comprimento - b.comprimento ||
+        a.entrada.nome.localeCompare(b.entrada.nome, "pt"));
+
+    return encontrados.slice(0, 8).map(e => e.entrada);
+}
+
+// ── Onde apontar a câmara ─────────────────────────────────────────
+
+// O ponto do céu de uma constelação. Devolve null quando nenhuma das suas
+// estrelas está acima do horizonte.
+function alvoDaConstelacao(const_id) {
+    if (!observatorioDados || !observatorioDados.constelacoes || !observatorioDados.estrelas) return null;
+    const constelacao = observatorioDados.constelacoes[const_id];
+    if (!constelacao) return null;
+
+    const estrelas = observatorioDados.estrelas;
+    let x = 0, y = 0, z = 0, n = 0;
+
+    // Só as estrelas que o desenho usa para o centróide: o primeiro elemento de
+    // cada linha (ver desenharObservatorio). É de propósito que se copie essa
+    // escolha em vez de se inventar outra — é ali que o nome da constelação é
+    // escrito no ecrã, e é isso que a câmara tem de centrar.
+    constelacao.linhas.forEach(linha => {
+        const est = estrelas[linha[0]];
+        if (!est || !est.visivel) return;
+
+        // Média de VETORES UNITÁRIOS, não de coordenadas. Altitude e azimute são
+        // ângulos, e a média deles não é o meio de nada: entre 359° e 1° daria
+        // 180°, do lado oposto do céu. Somados como vetores, o resultado cai
+        // sempre no sítio certo. A convenção é a do projectar().
+        const altRad = est.altitude * GRAU;
+        const azRad = est.azimute * GRAU;
+        x += Math.cos(altRad) * Math.cos(azRad);
+        y += Math.cos(altRad) * Math.sin(azRad);
+        z += Math.sin(altRad);
+        n++;
+    });
+
+    if (n === 0) return null;
+    const comprimento = Math.hypot(x, y, z);
+    if (comprimento === 0) return null;
+
+    return {
+        altitude: Math.asin(z / comprimento) / GRAU,
+        azimute: (Math.atan2(y, x) / GRAU + 360) % 360
+    };
+}
+
+// A posição atual de um objeto que se aponta (estrela, Sol, Lua, planeta ou
+// ISS), lida do céu que está no ecrã — e não da cópia que a pesquisa guardou,
+// que pode ser de antes da última atualização automática.
+function posicaoAtualDe(item) {
+    if (!observatorioDados) return null;
+
+    if (item.tipo === "estrela") {
+        const est = observatorioDados.estrelas ? observatorioDados.estrelas[item.id] : null;
+        if (!est) return null;
+        return { altitude: est.altitude, azimute: est.azimute, visivel: est.visivel, mag: est.mag };
+    }
+
+    const astro = (observatorioDados.astros || []).find(a => a.id === item.id);
+    if (!astro) return null;
+    return { altitude: astro.altitude, azimute: astro.azimute, visivel: astro.visivel, mag: null };
+}
+
+// A frase que explica a única impossibilidade que não depende do ecrã: a Terra
+// está no meio. "Abaixo do horizonte" sozinho ainda deixa a dúvida de se é uma
+// avaria ou uma impossibilidade — e é uma impossibilidade. Diz-se o que se passa
+// e o que isso quer dizer para quem está a olhar para o céu.
+//
+// Está aqui, e não escrita à mão em cada sítio, porque é usada em dois: na
+// pesquisa (alvoDeApontar) e no tour (irParaParagem, quando uma paragem desce
+// entretanto). Duas cópias era garantia de ficarem diferentes.
+const AVISO_CONSTELACAO_ABAIXO =
+    "Esta constelação está abaixo do horizonte — não é possível observá-la neste instante.";
+const AVISO_OBJETO_ABAIXO =
+    "Está abaixo do horizonte — não é possível observá-lo neste instante.";
+
+// Para onde apontar, ou porque é que não dá. Devolve:
+//   { altitude, azimute }  — há para onde apontar
+//   { motivo, curto }      — não há, e o motivo é para dizer no painel (a
+//                            versão curta é a que cabe na lista da pesquisa)
+//   { motivo: null }       — não há nada a dizer (a ISS abaixo do horizonte já
+//                            o diz no seu próprio painel; repeti-lo era ruído)
+//
+// A ordem dos motivos é a ordem em que eles se aplicam de fora para dentro: um
+// objeto abaixo do horizonte está fora do céu, e é isso que interessa saber
+// primeiro; só depois é que faz sentido falar dos filtros do ecrã.
+function alvoDeApontar(item) {
+    if (!observatorioDados) return { motivo: null };
+
+    if (item.tipo === "constelacao") {
+        const alvo = alvoDaConstelacao(item.const_id);
+        if (!alvo) {
+            return { motivo: AVISO_CONSTELACAO_ABAIXO, curto: "abaixo do horizonte" };
+        }
+        const caixa = document.getElementById("chk-constelacoes");
+        if (caixa && !caixa.checked) {
+            return {
+                motivo: "As linhas das constelações estão escondidas em Controlos → Linhas de Constelações.",
+                curto: "escondida pelos filtros"
+            };
+        }
+        return alvo;
+    }
+
+    const posicao = posicaoAtualDe(item);
+    if (!posicao) return { motivo: null };
+
+    if (!posicao.visivel) {
+        // A ISS já escreve isto no seu painel; nos outros objetos é aqui que
+        // se fica a saber.
+        return item.tipo === "iss"
+            ? { motivo: null }
+            : { motivo: AVISO_OBJETO_ABAIXO, curto: "abaixo do horizonte" };
+    }
+
+    if (item.tipo === "estrela") {
+        const limite = parseFloat(document.getElementById("rng-mag").value);
+        if (posicao.mag > limite) {
+            return {
+                motivo: `Está abaixo do filtro de brilho (Mag ≤ ${limite.toFixed(1)}) e por isso não aparece no mapa.`,
+                curto: "escondida pelos filtros"
+            };
+        }
+    } else {
+        const caixa = document.getElementById("chk-astros");
+        if (caixa && !caixa.checked) {
+            return {
+                motivo: "O Sol, a Lua e os planetas estão escondidos em Controlos → Sol, Lua e Planetas.",
+                curto: "escondido pelos filtros"
+            };
+        }
+    }
+
+    return { altitude: posicao.altitude, azimute: posicao.azimute };
+}
+
+function rotuloTipo(item) {
+    switch (item.tipo) {
+        case "estrela": return "Estrela";
+        case "constelacao": return "Constelação";
+        case "sol": return "Sol";
+        case "lua": return "Lua";
+        case "planeta": return "Planeta";
+        case "iss": return "ISS";
+        default: return item.tipo;
+    }
+}
+
+// ── Ir para ───────────────────────────────────────────────────────
+
+function irParaResultado(i) {
+    const entrada = resultadosPesquisa[i];
+    if (entrada) irPara(entrada);
+}
+
+function irPara(entrada) {
+    if (!entrada) return;
+
+    // O alvo é resolvido ANTES de o painel ser escrito, porque é ele que traz o
+    // motivo de não haver para onde apontar — e esse motivo entra dentro do
+    // painel, debaixo do título. (Antes era acrescentado ao fim do painel já
+    // escrito, e com a imagem de uma constelação à frente ficava fora da área
+    // visível: um aviso que não se vê é o mesmo que um aviso que não existe.)
+    const alvo = alvoDeApontar(entrada.item);
+
+    // O painel abre sempre, mesmo quando não há para onde apontar.
+    objetoSelecionado = entrada.item;
+    mostrarDetalhesDe(entrada.item, alvo.motivo || null);
+
+    if (alvo.altitude !== undefined) {
+        animarCameraPara(alvo.azimute, alvo.altitude);
+    }
+
+    agendarDesenhoObservatorio();
+    fecharResultados();
+
+    // O texto fica no campo (apagá-lo obrigaria a reescrevê-lo para procurar
+    // outra coisa parecida), mas o foco sai: no telemóvel é isto que fecha o
+    // teclado e deixa ver o céu.
+    const campo = document.getElementById("obs-pesquisa");
+    if (campo) campo.blur();
+}
+
+// ── A lista de resultados ─────────────────────────────────────────
+
+let resultadosPesquisa = [];
+let resultadoAtivo = -1;
+
+function aoEscreverPesquisa() {
+    const campo = document.getElementById("obs-pesquisa");
+    if (!campo) return;
+
+    resultadosPesquisa = procurarObjetos(campo.value);
+    resultadoAtivo = resultadosPesquisa.length > 0 ? 0 : -1;
+    mostrarResultados();
+}
+
+function mostrarResultados() {
+    const caixa = document.getElementById("obs-pesquisa-resultados");
+    const campo = document.getElementById("obs-pesquisa");
+    if (!caixa || !campo) return;
+
+    if (normalizarTexto(campo.value).length < 2) {
+        // Com menos de duas letras não há lista que sirva. O aviso só aparece
+        // quando já se escreveu alguma coisa: em branco não há nada a explicar.
+        caixa.innerHTML = campo.value.trim()
+            ? `<p class="obs-resultado-vazio">Escreve mais uma letra…</p>`
+            : "";
+        return;
+    }
+
+    if (resultadosPesquisa.length === 0) {
+        caixa.innerHTML = `<p class="obs-resultado-vazio">Nada encontrado com esse nome.</p>`;
+        return;
+    }
+
+    caixa.innerHTML = resultadosPesquisa.map((entrada, i) => {
+        const alvo = alvoDeApontar(entrada.item);
+        // Dizer na lista que um resultado está abaixo do horizonte evita o
+        // clique que não faz nada e parece avaria.
+        const nota = alvo.curto ? ` · ${alvo.curto}` : "";
+        return `<button type="button" class="obs-resultado${i === resultadoAtivo ? " ativo" : ""}"
+            onclick="irParaResultado(${i})">
+            <span class="obs-resultado-nome">${entrada.item.nome}</span>
+            <span class="obs-resultado-tipo">${rotuloTipo(entrada.item)}${nota}</span>
+        </button>`;
+    }).join("");
+}
+
+function fecharResultados() {
+    const caixa = document.getElementById("obs-pesquisa-resultados");
+    if (caixa) caixa.innerHTML = "";
+    resultadosPesquisa = [];
+    resultadoAtivo = -1;
+}
+
+function tratarTeclaPesquisa(e) {
+    if (e.key === "Escape") {
+        fecharResultados();
+        e.target.blur();
+        return;
+    }
+
+    if (resultadosPesquisa.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        resultadoAtivo = (resultadoAtivo + 1) % resultadosPesquisa.length;
+        mostrarResultados();
+    } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        resultadoAtivo = (resultadoAtivo - 1 + resultadosPesquisa.length) % resultadosPesquisa.length;
+        mostrarResultados();
+    } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (resultadoAtivo >= 0) irParaResultado(resultadoAtivo);
+    }
+}
+
+// ── Tour guiado ───────────────────────────────────────────────────
+// Uma visita às constelações que estão acima do horizonte, uma a uma. O texto
+// de cada paragem é a curiosidade que já existe em CURIOSIDADES_CONSTELACOES —
+// não há aqui conteúdo novo, só uma maneira de o percorrer.
+
+const DURACAO_PARAGEM_TOUR = 12000;   // ms em cada constelação
+
+// Estado do tour, ou null quando não há nenhum a decorrer. Ser um objeto só, e
+// nunca duas variáveis soltas, é o que torna impossível haver dois tours ao
+// mesmo tempo: quem começa um manda parar o anterior primeiro.
+//   paragens — abreviaturas das constelações, pela ordem da visita
+//   indice   — a paragem atual
+//   pausado  — true quando o tempo está parado
+//   idTimer  — o setTimeout que faz avançar a paragem
+let tourObs = null;
+
+function nomeDaConstelacao(const_id) {
+    const constelacoes = observatorioDados && observatorioDados.constelacoes;
+    return (constelacoes && constelacoes[const_id]) ? constelacoes[const_id].nome : const_id;
+}
+
+function mostrarBarraTour() {
+    const barra = document.getElementById("tour-barra");
+    if (barra) barra.classList.add("visivel");
+}
+
+function esconderBarraTour() {
+    const barra = document.getElementById("tour-barra");
+    if (barra) barra.classList.remove("visivel");
+}
+
+function atualizarBarraTour() {
+    if (!tourObs) return;
+
+    const estado = document.getElementById("tour-estado");
+    if (estado) {
+        estado.textContent = `${tourObs.indice + 1} de ${tourObs.paragens.length} · ` +
+            nomeDaConstelacao(tourObs.paragens[tourObs.indice]);
+    }
+
+    const pausa = document.getElementById("btn-tour-pausa");
+    if (pausa) {
+        pausa.textContent = tourObs.pausado ? "▶" : "⏸";
+        pausa.title = tourObs.pausado ? "Retomar" : "Pausar";
+    }
+}
+
+function iniciarTour() {
+    // Um tour de cada vez. Carregar em ▶ outra vez é o que se espera que
+    // recomece — e sem esta linha ficavam dois temporizadores a avançar
+    // paragens, cada um por seu lado.
+    pararTour();
+
+    const constelacoes = (observatorioDados && observatorioDados.constelacoes) || {};
+    const paragens = [];
+
+    for (const const_id in constelacoes) {
+        // Só entram as que têm, agora, pelo menos uma estrela acima do
+        // horizonte: uma paragem a apontar para o chão não é uma paragem.
+        //
+        // O que NÃO se testa aqui é o "Linhas de Constelações" dos Controlos.
+        // É de propósito: o tour é para ler as curiosidades, e uma visita que
+        // se recusasse a arrancar porque o utilizador escondeu as linhas seria
+        // uma recusa incompreensível — o painel escreve o nome da constelação e
+        // a câmara aponta ao sítio certo à mesma. (No "ir para", aí sim, o
+        // filtro conta: lá o que se pede é ir ter com uma coisa que se está a
+        // ver, e vale mais dizer que ela está escondida do que fingir que não.)
+        const alvo = alvoDaConstelacao(const_id);
+        if (alvo) paragens.push({ const_id: const_id, altitude: alvo.altitude });
+    }
+
+    if (paragens.length === 0) {
+        mostrarAvisoSemTour();
+        return;
+    }
+
+    // Da mais alta para a mais baixa: começa-se pelo que está melhor colocado
+    // no céu e o que anda a raspar o horizonte fica para o fim.
+    paragens.sort((a, b) => b.altitude - a.altitude);
+
+    tourObs = {
+        // Só as abreviaturas. As posições são recalculadas no início de cada
+        // paragem: a atualização automática de 30 em 30 segundos troca o céu
+        // inteiro, e uma lista de posições guardadas depressa estaria a apontar
+        // para onde as coisas estavam quando o tour começou.
+        paragens: paragens.map(p => p.const_id),
+        indice: 0,
+        pausado: false,
+        idTimer: null
+    };
+
+    mostrarBarraTour();
+    irParaParagem(0);
+}
+
+// Termina o tour, se houver um a andar. É feito para poder ser chamado às
+// cegas: o ✕, o fim da lista de paragens, o ▶ outra vez, a mudança de hora
+// simulada e a saída do ecrã chamam todos isto sem saber se há tour nenhum.
+function pararTour() {
+    // Tem de se saber se havia tour ANTES de o apagar: é esta linha que separa
+    // "o tour acabou" de "alguém chamou isto sem tour nenhum a andar". Sem ela,
+    // a mudança da hora simulada — que também passa por aqui — atirava a câmara
+    // para o Norte de cada vez que se mexia no relógio.
+    const haviaTour = tourObs !== null;
+
+    if (haviaTour && tourObs.idTimer !== null) clearTimeout(tourObs.idTimer);
+    tourObs = null;
+    esconderBarraTour();
+
+    if (haviaTour) {
+        // O tour acabou: a vista volta ao ponto de partida do Observatório — o
+        // Norte a 15° de altitude, os mesmos CAMERA_AZ_INICIAL/CAMERA_ALT_INICIAL
+        // com que o céu abre. Acaba-se onde se começou, em vez de se deixar a
+        // câmara parada na última constelação da lista, que foi onde o sorteio
+        // das paragens a deixou e não uma escolha de quem estava a ver.
+        //
+        // Isto também corre ao sair do ecrã (mudarEcra passa por aqui) e é de
+        // propósito: a viagem não se vê, mas quem voltar ao Observatório
+        // encontra-o no princípio, em vez de apontado a um sítio que já esqueceu.
+        //
+        // O ▶ que interrompe um tour a andar também passa por aqui; a viagem que
+        // ele arranca logo a seguir cancela esta antes do primeiro fotograma, por
+        // isso o desvio é invisível.
+        animarCameraPara(CAMERA_AZ_INICIAL, CAMERA_ALT_INICIAL);
+    } else {
+        // Sem tour, mas pode estar uma viagem do "ir para" a meio. Aqui não há
+        // viagem nenhuma para começar, por isso cancela-se e pronto: é isto que
+        // impede a câmara de continuar a andar num ecrã que já ninguém vê.
+        cancelarAnimacaoCamera();
+    }
+}
+
+function irParaParagem(i) {
+    if (!tourObs) return;
+
+    // Passar da última paragem termina o tour, em vez de voltar ao princípio.
+    // Um tour que recomeça sozinho nunca acaba — quem o quiser repetir carrega
+    // em ▶ outra vez.
+    if (i >= tourObs.paragens.length) {
+        pararTour();
+        return;
+    }
+
+    // O temporizador da paragem anterior é sempre cancelado antes de armar o
+    // novo. É isto que garante que existe um só, venha-se aqui pelo tempo, pelo
+    // › ou pelo ‹.
+    if (tourObs.idTimer !== null) clearTimeout(tourObs.idTimer);
+    tourObs.idTimer = null;
+    tourObs.indice = i;
+
+    const const_id = tourObs.paragens[i];
+    const constelacoes = observatorioDados && observatorioDados.constelacoes;
+    const constelacao = constelacoes ? constelacoes[const_id] : null;
+
+    if (constelacao) {
+        const item = itemConstelacao(const_id, constelacao);
+        const alvo = alvoDaConstelacao(const_id);
+
+        // Sem alvo (as estrelas desceram entretanto — a atualização automática
+        // pode ter trocado o céu a meio do tour): a curiosidade fica à vista, o
+        // aviso diz por que é que a câmara não se mexeu, e a lista de paragens
+        // não é refeita debaixo dos pés de quem está a ver o tour.
+        //
+        // Aqui não se pergunta pelos filtros do ecrã (ao contrário do
+        // alvoDeApontar): o tour não depende deles — mostra as constelações
+        // mesmo com as linhas escondidas —, e por isso não pode recusar-se a
+        // apontar por causa de uma caixa que ele próprio ignora.
+        objetoSelecionado = item;
+        mostrarDetalhesDe(item, alvo ? null : AVISO_CONSTELACAO_ABAIXO);
+
+        if (alvo) animarCameraPara(alvo.azimute, alvo.altitude);
+
+        agendarDesenhoObservatorio();
+    }
+
+    atualizarBarraTour();
+
+    if (!tourObs.pausado) {
+        tourObs.idTimer = setTimeout(paragemSeguinte, DURACAO_PARAGEM_TOUR);
+    }
+}
+
+function paragemSeguinte() {
+    if (!tourObs) return;
+    irParaParagem(tourObs.indice + 1);
+}
+
+function paragemAnterior() {
+    if (!tourObs) return;
+    irParaParagem(Math.max(0, tourObs.indice - 1));
+}
+
+function alternarPausaTour() {
+    if (!tourObs) return;
+
+    tourObs.pausado = !tourObs.pausado;
+
+    if (tourObs.pausado) {
+        // O tempo já decorrido nesta paragem não conta: ao retomar, a contagem
+        // começa do zero. Guardá-lo obrigaria a registar o instante de arranque
+        // e a descontar a pausa, para nada — quem carrega em ⏸ quer tempo para
+        // ler o que está no painel.
+        if (tourObs.idTimer !== null) clearTimeout(tourObs.idTimer);
+        tourObs.idTimer = null;
+    } else {
+        tourObs.idTimer = setTimeout(paragemSeguinte, DURACAO_PARAGEM_TOUR);
+    }
+
+    atualizarBarraTour();
+}
+
+function mostrarAvisoSemTour() {
+    const painel = document.getElementById("observatorio-detalhes");
+    if (!painel) return;
+
+    objetoSelecionado = null;
+    painel.innerHTML = `
+        <div class="detalhe-titulo">🧭 Tour guiado</div>
+        <p class="obs-aviso-ir">Não há nenhuma constelação acima do horizonte neste instante, por isso não há por onde passear. Experimenta outra hora em Controlos → Simular Data/Hora.</p>
+    `;
+
+    agendarDesenhoObservatorio();
+}
+
 // ── Auto-refresh ──────────────────────────────────────────────────
 // Atualiza dados se o ecrã ativo for o Céu Agora ou o Observatório.
 // No observatório, só atualiza se estiver em tempo real (sem simulação).
@@ -1720,6 +2554,11 @@ if (pagina === "/calendario") {
 // Inicializa o seletor quando o utilizador navega para o observatório
 const _mudarEcraOriginal = mudarEcra;
 window.mudarEcra = function (nome) {
+    // O tour vive do céu do Observatório e da barra que lhe pertence: sair do
+    // ecrã tem de o terminar. Sem isto continuava a correr às escondidas, a
+    // escrever no painel e a mexer na câmara de um ecrã que já não está à vista.
+    if (nome !== "observatorio") pararTour();
+
     _mudarEcraOriginal(nome);
     if (nome === "observatorio") inicializarSeletorHora();
 };
