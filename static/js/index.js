@@ -576,7 +576,9 @@ function moverArrasto(e) {
     // Arrastar para baixo (dy > 0) -> câmara inclina para cima (altitude aumenta)
     cameraAltitude = Math.max(-85, Math.min(85, startAltitude + dy * sensibilidade));
 
-    desenharObservatorio();
+    // Agendado (e não desenhado já): vários mousemove podem chegar antes de o
+    // browser pintar o frame seguinte — só o último interessa.
+    agendarDesenhoObservatorio();
 }
 
 function terminarArrasto(e) {
@@ -628,7 +630,7 @@ function moverArrastoToque(e) {
         cameraAzimuth = (startAzimuth - dx * sensibilidade + 360) % 360;
         cameraAltitude = Math.max(-85, Math.min(85, startAltitude + dy * sensibilidade));
 
-        desenharObservatorio();
+        agendarDesenhoObservatorio();
         e.preventDefault();
     } else if (e.touches.length === 2) {
         const dist = Math.hypot(
@@ -639,7 +641,7 @@ function moverArrastoToque(e) {
             const ratio = touchStartDist / dist;
             cameraFOV = Math.max(30, Math.min(110, cameraFOV * ratio));
             touchStartDist = dist;
-            desenharObservatorio();
+            agendarDesenhoObservatorio();
         }
         e.preventDefault();
     }
@@ -661,7 +663,57 @@ function tratarScrollZoom(e) {
     const factor = e.deltaY > 0 ? 1.05 : 0.95;
     cameraFOV = Math.max(35, Math.min(110, cameraFOV * factor));
 
-    desenharObservatorio();
+    agendarDesenhoObservatorio();
+}
+
+// ── Renderização do Observatório ──────────────────────────────────
+// ── Agenda de desenho ─────────────────────────────────────────────
+// O arrasto gera muitos mais eventos do que o ecrã consegue mostrar: um rato
+// de 1000 Hz dispara dezenas de mousemove por cada frame pintado, e desenhar
+// a cada um deles é trabalho deitado fora — só o último estado chega a ser
+// visto. Agrupar os pedidos num único requestAnimationFrame desenha uma vez
+// por frame, com o estado final. O resultado visual é igual.
+let desenhoAgendado = false;
+function agendarDesenhoObservatorio() {
+    if (desenhoAgendado) return;
+    desenhoAgendado = true;
+    requestAnimationFrame(() => {
+        desenhoAgendado = false;
+        desenharObservatorio();
+    });
+}
+
+// ── Cache do fundo do céu (fotografia da Via Láctea) ───────────────
+// Escalar a fotografia para o tamanho do canvas E passar-lhe o filtro de cor
+// são, de longe, as operações mais caras de cada frame — e eram feitas duas
+// vezes (a 2ª cópia tapa a costura). O resultado só depende da altura do
+// canvas, por isso prepara-se uma vez numa imagem à parte; depois cada frame
+// limita-se a copiá-la, que é praticamente só memória.
+let fundoCeuCache = null; // { chave, imagem }
+
+function obterFundoCeuPreparado(alturaAlvo) {
+    // A chave inclui as dimensões da fotografia (muda quando ela carrega) e a
+    // altura do canvas (muda quando a janela é redimensionada).
+    const chave = `${imgCeuFundo.naturalWidth}x${imgCeuFundo.naturalHeight}@${alturaAlvo}`;
+    if (fundoCeuCache && fundoCeuCache.chave === chave) return fundoCeuCache.imagem;
+
+    // Escala a imagem para cobrir a altura do canvas, com alguma folga extra
+    // (1.4x) para haver imagem suficiente quando o utilizador olha para cima/baixo.
+    const escala = (alturaAlvo / imgCeuFundo.naturalHeight) * 1.4;
+    const largura = Math.round(imgCeuFundo.naturalWidth * escala);
+    const altura = Math.round(imgCeuFundo.naturalHeight * escala);
+
+    const tela = document.createElement("canvas");
+    tela.width = largura;
+    tela.height = altura;
+    const tctx = tela.getContext("2d");
+
+    // Filtro ajustado para equilibrar a via láctea e as constelações
+    tctx.filter = "brightness(1.1) contrast(1.5) saturate(1.2)";
+    tctx.drawImage(imgCeuFundo, 0, 0, largura, altura);
+
+    fundoCeuCache = { chave, imagem: tela };
+    return tela;
 }
 
 // ── Renderização do Observatório ──────────────────────────────────
@@ -726,6 +778,19 @@ function desenharObservatorio() {
         }
     }
 
+    // A mesma estrela é projetada várias vezes por frame: uma vez por cada linha
+    // de constelação em que entra, outra para o centróide da constelação e outra
+    // ainda como ponto. A posição só depende da estrela, por isso guarda-se o
+    // resultado do primeiro cálculo e reutiliza-se.
+    const posicoesEstrelas = new Map();
+    function projectarEstrela(est_id) {
+        if (posicoesEstrelas.has(est_id)) return posicoesEstrelas.get(est_id);
+        const est = observatorioDados.estrelas[est_id];
+        const pos = est ? projectar(est.altitude, est.azimute) : null;
+        posicoesEstrelas.set(est_id, pos);
+        return pos;
+    }
+
     // 1. Desenhar fundos e grelhas específicas do modo
     if (modoVisao === "360") {
 
@@ -736,25 +801,26 @@ function desenharObservatorio() {
         gradSky.addColorStop(1, "#08122a");
 
         if (imgCeuFundo.complete && imgCeuFundo.naturalWidth > 0) {
-            // Escala a imagem para cobrir a altura do canvas, com alguma folga extra
-            // (1.4x) para haver imagem suficiente quando o utilizador olha para cima/baixo.
-            const escala = (height / imgCeuFundo.naturalHeight) * 1.4;
-            const imgW = imgCeuFundo.naturalWidth * escala;
-            const imgH = imgCeuFundo.naturalHeight * escala;
+            // Imagem já escalada e com o filtro aplicado (ver obterFundoCeuPreparado)
+            // — aqui é só uma cópia, sem reamostragem nem filtros de cor.
+            const fundo = obterFundoCeuPreparado(height);
+            const imgW = fundo.width;
+            const imgH = fundo.height;
 
             // Desloca a imagem horizontalmente conforme o azimute da câmara — dá a
             // sensação de estar a rodar sobre uma cúpula panorâmica, como um céu real.
+            // Os deslocamentos vão arredondados a pixels inteiros: uma cópia alinhada
+            // à grelha de pixels é uma operação de memória, ao passo que um
+            // deslocamento fraccionário obriga o browser a reamostrar os milhões de
+            // pixels da imagem, duas vezes por frame. O erro máximo é meio pixel,
+            // invisível a arrastar.
             let offsetX = -((cameraAzimuth / 360) * imgW) % imgW;
             if (offsetX > 0) offsetX -= imgW;
-            const offsetY = (height - imgH) / 2 - (cameraAltitude / 90) * (imgH * 0.15);
+            offsetX = Math.round(offsetX);
+            const offsetY = Math.round((height - imgH) / 2 - (cameraAltitude / 90) * (imgH * 0.15));
 
-            // Filtro ajustado para equilibrar a via láctea e as constelações
-            ctx.filter = "brightness(1.1) contrast(1.5) saturate(1.2)";
-
-            ctx.drawImage(imgCeuFundo, offsetX, offsetY, imgW, imgH);
-            ctx.drawImage(imgCeuFundo, offsetX + imgW, offsetY, imgW, imgH); // 2ª cópia: evita "buraco" ao dar a volta
-
-            ctx.filter = "none"; // Limpar o filtro
+            ctx.drawImage(fundo, offsetX, offsetY);
+            ctx.drawImage(fundo, offsetX + imgW, offsetY); // 2ª cópia: evita "buraco" ao dar a volta
 
             // Dissolve a "costura" onde as duas cópias se encontram — a foto não é
             // um panorama 360° verdadeiro, por isso há um corte visível ali sem isto.
@@ -925,22 +991,27 @@ function desenharObservatorio() {
 
         for (const const_id in constelacoes) {
             const constelacao = constelacoes[const_id];
+
+            // Todas as linhas da constelação num único caminho, traçado de uma só
+            // vez. Cada stroke() com brilho neon obriga o browser a criar uma
+            // camada, desfocá-la e compô-la; com 73 linhas eram 73 dessas camadas
+            // por frame, agora são 15 (uma por constelação). O traço fica igual.
+            ctx.beginPath();
             constelacao.linhas.forEach(linha => {
                 const estA = estrelas[linha[0]];
                 const estB = estrelas[linha[1]];
 
                 if (estA && estB && (estA.visivel || estB.visivel)) {
-                    const posA = projectar(estA.altitude, estA.azimute);
-                    const posB = projectar(estB.altitude, estB.azimute);
+                    const posA = projectarEstrela(linha[0]);
+                    const posB = projectarEstrela(linha[1]);
 
                     if (posA && posB) {
-                        ctx.beginPath();
                         ctx.moveTo(posA.x, posA.y);
                         ctx.lineTo(posB.x, posB.y);
-                        ctx.stroke();
                     }
                 }
             });
+            ctx.stroke();
 
             // Calcular centróide da constelação (usado para nomes e cliques)
             let sumX = 0, sumY = 0, count = 0;
@@ -950,7 +1021,7 @@ function desenharObservatorio() {
                 estrelasUnicas.add(linha[1]);
                 const estA = estrelas[linha[0]];
                 if (estA && estA.visivel) {
-                    const pos = projectar(estA.altitude, estA.azimute);
+                    const pos = projectarEstrela(linha[0]);
                     if (pos) {
                         sumX += pos.x;
                         sumY += pos.y;
@@ -969,11 +1040,7 @@ function desenharObservatorio() {
                 ctx.fillText(constelacao.nome, sumX / count, sumY / count);
 
                 // Repor o shadowBlur para as linhas na próxima iteração do ciclo
-                if (showConstelacoes) {
-                    ctx.shadowBlur = 12;
-                } else {
-                    ctx.shadowBlur = 0;
-                }
+                ctx.shadowBlur = 12;
             }
 
             // Registar constelação como elemento clicável
@@ -996,12 +1063,23 @@ function desenharObservatorio() {
 
     // 3. Desenhar as Estrelas
     const estrelas = observatorioDados.estrelas;
+
+    // A fonte e o alinhamento são iguais para todos os nomes, por isso definem-se
+    // uma vez em vez de uma vez por estrela — ctx.font obriga o browser a analisar
+    // a string outra vez de cada vez que lhe é atribuída.
+    if (showNomesEstrelas) {
+        ctx.font = "9px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+    }
+
     for (const est_id in estrelas) {
         const est = estrelas[est_id];
         if (!est.visivel) continue;
         if (est.mag > magLimite) continue;
 
-        const pos = projectar(est.altitude, est.azimute);
+        // Já pode estar calculada, se a estrela pertencer a uma constelação
+        const pos = projectarEstrela(est_id);
         if (!pos) continue; // ignora se estiver fora da perspetiva 3D
 
         // Tamanho da estrela com base na magnitude
@@ -1034,12 +1112,11 @@ function desenharObservatorio() {
             ctx.stroke();
         }
 
-        // Nomes das estrelas
+        // Nomes das estrelas — a cor é reposta em cada estrela porque o ponto
+        // desenhado acima já alterou o fillStyle; a fonte e o alinhamento já vêm
+        // definidos de fora do ciclo.
         if (showNomesEstrelas) {
             ctx.fillStyle = "rgba(200, 220, 255, 0.65)";
-            ctx.font = "9px sans-serif";
-            ctx.textAlign = "left";
-            ctx.textBaseline = "middle";
             ctx.fillText(" " + est.nome, pos.x + starSize + 2, pos.y);
         }
 
