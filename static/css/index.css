@@ -1599,7 +1599,6 @@ body.red-velvet-mode #btn-iss:hover {
 
 body.red-velvet-mode .observatorio-controlos,
 body.red-velvet-mode #observatorio-detalhes,
-body.red-velvet-mode #observatorio-ajuda,
 body.red-velvet-mode .observatorio-pesquisa,
 body.red-velvet-mode #tour-barra {
     border-color: rgba(255, 40, 65, 0.35) !important;
@@ -1616,13 +1615,8 @@ body.red-velvet-mode .obs-tempo-titulo {
 }
 
 body.red-velvet-mode .config-linha label,
-body.red-velvet-mode .config-linha-check label,
-body.red-velvet-mode #observatorio-ajuda {
+body.red-velvet-mode .config-linha-check label {
     color: #ff8595 !important;
-}
-
-body.red-velvet-mode #observatorio-ajuda strong {
-    color: #ff4d66 !important;
 }
 
 body.red-velvet-mode .glass-select,

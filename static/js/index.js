@@ -2213,11 +2213,22 @@ function irPara(entrada) {
     agendarDesenhoObservatorio();
     fecharResultados();
 
-    // O texto fica no campo (apagá-lo obrigaria a reescrevê-lo para procurar
-    // outra coisa parecida), mas o foco sai: no telemóvel é isto que fecha o
-    // teclado e deixa ver o céu.
+    // O campo fica limpo, e não com o nome que se acabou de escolher: a
+    // pesquisa já deu o que tinha a dar — o objeto está no painel e o céu
+    // apontado a ele —, e deixar lá "Órion" só fazia parecer que ainda estava
+    // à espera de alguma coisa. A pesquisa seguinte começa do zero, sem ter de
+    // apagar a anterior à mão.
+    //
+    // Escrever no campo não dispara o "input", mas não é preciso: fecharResultados
+    // (aqui em cima) já esvaziou a lista e o estado dela, e um campo vazio dá a
+    // mesma lista vazia se for focado outra vez.
     const campo = document.getElementById("obs-pesquisa");
-    if (campo) campo.blur();
+    if (campo) {
+        campo.value = "";
+        // O foco sai a seguir: no telemóvel é isto que fecha o teclado e deixa
+        // ver o céu.
+        campo.blur();
+    }
 }
 
 // ── A lista de resultados ─────────────────────────────────────────
