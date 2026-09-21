@@ -25,6 +25,17 @@ from flask import request                                    # para ler query pa
 app = Flask(__name__)                               # cria a aplicação Flask
                                                     # __name__ diz ao Flask onde está a pasta do projeto
 
+# Relê os templates .html do disco a cada pedido, tal como o Flask já faz com
+# os .css e os .js. Sem isto — e como o servidor corre com debug=False — o Jinja
+# guarda cada template em cache logo no primeiro render, e uma alteração ao
+# menu.html só aparecia depois de reiniciar o servidor. Isso dava a impressão
+# errada de que "o CSS novo chegou mas o elemento novo não existe".
+# Nota: isto NÃO liga o modo de depuração. Não ativa o recarregador automático
+# nem o depurador interativo — é só a releitura dos templates.
+# Tem de ficar aqui, antes do primeiro render: o jinja_env do Flask só é criado
+# no primeiro acesso, e é nessa altura que lê esta configuração.
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+
 @app.route("/favicon.ico")
 def favicon():
     # O browser pede /favicon.ico automaticamente — servimos a estrela SVG
@@ -33,6 +44,16 @@ def favicon():
         "favicon.svg",
         mimetype="image/svg+xml",
     )
+
+@app.route("/.well-known/appspecific/com.chrome.devtools.json")
+def devtools_workspace():
+    # Tal como o favicon acima, este é um pedido que o browser faz por
+    # iniciativa própria: o Chrome pede este ficheiro quando as DevTools estão
+    # abertas (F12), a tentar ligar a pasta do projeto à janela do inspetor.
+    # Não temos nada para lhe dar — mas responder 404 enchia o terminal de
+    # erros que não eram erros nenhuns, por isso devolvemos um JSON vazio.
+    # Isto não afeta a aplicação: serve só para o log ficar limpo.
+    return jsonify({})
 
 # ── Rotas de páginas ──────────────────────────────────────────────────────────
 # Rotas são URLs — quando o browser acede a um URL, Flask chama a função correspondente

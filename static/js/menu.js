@@ -25,9 +25,22 @@ function detetarLocalizacao() {
         navigator.geolocation.getCurrentPosition(
             pos => {
                 // sucesso — mostra as coordenadas no label
-                const lat = pos.coords.latitude.toFixed(2);
-                const lon = pos.coords.longitude.toFixed(2);
-                document.getElementById("lbl-localizacao").textContent = `📍 ${lat}°N, ${Math.abs(lon)}°W`;
+                // O hemisfério (N/S) e o lado do meridiano (E/O) são calculados
+                // a partir do sinal da coordenada. Estavam escritos à mão no
+                // texto ("N" e "W"), o que dava resultados errados em quase todo
+                // o mundo: em São Paulo mostrava "-23.55°N" e em Berlim
+                // "13.40°W". O Math.abs(lon) tirava o sinal e depois rotulava
+                // sempre como W, mesmo quando era leste.
+                // Num app de astronomia isto não é cosmético: o hemisfério
+                // decide o que é visível no céu (as Nuvens de Magalhães só se
+                // veem do sul, a Polaris só do norte).
+                // Usa-se N/S/E/O, que é a convenção portuguesa — o W do código
+                // anterior é a convenção inglesa.
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                const latTxt = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"}`;
+                const lonTxt = `${Math.abs(lon).toFixed(2)}°${lon >= 0 ? "E" : "O"}`;
+                document.getElementById("lbl-localizacao").textContent = `📍 ${latTxt}, ${lonTxt}`;
             },
             () => {
                 // utilizador recusou a permissão — mostra localização padrão

@@ -1,4 +1,4 @@
-/* ── Menu — foto do buraco negro + Three.js por cima ─────────────── */
+/* ── Menu — foto do buraco negro + os cards por cima ─────────────── */
 body.page-menu {
     overflow: hidden;
     display: flex;
@@ -50,7 +50,7 @@ body.page-menu {
 .conteudo {
     position: relative;
     z-index: 2;
-    /* por cima da foto, Three.js e vinheta */
+    /* por cima da foto e da vinheta */
     display: flex;
     flex-direction: column;
     align-items: center;
