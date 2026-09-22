@@ -71,6 +71,28 @@
     document.removeEventListener("click", tentarAutoplay);
   }
 
+  // ── Campo de estrelas do fundo ───────────────────────────────────
+  // Vive aqui, e não no menu.js onde nasceu, porque passou a ser usado por
+  // três páginas: o menu, a aplicação e a página de entrada. Cada uma tem o
+  // seu <div id="stars"> e chama esta função — antes só o menu as criava e a
+  // página de entrada teria de manter uma segunda cópia destas linhas.
+  window.criarEstrelas = function criarEstrelas() {
+    const container = document.getElementById("stars");
+    if (!container) return;   // páginas sem campo de estrelas não fazem nada
+    for (let i = 0; i < 180; i++) {
+      const star = document.createElement("div");    // cria um div por estrela
+      star.className = "star";                       // aplica o estilo .star do CSS
+      const size = Math.random() * 2.5 + 0.5;       // tamanho aleatório entre 0.5px e 3px
+      star.style.cssText = `
+          width:${size}px; height:${size}px;
+          left:${Math.random() * 100}%; top:${Math.random() * 100}%;
+          --dur:${Math.random() * 4 + 2}s;
+          animation-delay:${Math.random() * 4}s;
+      `;
+      container.appendChild(star);    // adiciona a estrela ao contentor
+    }
+  };
+
   // ── Painel de configurações ──────────────────────────────────────
   window.toggleConfig = function toggleConfig() {
     const painel = document.getElementById("painel-config");

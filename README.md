@@ -25,6 +25,12 @@ e a Imagem Astronómica do Dia da NASA (APOD).
   git commit -m "descrição do que foi feito"
   git push
 
+Não é preciso criar a base de dados à mão. Na primeira execução
+o servidor cria o ficheiro astroguide.db e as tabelas todas, ao
+lado do código. A partir daí as contas ficam lá guardadas entre
+execuções. As dependências continuam a ser as mesmas de antes:
+o SQLite vem dentro do Python e o resto já vinha com o Flask.
+
 ---
 
 ## ESTRUTURA DE FICHEIROS
@@ -58,6 +64,44 @@ astroguide/
 │                            Localização, nome, versão,
 │                            fuso horário e elevação.
 │
+├── db.py                  → Base de dados SQLite
+│                            Contas de utilizador, localização
+│                            pessoal, favoritos e registo de
+│                            observações. Cria as tabelas na
+│                            1ª execução.
+│
+├── auth.py                → Contas de utilizador
+│                            Registo, entrada e saída, e as
+│                            rotas do que é pessoal de cada
+│                            conta (localização, favoritos,
+│                            observações).
+│
+├── admin.py               → Página de administração
+│                            Só de leitura, e só para a conta
+│                            com o papel de admin: mostra as
+│                            contas registadas e o que cada
+│                            uma tem guardado. É renderizada no
+│                            servidor, para não haver um endpoint
+│                            em JSON a devolver os dados de todos.
+│
+├── promover_admin.py      → Dá (ou tira) o papel de admin
+│                            Corre no terminal, na pasta do
+│                            projeto: py promover_admin.py email
+│                            Não está ligado a rota nenhuma — é
+│                            de propósito o único caminho para
+│                            uma conta passar a admin.
+│
+├── astroguide.db          → Base de dados (criada ao correr)
+│                            Um ficheiro só, ao lado do
+│                            código. Cada máquina cria o seu.
+│                            Não está no GitHub — tem os
+│                            dados de quem já usou a aplicação.
+│
+├── _teste_contas.py       → Testes das contas e da localização
+│                            137 verificações automáticas.
+│                            Correr com: py _teste_contas.py
+│                            Não arranca servidor nem abre browser.
+│
 ├── requirements.txt       → Lista de dependências Python
 │                            Instalar com:
 │                            py -m pip install -r requirements.txt
@@ -74,10 +118,19 @@ astroguide/
 │   │                        configurações de áudio e os
 │   │                        4 cartões de acesso rápido.
 │   │
-│   └── index.html         → Interface principal da app
-│                            Céu Agora, Observatório,
-│                            Calendário Lunar, NASA - Imagem
-│                            do Dia, e Observatório VR.
+│   ├── index.html         → Interface principal da app
+│   │                        Céu Agora, Observatório,
+│   │                        Calendário Lunar, NASA - Imagem
+│   │                        do Dia, e Observatório VR.
+│   │
+│   ├── entrar.html        → Página de entrada e registo
+│   │                        Os dois formulários na mesma
+│   │                        página, alternados por abas.
+│   │
+│   └── admin.html         → Página de administração
+│                            A tabela das contas. O HTML chega
+│                            pronto do servidor; o JavaScript
+│                            só trata do campo de estrelas.
 │
 └── static/
     ├── css/
@@ -91,13 +144,35 @@ astroguide/
     │   ├── menu.css       → Estilos exclusivos do menu
     │   │                    (foto de fundo, cards, título).
     │   │
-    │   └── index.css      → Estilos da app principal
-    │                        (céu agora, calendário, dados,
-    │                        observatório, APOD e VR).
+    │   ├── index.css      → Estilos da app principal
+    │   │                    (céu agora, calendário, dados,
+    │   │                    observatório, APOD e VR).
+    │   │
+    │   ├── auth.css       → Página de entrada e registo
+    │   │                    (campos, abas, botões).
+    │   │
+    │   ├── conta.css      → Botão e painel de conta, no menu
+    │   │                    e na app.
+    │   │
+    │   └── admin.css      → Página de administração (tabela
+    │                        das contas, totais, cartão de
+    │                        acesso negado).
     │
     ├── js/
     │   ├── shared-ui-controls.js → Funções partilhadas
-    │   │                    (música, volume, configurações).
+    │   │                    (música, volume, configurações e o
+    │   │                    campo de estrelas do fundo).
+    │   │
+    │   ├── conta.js       → Botão e painel de conta: quem tem
+    │   │                    sessão iniciada, guardar a localização
+    │   │                    do dispositivo, terminar sessão.
+    │   │
+    │   ├── auth.js        → Formulários da página de entrada:
+    │   │                    alternar as abas, validar e enviar.
+    │   │
+    │   ├── admin.js       → Página de administração: só o campo
+    │   │                    de estrelas do fundo. Os dados já
+    │   │                    vêm no HTML, do servidor.
     │   │
     │   ├── menu.js        → Lógica do menu: deteção de
     │   │                    localização e ícones Canvas
@@ -157,6 +232,21 @@ A aplicação usa um sistema de rotas simples:
   /calendario  → Ecrã Calendário Lunar
   /observatorio → Ecrã Observatório Astronómico
   /apod        → Ecrã NASA - Imagem do Dia
+  /entrar      → Página de entrada e registo
+  /admin       → Página de administração (exige o papel de
+                 admin — é a única rota com essa exigência)
+
+Todas estas rotas, menos o /admin, estão abertas a quem não tem
+conta: quem não tiver sessão iniciada vê tudo, calculado para a
+localização de config.py.
+  /entrar?seguinte=/observatorio → Volta ao sítio onde estava
+                                   depois de entrar (só aceita
+                                   caminhos internos, por segurança)
+  /entrar?aba=registar           → Abre já na aba de criar conta
+
+O /admin não tem API própria e não aparece no menu: é uma página
+só, para o dono da aplicação, e chega-se lá escrevendo o endereço
+ou pela ligação que aparece no painel de conta de quem é admin.
 
 (O Observatório VR não tem rota própria — abre-se a partir
 de um botão dentro do Observatório, dentro da mesma SPA.)
@@ -173,6 +263,125 @@ Rotas da API (devolvem JSON para o JavaScript):
   /api/observatorio?data=&hora=    → Idem para uma data/hora específica
   /api/apod                        → Imagem Astronómica do Dia da NASA
                                       (título, explicação, imagem/vídeo)
+
+Rotas da API de conta (Precisa de sessão, marcadas com ✱):
+  /api/me          → Quem tem sessão iniciada e a que localização
+                     está associado (devolve utilizador: null se
+                     ninguém tiver entrado — não é um erro)
+  /api/registar    → Criar conta (nome, email, password)
+  /api/entrar      → Iniciar sessão (aceita o nome OU o email)
+  /api/sair        → Terminar sessão
+  /api/localizacao ✱ → PUT guarda a localização pessoal,
+                       DELETE volta à de config.py
+  /api/favoritos   ✱ → GET lista, POST adiciona, DELETE remove
+  /api/observacoes ✱ → GET lista, POST adiciona,
+                       DELETE /api/observacoes/id remove
+
+---
+
+## CONTAS DE UTILIZADOR
+
+A conta não tranca nada. O Céu, o Calendário, o Observatório e a
+Imagem do Dia continuam abertos a quem não tem conta — são a
+montra do projeto e quem abrir a aplicação pela primeira vez
+tem de os ver sem barreiras.
+
+O que a conta acrescenta é o que só faz sentido para uma pessoa:
+
+  📍 Localização pessoal
+     O observador não é fixo em Vila Nova de Gaia. Cada conta
+     pode guardar a sua latitude, longitude, elevação e fuso
+     horário, e todos os cálculos passam a ser feitos para lá:
+     o céu, o calendário lunar e o observatório. A ISS entra
+     aqui também — é o objeto do céu cuja posição mais depende
+     do sítio de quem olha, por estar só a 400 km de altitude.
+     Há dois caminhos no painel de conta:
+       · "usar a localização deste dispositivo" — pede as
+         coordenadas ao browser e o fuso ao sistema;
+       · "escrever as coordenadas" — para quando o browser não
+         ajuda: um sítio de observação onde ainda não se está,
+         ou um GPS que recusa. Aí o fuso vem pré-preenchido com
+         o do dispositivo, e só é preciso mexer nele se o local
+         for noutro fuso horário.
+
+  ⭐ Favoritos
+     Estrelas, constelações e objetos de céu profundo, guardados
+     por conta. O objeto_id gravado é a chave do catálogo
+     ("vega", "Ori"), e não o nome visível — mudar um nome no
+     catálogo não deixa os favoritos de ninguém pendurados.
+
+  📔 Registo de observações
+     "Vi Saturno em 18/09, anéis bem visíveis." O nome do objeto
+     fica copiado no registo, para a observação continuar a fazer
+     sentido mesmo que o objeto mude de nome ou saia do catálogo.
+
+O botão de conta não aparece no Observatório nem no VR: nesses
+dois modos a página é toda céu e ele ficava a flutuar por cima,
+sem nada à volta. Voltar ao menu (botão "◀ Menu") traz o botão
+de novo.
+
+SEGURANÇA
+
+  · As passwords nunca são gravadas. É gravado um hash scrypt
+    (generate_password_hash, do werkzeug), com sal, do qual não
+    se consegue voltar atrás para a password.
+  · A sessão é um cookie assinado. Só lá vai o id da conta, e
+    o cookie é HttpOnly (o JavaScript não o consegue ler) e
+    SameSite=Lax (um site externo não consegue fazer pedidos
+    autenticados em nome de quem tem sessão aberta).
+  · A chave que assina o cookie é gerada na primeira execução
+    para um ficheiro .secret_key, que está no .gitignore. Se
+    estiver definida a variável de ambiente
+    ASTROGUIDE_SECRET_KEY, é essa que é usada.
+  · Entrar com uma conta que não existe e entrar com a password
+    errada dão exatamente a mesma mensagem ("Nome ou password
+    incorretos."). Distingui-las diria a quem tentasse à força
+    quais os nomes que existem.
+  · Apagar uma observação obriga a que ela seja da própria
+    conta, e não apenas a que exista — um id adivinhado de
+    outra pessoa não apaga nada.
+  · O papel de administrador só se atribui a partir do
+    terminal (py promover_admin.py). Nenhuma rota o pode dar e
+    não há na aplicação nenhum botão que o faça — um botão
+    desses seria a peça mais valiosa do projeto: chegar a ele
+    era passar a ver os dados de todas as contas.
+  · A /admin verifica o papel ANTES de renderizar, e a página
+    de acesso negado não leva um único dado lá dentro. Um
+    endpoint em JSON que devolvesse a lista de contas seria
+    mais uma porta que teria de estar bem fechada; assim não
+    existe nenhuma.
+
+---
+
+## ADMINISTRAÇÃO
+
+O /admin mostra o que a base de dados tem: a lista das contas
+com a localização de cada uma, quantos favoritos e quantas
+observações guardou, e a data de registo. No topo, os totais.
+
+É uma página só de leitura. Não apaga contas, não muda papéis,
+não apaga observações. Quem quiser mexer nos dados usa o
+DB Browser for SQLite, que é uma ferramenta feita para isso —
+esta página é para olhar, e cliques distraídos aqui não
+estragam nada.
+
+Para passar uma conta a admin, uma vez, na pasta do projeto:
+
+  py promover_admin.py                            → quem é admin
+  py promover_admin.py o-email-da-conta           → promove
+  py promover_admin.py o-email-da-conta --remover → tira o papel
+
+Depois, entra na aplicação com essa conta e abre o /admin. O
+papel fica gravado na base de dados, por isso vale para
+qualquer browser e para qualquer sessão nova — e se a sessão
+estiver aberta no momento em que se corre o script, também já
+vale, sem ser preciso voltar a entrar.
+
+O papel é uma coluna da tabela dos utilizadores, com
+'utilizador' por omissão. Quem se regista nunca nasce admin, e
+um astroguide.db que já existisse de antes desta alteração ganha
+a coluna no arranque seguinte, com todas as contas a ficar
+'utilizador' — ninguém ganha poderes por ter sido criado antes.
 
 ---
 
@@ -403,11 +612,22 @@ DRY (Don't Repeat Yourself)
       (immersive-vr) com tracking real da cabeça num Meta
       Quest 3, mantendo o arrasto do rato no PC
   [x] Observatório VR — Sol, Lua e planetas na cena 3D
+  [x] Papel de administrador, atribuído a partir do terminal
+      (py promover_admin.py) e nunca a partir do browser
+  [x] Página /admin — só para quem tem esse papel: as contas
+      registadas e o que cada uma guardou, numa tabela só de
+      leitura, com os totais no topo
 
 ---
 
 ## ROADMAP — PRÓXIMAS FUNCIONALIDADES
 
+  [x] Contas de utilizador e localização pessoal (feito)
+  [ ] Favoritos no Observatório — a API já está feita e a
+      funcionar; falta o botão de estrela ao clicar num objeto,
+      e a lista dos favoritos no painel lateral
+  [ ] Registo de observações na interface — a API já está feita;
+      falta o formulário para escrever e a lista do caderno
   [ ] Catálogo de estrelas alargado (Hipparcos — 117k estrelas)
   [ ] Hosting online com URL público
   [ ] Versão mobile (React Native ou Capacitor)

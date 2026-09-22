@@ -7,6 +7,7 @@
 
 from flask import Flask, jsonify, render_template, send_from_directory
 import os
+import secrets
 
 from sky_engine import (
     get_sol, get_lua, get_todos_planetas,
@@ -22,8 +23,66 @@ import datetime                                              # conversão e vali
 from zoneinfo import ZoneInfo                                # conversão de fuso horário
 from flask import request                                    # para ler query parameters
 
+from db import criar_esquema, fechar_ligacao                 # base de dados (contas, favoritos, observações)
+from auth import auth_bp, localizacao_do_utilizador          # rotas de conta e localização pessoal
+from admin import admin_bp                                   # página de administração (/admin)
+
 app = Flask(__name__)                               # cria a aplicação Flask
                                                     # __name__ diz ao Flask onde está a pasta do projeto
+
+
+def _chave_secreta():
+    # Chave com que o Flask assina o cookie de sessão (é o que impede alguém
+    # de forjar um cookie a dizer que já entrou como outro utilizador).
+    #
+    # Três casos, por ordem: se estiver definida no ambiente — que é o que se
+    # faz num servidor a sério — usa-se essa e nunca chega ao disco. Se não
+    # estiver mas já houver uma guardada de uma execução anterior, reutiliza-se
+    # (sem isto, cada arranque do servidor invalidava as sessões todas e
+    # obrigava a entrar outra vez). Se não houver nada, gera-se uma nova e
+    # guarda-se.
+    #
+    # Fica num ficheiro e não escrita aqui no código porque este projeto está
+    # num repositório público: uma chave fixa no código-fonte deixaria qualquer
+    # pessoa que a lesse assinar cookies válidos para esta aplicação. O
+    # ficheiro está no .gitignore.
+    do_ambiente = os.environ.get("ASTROGUIDE_SECRET_KEY")
+    if do_ambiente:
+        return do_ambiente
+
+    caminho = os.path.join(app.root_path, ".secret_key")
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f:
+            guardada = f.read().strip()
+        if guardada:
+            return guardada
+
+    nova = secrets.token_hex(32)
+    with open(caminho, "w", encoding="utf-8") as f:
+        f.write(nova)
+    return nova
+
+
+app.secret_key = _chave_secreta()
+
+# O cookie da sessão nunca deve ser legível por JavaScript (HttpOnly): se
+# alguma vez entrar na página um script de outra origem, não lhe serve de nada
+# ler o cookie para se passar pelo utilizador. E SameSite=Lax impede que um
+# site externo faça pedidos autenticados em nome de quem tem sessão aberta —
+# é a defesa que falta e que, sem isto, obrigaria a um sistema de tokens CSRF.
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+criar_esquema()                                     # cria as tabelas que ainda não existam
+
+app.register_blueprint(auth_bp)                     # junta as rotas de conta (/entrar, /api/entrar, ...)
+app.register_blueprint(admin_bp)                    # junta a página de administração (/admin)
+
+@app.teardown_appcontext
+def _fechar_bd(excecao=None):
+    # O Flask chama isto no fim de cada pedido, tenha ele corrido bem ou mal.
+    # É o que devolve a ligação à base de dados aberta durante o pedido.
+    fechar_ligacao(excecao)
 
 # Relê os templates .html do disco a cada pedido, tal como o Flask já faz com
 # os .css e os .js. Sem isto — e como o servidor corre com debug=False — o Jinja
@@ -91,11 +150,14 @@ def apod_pagina():
 @app.route("/api/ceu")                              # URL: http://localhost:5000/api/ceu
 def api_ceu():
     # Devolve os dados do céu em tempo real — sol, lua e planetas.
+    # Calculados para a localização da conta com sessão iniciada, ou para a de
+    # config.py se ninguém tiver entrado (ver localizacao_do_utilizador).
+    local = localizacao_do_utilizador()
     return jsonify({
-        "sol":      get_sol(),                      # chama sky_engine e obtém dados do Sol
-        "lua":      get_lua(),                      # idem para a Lua
-        "planetas": get_todos_planetas(),           # lista com os 7 planetas
-        "location": LOCATION["nome"],               # nome da localização para mostrar na interface
+        "sol":      get_sol(localizacao=local),         # chama sky_engine e obtém dados do Sol
+        "lua":      get_lua(localizacao=local),         # idem para a Lua
+        "planetas": get_todos_planetas(localizacao=local),  # lista com os 7 planetas
+        "location": local["nome"],                      # nome da localização para mostrar na interface
     })
 
 @app.route("/api/observatorio")                      # URL: http://localhost:5000/api/observatorio
@@ -107,10 +169,16 @@ def api_observatorio():
     data_str = request.args.get("data")   # ex: "2026-07-18"
     hora_str = request.args.get("hora")   # ex: "02:00"
 
+    # A localização da conta manda em tudo nesta rota: no céu que é calculado e
+    # no fuso horário em que a data/hora pedida é interpretada. Se ?hora=02:00
+    # viesse de alguém em Tóquio e fosse lida como hora de Lisboa, o céu
+    # mostrado seria o de um instante seis horas ao lado do que a pessoa pediu.
+    local = localizacao_do_utilizador()
+
     timestamp_utc = None
     if data_str and hora_str:
         try:
-            local_tz = ZoneInfo(LOCATION["timezone"])
+            local_tz = ZoneInfo(local["timezone"])
             # Converte a data e hora local para UTC com suporte a hora de verão
             dt_local = datetime.datetime.strptime(
                 f"{data_str} {hora_str}", "%Y-%m-%d %H:%M"
@@ -121,14 +189,14 @@ def api_observatorio():
             # o utilizador simplesmente recebe os dados em tempo real como fallback.
             app.logger.warning(f"Parâmetros data/hora inválidos ('{data_str}', '{hora_str}'): {e}")
 
-    ceu = get_observatorio(timestamp_utc)
+    ceu = get_observatorio(timestamp_utc, local)
 
     # A ISS entra na lista dos astros para ser desenhada no céu tal como o Sol,
     # a Lua e os planetas. Se não houver elementos orbitais (sem internet, por
     # exemplo) não se acrescenta nada e o céu sai exatamente como saía antes:
     # esta rota nunca pode falhar por causa do satélite.
     try:
-        iss = get_posicao_iss(momento_de(timestamp_utc))
+        iss = get_posicao_iss(momento_de(timestamp_utc), local)
     except Exception as e:
         # Nem a propagação da órbita pode impedir o céu de ser desenhado.
         app.logger.warning(f"Erro ao calcular a posição da ISS: {e}")
@@ -148,7 +216,7 @@ def api_calendario(ano, mes):
         # o Skyfield rebentava com um erro 500 em vez de uma resposta sensata.
         return jsonify({"erro": "Mês inválido — tem de estar entre 1 e 12"}), 400
 
-    fases   = get_fases_mes(ano, mes)               # luas novas, cheias, quartos do mês
+    fases   = get_fases_mes(ano, mes, localizacao_do_utilizador())   # luas novas, cheias, quartos do mês
     eventos = get_eventos_do_mes(ano, mes)         # chuvas de meteoros e eclipses filtrados por ano
     return jsonify({
         "fases":   fases,
@@ -165,7 +233,7 @@ def api_dia(ano, mes, dia):
     except ValueError:
         return jsonify({"erro": "Data inválida"}), 400
 
-    sol     = get_nascer_por_sol(ano, mes, dia)     # horas de nascer e pôr do sol
+    sol     = get_nascer_por_sol(ano, mes, dia, localizacao_do_utilizador())  # horas de nascer e pôr do sol
     fase    = get_fase_lua_dia(ano, mes, dia)        # fase da lua nesse dia
     eventos = get_eventos_do_dia(ano, mes, dia)     # eventos astronómicos nesse dia (filtrado por ano para eclipses)
     return jsonify({

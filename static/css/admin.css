@@ -1,0 +1,281 @@
+/* ── Administração — o que a base de dados tem ───────────────────────── */
+/* A página veste a moldura do menu (page-menu + page-admin, ver admin.html)
+   para ter o mesmo fundo. Só desfaz o que, sendo verdade no menu, é falso
+   aqui. O resto — cartões de vidro, botão de voltar, campo de estrelas —
+   vem de glass.css e shared-ui-controls.css, tal e qual. */
+
+/* ── O body: a única herança do menu que não serve ───────────────────── */
+/* O menu é uma página de um ecrã só e por isso esconde o transbordo. Esta
+   é o contrário: cresce com o número de contas. Com o "overflow: hidden" do
+   menu.css, a partir da décima conta as últimas linhas desapareciam — e sem
+   barra de scroll para lá chegar, porque o que está escondido não se
+   percorre. O "display: block" é pela mesma razão: o menu centra o conteúdo
+   em coluna, e num contentor flex o centrado vertical corta o topo quando o
+   conteúdo é mais alto que o ecrã, deixando-o inalcançável mesmo com scroll. */
+body.page-admin {
+    display: block;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+/* ── Moldura do conteúdo ─────────────────────────────────────────────── */
+/* O padding de cima não é estético: o botão de voltar é fixo no canto
+   superior esquerdo (shared-ui-controls.css) e sem esta folga o primeiro
+   cartão nascia por baixo dele. */
+.page-admin .conteudo {
+    align-items: stretch;
+    gap: 16px;
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 84px 20px 56px;
+}
+
+/* ── Cabeçalho ───────────────────────────────────────────────────────── */
+
+.admin-cabecalho {
+    padding: 26px 28px;
+    text-align: center;
+}
+
+.admin-titulo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.92);
+    letter-spacing: 0.12em;
+    line-height: 1.1;
+    text-shadow: 0 0 18px rgba(160, 210, 255, 0.45);
+}
+
+.admin-sub {
+    max-width: 62ch;
+    margin: 10px auto 0;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: rgba(200, 215, 240, 0.62);
+}
+
+/* ── Números no topo ─────────────────────────────────────────────────── */
+/* Uma grelha que se rearranja sozinha em vez de quatro colunas fixas: com
+   "auto-fit" os quatro cartões passam a dois ou a um conforme a largura,
+   sem uma única media query. O minmax é o tamanho abaixo do qual o número
+   e a etiqueta deixam de caber lado a lado. */
+.admin-totais {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+    gap: 12px;
+}
+
+.admin-total {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    padding: 18px 14px;
+}
+
+.admin-numero {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.3rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--accent, #6eb8ff);
+    /* Números tabulares: sem isto, um "1" é mais estreito que um "8" e os
+       quatro cartões ficam com alturas de dígito diferentes ao lado uns dos
+       outros — nota-se quando os valores mudam de 9 para 10. */
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-etiqueta {
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    color: rgba(160, 175, 200, 0.65);
+}
+
+/* ── Tabela de contas ────────────────────────────────────────────────── */
+
+.admin-tabela-envolvente {
+    /* A tabela tem uma largura mínima (ver abaixo) e em ecrãs estreitos anda
+       de lado dentro deste contentor, em vez de espremer as colunas até ao
+       ilegível. Nota: o overflow vertical fica "hidden", herdado do
+       .glass-panel — e é o que se quer, porque a altura deste contentor é a
+       da própria tabela, logo não há nada para cortar; também é ele que faz
+       o border-radius cortar a primeira e a última linha. */
+    overflow-x: auto;
+}
+
+.admin-tabela {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.admin-tabela th {
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: rgba(160, 175, 200, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.admin-tabela td {
+    padding: 13px 16px;
+    color: rgba(220, 227, 240, 0.9);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* A última linha não leva separador: o fundo do cartão já faz de limite, e
+   um traço encostado à borda lia-se como uma moldura a mais. */
+.admin-tabela tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.admin-tabela tbody tr {
+    transition: background 0.2s ease;
+}
+
+.admin-tabela tbody tr:hover {
+    background: rgba(110, 184, 255, 0.06);
+}
+
+.admin-col-num {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-email {
+    white-space: nowrap;
+    color: rgba(200, 215, 240, 0.72);
+}
+
+.admin-data {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: rgba(160, 175, 200, 0.7);
+}
+
+/* ── Sem contas nenhumas ─────────────────────────────────────────────── */
+
+.admin-vazio {
+    padding: 26px 24px;
+    text-align: center;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: rgba(200, 215, 240, 0.6);
+}
+
+.admin-vazio a {
+    color: var(--accent, #6eb8ff);
+    text-decoration: none;
+}
+
+.admin-vazio a:hover {
+    text-decoration: underline;
+}
+
+/* ── Nota de rodapé ──────────────────────────────────────────────────── */
+
+.admin-nota {
+    max-width: 78ch;
+    margin: 0 auto;
+    padding: 0 4px 8px;
+    text-align: center;
+    font-size: 0.72rem;
+    line-height: 1.65;
+    color: rgba(160, 175, 200, 0.55);
+}
+
+/* ── Conta sem papel (403) ───────────────────────────────────────────── */
+/* Mesma forma do cartão da página de entrada (.auth-cartao), de propósito:
+   quem chega aqui vem de lá, e um cartão com outra medida parecia outra
+   aplicação. */
+
+.admin-cartao {
+    width: min(460px, 100%);
+    margin: 0 auto;
+    padding: 34px 32px 30px;
+    text-align: center;
+}
+
+.admin-negado {
+    margin-top: 14px;
+    font-size: 0.84rem;
+    line-height: 1.65;
+    color: rgba(200, 215, 240, 0.7);
+}
+
+.admin-negado-ajuda {
+    margin-top: 12px;
+    font-size: 0.76rem;
+    line-height: 1.65;
+    color: rgba(160, 175, 200, 0.6);
+}
+
+/* O comando em bloco próprio: no meio da frase, um "py promover_admin.py
+   o-teu-email" com espaços parte-se em duas linhas e o comando deixa de ser
+   copiável de uma vez. */
+.admin-negado-ajuda code {
+    display: block;
+    margin-top: 10px;
+    padding: 8px 12px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.78rem;
+    color: var(--accent, #6eb8ff);
+    background: rgba(4, 6, 20, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+}
+
+.admin-ligacao {
+    display: inline-block;
+    margin-top: 22px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent, #6eb8ff);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.admin-ligacao:hover {
+    color: #fff;
+}
+
+.admin-ligacao:focus-visible {
+    outline: 2px solid var(--accent, #6eb8ff);
+    outline-offset: 3px;
+    border-radius: 6px;
+}
+
+/* ── Ecrãs pequenos ──────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+    .page-admin .conteudo {
+        padding: 76px 14px 44px;
+    }
+
+    .admin-cabecalho {
+        padding: 22px 18px;
+    }
+
+    .admin-titulo {
+        font-size: 1.6rem;
+    }
+
+    .admin-cartao {
+        padding: 26px 20px 24px;
+    }
+
+    /* Células mais justas: são 6 colunas a caber num telemóvel, e cada pixel
+       de padding conta antes de a tabela começar a andar de lado. */
+    .admin-tabela th,
+    .admin-tabela td {
+        padding: 11px 12px;
+    }
+}

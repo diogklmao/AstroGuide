@@ -54,6 +54,43 @@ body {
 }
 
 
+/* ── Botão de voltar ao menu (canto superior esquerdo) ────────────── */
+/* Partilhado por todas as páginas com moldura própria: a aplicação, o menu,
+   a entrada e a administração. Nasceu duplicado no index.css e no auth.css,
+   com os valores copiados à mão de um lado para o outro — que é exatamente
+   o género de cópia que fica desalinhada à primeira alteração feita só num
+   deles. Vive aqui, onde os controlos comuns já moram.
+   O que cada página acrescenta por cima (esconder no VR, subir no
+   observatório, encolher em ecrãs pequenos) fica no ficheiro dessa página:
+   são desvios, e um desvio pertence a quem se desvia. */
+#btn-voltar {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    border-radius: 12px;
+    color: var(--accent, #6eb8ff);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 10px 18px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.25s ease;
+}
+
+#btn-voltar:hover {
+    color: #fff;
+    transform: translateX(-2px);
+}
+
+#btn-voltar:focus-visible {
+    outline: 2px solid var(--accent, #6eb8ff);
+    outline-offset: 3px;
+}
+
+
 /* ── Botão de configurações (canto inferior direito) ──────────────── */
 /* É um <button> a sério (alcançável por teclado). As primeiras linhas
    anulam os estilos que o browser aplica aos botões por omissão —

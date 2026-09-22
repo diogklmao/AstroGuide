@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstroGuide — Entrar</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared-ui-controls.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/glass.css') }}">
+    <!-- O menu.css é carregado aqui de propósito: é ele que define a moldura da
+         página (.conteudo centrado, a fotografia de fundo, a vinheta). Assim a
+         página de entrada tem exatamente o mesmo fundo do menu, em vez de uma
+         cópia que se desalinhava à primeira alteração feita num dos lados. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+
+<!-- A classe "page-menu" faz o body herdar a moldura do menu (foto de fundo e
+     vinheta, ver menu.css); "page-auth" é o que o auth.css usa para o que é
+     só desta página. -->
+<body class="page-menu page-auth" data-bg-theme="menu">
+
+    <div class="bg-foto" aria-hidden="true">
+        <img src="{{ url_for('static', filename='images/618.jpg') }}" alt="">
+    </div>
+
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="stars" id="stars"></div>
+
+    <a id="btn-voltar" class="glass-panel" href="/">◀ Menu</a>
+
+    <div class="conteudo">
+        <div class="auth-cartao glass-panel glass-shimmer">
+            <div class="auth-titulo">AstroGuide</div>
+            <p class="auth-sub">A tua conta de observação</p>
+
+            <!-- Abas. São botões a sério e não <div>, para serem alcançáveis
+                 por teclado (Tab) e acionáveis com Enter — tal como o botão de
+                 configurações, que já tinha sido convertido de div para button
+                 pelo mesmo motivo. -->
+            <div class="auth-abas">
+                <button type="button" id="aba-entrar" class="auth-aba ativa"
+                    onclick="mostrarAba('entrar')">Entrar</button>
+                <button type="button" id="aba-registar" class="auth-aba"
+                    onclick="mostrarAba('registar')">Criar conta</button>
+            </div>
+
+            <form id="form-entrar" class="auth-form" onsubmit="submeterEntrar(event)">
+                <label for="entrar-identificador">Nome ou email</label>
+                <input type="text" id="entrar-identificador" name="identificador"
+                    autocomplete="username" spellcheck="false" autofocus>
+
+                <label for="entrar-password">Password</label>
+                <input type="password" id="entrar-password" name="password"
+                    autocomplete="current-password">
+
+                <button type="submit" class="auth-btn">Entrar</button>
+            </form>
+
+            <form id="form-registar" class="auth-form escondido" onsubmit="submeterRegistar(event)">
+                <label for="registar-nome">Nome de utilizador</label>
+                <input type="text" id="registar-nome" name="nome"
+                    autocomplete="username" spellcheck="false">
+
+                <label for="registar-email">Email</label>
+                <input type="email" id="registar-email" name="email"
+                    autocomplete="email" spellcheck="false">
+
+                <label for="registar-password">Password</label>
+                <input type="password" id="registar-password" name="password"
+                    autocomplete="new-password">
+                <p class="auth-dica">Pelo menos 8 caracteres.</p>
+
+                <button type="submit" class="auth-btn">Criar conta</button>
+            </form>
+
+            <!-- aria-live: a mensagem de erro aparece sem a página mudar, por
+                 isso um leitor de ecrã só a anuncia se lhe for dito que este
+                 bloco é para acompanhar. -->
+            <div id="auth-erro" class="auth-erro" role="alert" aria-live="polite"></div>
+        </div>
+
+        <p class="auth-nota">
+            Sem conta também podes usar o AstroGuide. Com conta, o céu passa a ser
+            calculado para o sítio onde estás e guardamos os teus favoritos.
+        </p>
+    </div>
+
+    <script src="/static/js/shared-ui-controls.js"></script>
+    <script src="/static/js/auth.js"></script>
+</body>
+
+</html>

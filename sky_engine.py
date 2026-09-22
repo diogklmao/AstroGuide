@@ -5,7 +5,7 @@
 # ============================================================
 
 # --- Bibliotecas externas ---
-from skyfield.api import load, wgs84, N, W, Star  # load = carrega dados NASA | wgs84 = sistema GPS da Terra | N/W = direções | Star = coordenadas de estrelas
+from skyfield.api import load, wgs84, Star  # load = carrega dados NASA | wgs84 = sistema GPS da Terra | Star = coordenadas de estrelas
 from skyfield import almanac                      # funções de astronomia: nascer/pôr do sol, fases da lua, etc.
 from zoneinfo import ZoneInfo                    # converte horas UTC para hora local com suporte a hora de verão
 import datetime                                  # manipulação de datas e horas
@@ -23,11 +23,32 @@ from ceu_profundo import CATALOGO_CEU_PROFUNDO    # base de dados de galáxias, 
 ts = load.timescale()       # sistema de tempo científico ultra-preciso do Skyfield
 eph = load("de421.bsp")     # efemérides NASA — posições de todos os planetas
 
-observador = wgs84.latlon(              # ponto de observação na superfície da Terra
-    LOCATION["latitude"] * N,           # latitude em graus Norte
-    abs(LOCATION["longitude"]) * W,     # longitude em graus Oeste (valor absoluto)
-    elevation_m=LOCATION["elevacao"]    # altitude em metros acima do nível do mar
-)
+def observador_de(localizacao):
+    # Constrói o ponto de observação a partir de um dicionário com as mesmas
+    # chaves de config.LOCATION (latitude, longitude, elevacao).
+    #
+    # A latitude e a longitude vão em graus simples, com o sinal que têm: a
+    # longitude é positiva a LESTE e negativa a OESTE. Antes era
+    # `abs(longitude) * W`, que força o observador para oeste de Greenwich
+    # seja qual for a longitude. Em Vila Nova de Gaia dá o mesmo resultado (a
+    # longitude é negativa, o valor absoluto com W dá o valor original), mas
+    # para qualquer local a leste — Madrid, Berlim, Tóquio — punha o
+    # observador no lado errado do planeta, e a aplicação mostraria o céu de
+    # um ponto do outro hemisfério. Enquanto a localização esteve fixa em
+    # config.py o erro nunca aparecia; a partir do momento em que cada
+    # utilizador pode escolher a sua, apareceria logo ao primeiro que
+    # estivesse a leste.
+    return wgs84.latlon(
+        float(localizacao["latitude"]),
+        float(localizacao["longitude"]),
+        elevation_m=float(localizacao.get("elevacao") or 0),
+    )
+
+
+# O observador por omissão: a localização de config.py. É o que é usado sempre
+# que uma função é chamada sem localização própria, para quem não tem conta (ou
+# ainda não escolheu a sua) continuar a ver exatamente o que via antes.
+observador = observador_de(LOCATION)
 
 PLANETAS = {                            # mapeamento de nomes internos NASA para português
     "mercury": "Mercúrio",
@@ -50,25 +71,30 @@ def momento_de(timestamp_utc=None):
         return ts.from_datetime(timestamp_utc)
     return ts.now()
 
-def _centro_em(momento):
+def _centro_em(momento, localizacao=None):
     # Posição do observador (Terra + Gaia) no instante pedido.
     # É o passo mais caro do cálculo — interpola as efemérides da NASA e a
     # rotação da Terra — mas só depende do INSTANTE e do LOCAL, nunca do
     # alvo que estamos a observar. Por isso calcula-se uma vez por pedido
     # e reutiliza-se para todas as estrelas e astros.
-    return (eph["earth"] + observador).at(momento)
+    #
+    # localizacao: dicionário com as chaves de config.LOCATION. Sem ele usa-se
+    # a localização por omissão do ficheiro — é o caso de quem não tem conta.
+    obs = observador if localizacao is None else observador_de(localizacao)
+    return (eph["earth"] + obs).at(momento)
 
-def get_planeta(chave, momento=None, centro=None):
-    # Calcula a posição de um planeta visto de Vila Nova de Gaia.
+def get_planeta(chave, momento=None, centro=None, localizacao=None):
+    # Calcula a posição de um planeta visto do local do observador.
     # Recebe a chave interna ex: "saturn barycenter"
     # momento: objeto Time do Skyfield; se None usa ts.now() (tempo real)
     # centro:  posição do observador já calculada (opcional) — permite
     #          reutilizar o mesmo cálculo entre vários astros do mesmo instante
+    # localizacao: local do observador (opcional); sem ele usa config.LOCATION
     # Devolve dicionário com altitude, azimute, distância e visibilidade.
 
     t = momento if momento is not None else ts.now()   # usa o instante pedido ou o atual
     if centro is None:
-        centro = _centro_em(t)
+        centro = _centro_em(t, localizacao)
     planeta = eph[chave]        # objeto do planeta pedido nas efemérides
 
     posicao = centro.observe(planeta).apparent()
@@ -89,19 +115,19 @@ def get_planeta(chave, momento=None, centro=None):
         "visivel": bool(alt.degrees > 0)                # True se acima do horizonte
     }
 
-def get_todos_planetas(momento=None, centro=None):
+def get_todos_planetas(momento=None, centro=None, localizacao=None):
     # Devolve lista com os 7 planetas de uma vez.
     # List comprehension — chama get_planeta() para cada chave do dicionário PLANETAS.
     # O centro é calculado uma única vez e partilhado pelos 7 planetas.
-    return [get_planeta(chave, momento, centro) for chave in PLANETAS]
+    return [get_planeta(chave, momento, centro, localizacao) for chave in PLANETAS]
 
-def get_sol(momento=None, centro=None):
+def get_sol(momento=None, centro=None, localizacao=None):
     # Calcula a posição do Sol num dado instante (ou agora se None).
     # Distância em UA e km porque faz sentido para uma estrela.
 
     t = momento if momento is not None else ts.now()
     if centro is None:
-        centro = _centro_em(t)
+        centro = _centro_em(t, localizacao)
     sol = eph["sun"]            # "sun" = nome do Sol nas efemérides NASA
 
     posicao = centro.observe(sol).apparent()
@@ -120,13 +146,13 @@ def get_sol(momento=None, centro=None):
         "visivel": bool(alt.degrees > 0)
     }
 
-def get_lua(momento=None, centro=None):
+def get_lua(momento=None, centro=None, localizacao=None):
     # Calcula a posição da Lua num dado instante (ou agora se None).
     # Distância só em km — UA seria "0.0026", pouco intuitivo.
 
     t = momento if momento is not None else ts.now()
     if centro is None:
-        centro = _centro_em(t)
+        centro = _centro_em(t, localizacao)
     lua = eph["moon"]           # "moon" = nome da Lua nas efemérides NASA
 
     posicao = centro.observe(lua).apparent()
@@ -180,9 +206,12 @@ def get_fase_lua_dia(ano, mes, dia):
     # apresenta. Para a fase de um instante exato, ver get_fase_lua_instante().
     return _descrever_fase(almanac.moon_phase(eph, ts.utc(ano, mes, dia, 12)).degrees)
 
-def get_nascer_por_sol(ano, mes, dia):
-    # Calcula o nascer e pôr do sol para um dia específico.
-    # Usa o observador global definido no topo do ficheiro.
+def get_nascer_por_sol(ano, mes, dia, localizacao=None):
+    # Calcula o nascer e pôr do sol para um dia específico, para o local do
+    # observador (config.LOCATION se nenhum for indicado).
+
+    local = LOCATION if localizacao is None else localizacao
+    obs = observador if localizacao is None else observador_de(localizacao)
 
     t0 = ts.utc(ano, mes, dia, 0)   # início do dia (meia-noite UTC)
 
@@ -190,11 +219,11 @@ def get_nascer_por_sol(ano, mes, dia):
     data_seguinte = datetime.date(ano, mes, dia) + datetime.timedelta(days=1)
     t1 = ts.utc(data_seguinte.year, data_seguinte.month, data_seguinte.day, 0)
 
-    f = almanac.sunrise_sunset(eph, observador)         # usa o observador global
+    f = almanac.sunrise_sunset(eph, obs)                # usa o observador do local
     tempos, eventos = almanac.find_discrete(t0, t1, f)  # encontra nascer e pôr no intervalo
 
     resultado = {"nascer": "---", "por": "---"}         # valores padrão caso não encontre
-    local_tz = ZoneInfo(LOCATION["timezone"])           # fuso horário de Lisboa com hora de verão
+    local_tz = ZoneInfo(local["timezone"])              # fuso horário do local do observador
 
     for t, e in zip(tempos, eventos):       # percorre os momentos encontrados
         hora_utc = t.utc_datetime()         # converte para objeto datetime UTC do Python
@@ -212,9 +241,13 @@ def get_nascer_por_sol(ano, mes, dia):
 
     return resultado
 
-def get_fases_mes(ano, mes):
+def get_fases_mes(ano, mes, localizacao=None):
     # Calcula todas as fases principais da Lua num mês inteiro.
     # Devolve lista com lua nova, quarto crescente, lua cheia e quarto minguante.
+    # A fase em si é a mesma em todo o mundo; o que depende do local é a HORA
+    # a que é mostrada, por isso só o fuso horário vem da localização.
+
+    local = LOCATION if localizacao is None else localizacao
 
     t0 = ts.utc(ano, mes, 1)                                                        # primeiro dia do mês
     t1 = ts.utc(ano, mes + 1, 1) if mes < 12 else ts.utc(ano + 1, 1, 1)           # primeiro dia do mês seguinte
@@ -229,7 +262,7 @@ def get_fases_mes(ano, mes):
     }
 
     resultado = []
-    local_tz = ZoneInfo(LOCATION["timezone"])   # fuso horário de Lisboa
+    local_tz = ZoneInfo(local["timezone"])   # fuso horário do local do observador
 
     for t, fase in zip(tempos, fases):          # percorre cada fase encontrada
         hora_utc = t.utc_datetime()
@@ -278,16 +311,19 @@ def _posicao_objeto_fixo(centro, ra_horas, dec_graus):
     }
 
 
-def get_observatorio(timestamp_utc=None):
+def get_observatorio(timestamp_utc=None, localizacao=None):
     # Calcula a posição das estrelas, constelações e planetas
-    # observáveis a partir de Vila Nova de Gaia.
+    # observáveis a partir do local do observador (config.LOCATION se nenhum
+    # for indicado).
     # timestamp_utc: datetime UTC com tzinfo; se None usa o instante atual.
+
+    local = LOCATION if localizacao is None else localizacao
 
     agora = momento_de(timestamp_utc)            # o instante pedido, ou o agora
     # Posição do observador (Terra + Gaia) no instante pedido.
     # Calculada UMA vez e reutilizada por todas as estrelas, pelo Sol,
     # pela Lua e pelos 7 planetas — em vez de a recalcular a cada um.
-    centro = _centro_em(agora)
+    centro = _centro_em(agora, localizacao)
     
     estrelas_calculadas = {}
 
@@ -335,9 +371,9 @@ def get_observatorio(timestamp_utc=None):
         }
         
     # Obter posições do Sol, Lua e Planetas para o instante pedido
-    sol_dados = get_sol(agora, centro)
-    lua_dados = get_lua(agora, centro)
-    planetas_dados = get_todos_planetas(agora, centro)
+    sol_dados = get_sol(agora, centro, local)
+    lua_dados = get_lua(agora, centro, local)
+    planetas_dados = get_todos_planetas(agora, centro, local)
     
     # Adicionar astros à lista de planetas/luminares
     astros = []
@@ -404,6 +440,11 @@ def get_observatorio(timestamp_utc=None):
         # parênteses) e vem em horas. A longitude segue a convenção positiva
         # para leste (config.py), ou seja negativa em Gaia — que é o que faz o
         # tempo sideral local ser menor que o de Greenwich, como deve ser.
-        "latitude": LOCATION["latitude"],
-        "tempo_sideral": (agora.gast * 15 + LOCATION["longitude"]) % 360
+        "latitude": local["latitude"],
+        "tempo_sideral": (agora.gast * 15 + local["longitude"]) % 360,
+        # O nome do local vai na resposta para a interface poder dizer para
+        # onde é que o céu que está a mostrar foi calculado — sem isto, um
+        # utilizador com localização própria não teria como confirmar que os
+        # cálculos são mesmo os do sítio dele.
+        "localizacao_nome": local["nome"]
     }

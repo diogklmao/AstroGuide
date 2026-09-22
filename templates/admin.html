@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstroGuide — Administração</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=Raleway:wght@200;300&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared-ui-controls.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/glass.css') }}">
+    <!-- O menu.css entra pelo mesmo motivo que na página de entrada: é ele que
+         define a moldura (fotografia de fundo e vinheta). Assim esta página tem
+         o mesmo fundo do menu em vez de uma cópia que se desalinhava à primeira
+         alteração feita num dos lados. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+
+<body class="page-menu page-admin" data-bg-theme="menu">
+
+    <div class="bg-foto" aria-hidden="true">
+        <img src="{{ url_for('static', filename='images/618.jpg') }}" alt="">
+    </div>
+
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="stars" id="stars"></div>
+
+    <a id="btn-voltar" class="glass-panel" href="/">◀ Menu</a>
+
+    <div class="conteudo">
+        {% if autorizado %}
+
+        <div class="admin-cabecalho glass-panel glass-shimmer">
+            <div class="admin-titulo">🔐 Administração</div>
+            <p class="admin-sub">
+                O que a base de dados tem, neste momento. Esta página só mostra —
+                não apaga nem altera nada.
+            </p>
+        </div>
+
+        <div class="admin-totais">
+            <div class="admin-total glass-panel">
+                <span class="admin-numero">{{ totais.contas }}</span>
+                <span class="admin-etiqueta">Contas</span>
+            </div>
+            <div class="admin-total glass-panel">
+                <span class="admin-numero">{{ totais.com_local }}</span>
+                <span class="admin-etiqueta">Com localização própria</span>
+            </div>
+            <div class="admin-total glass-panel">
+                <span class="admin-numero">{{ totais.favoritos }}</span>
+                <span class="admin-etiqueta">Favoritos</span>
+            </div>
+            <div class="admin-total glass-panel">
+                <span class="admin-numero">{{ totais.observacoes }}</span>
+                <span class="admin-etiqueta">Observações</span>
+            </div>
+        </div>
+
+        {% if contas %}
+        <div class="admin-tabela-envolvente glass-panel">
+            <table class="admin-tabela">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Email</th>
+                        <th>Localização</th>
+                        <th class="admin-col-num">Favoritos</th>
+                        <th class="admin-col-num">Observações</th>
+                        <th>Registo (UTC)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in contas %}
+                    <tr>
+                        <td>{{ c.nome }}</td>
+                        <td class="admin-email">{{ c.email }}</td>
+                        <!-- Traço quando não há linha em "localizacoes": é quem
+                             nunca escolheu local e a quem os cálculos dão Vila
+                             Nova de Gaia. Não é um dado em falta — é a ausência
+                             a significar "por omissão". -->
+                        <td>{{ c.local_nome or "—" }}</td>
+                        <td class="admin-col-num">{{ c.n_favoritos }}</td>
+                        <td class="admin-col-num">{{ c.n_observacoes }}</td>
+                        <td class="admin-data">{{ c.criado_em[:16].replace('T', ' ') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="admin-vazio glass-panel">
+            Ainda não há contas registadas. Quando alguém criar conta em
+            <a href="/entrar">/entrar</a>, aparece aqui.
+        </p>
+        {% endif %}
+
+        <p class="admin-nota">
+            A coluna "Favoritos" e a coluna "Observações" contam o que cada conta
+            guardou. As datas ficam em UTC porque é assim que são gravadas — a
+            hora local de cada conta é aplicada nos cálculos, não no registo.
+        </p>
+
+        {% else %}
+
+        <div class="admin-cartao glass-panel glass-shimmer">
+            <div class="admin-titulo">🔐 Administração</div>
+            <p class="admin-negado">
+                Esta página é só para a conta de administrador. A tua conta está
+                iniciada, mas não tem esse papel — por isso não há aqui nada para
+                ti.
+            </p>
+            <p class="admin-negado-ajuda">
+                O papel de administrador atribui-se a partir do terminal, na
+                pasta do projeto, e só uma vez:
+                <code>py promover_admin.py o-teu-email</code>
+            </p>
+            <a class="admin-ligacao" href="/">◀ Voltar ao menu</a>
+        </div>
+
+        {% endif %}
+    </div>
+
+    <script src="/static/js/shared-ui-controls.js"></script>
+    <script src="/static/js/admin.js"></script>
+</body>
+
+</html>

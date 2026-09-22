@@ -55,28 +55,9 @@ header .subtitulo {
 }
 
 
-/* ── Botão voltar (canto superior esquerdo) ───────────────────────── */
-#btn-voltar {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    border-radius: 12px;
-    color: var(--accent, #6eb8ff);
-    text-decoration: none;
-    font-size: 0.85rem;
-    font-weight: 600;
-    padding: 10px 18px;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.25s ease;
-}
-
-#btn-voltar:hover {
-    color: #fff;
-    transform: translateX(-2px);
-}
+/* O #btn-voltar vive no shared-ui-controls.css, que esta página também
+   carrega. Os desvios deste ficheiro (escondê-lo no VR, subi-lo no
+   observatório) ficam mais abaixo, junto do resto das regras desses modos. */
 
 
 /* ── Navegação por tabs ───────────────────────────────────────────── */

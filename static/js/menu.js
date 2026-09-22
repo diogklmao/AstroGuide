@@ -1,22 +1,3 @@
-// ── Estrelas ──────────────────────────────────────────────────────────────────
-// Cria estrelas aleatórias no fundo da página (elemento #stars no HTML)
-function criarEstrelas() {
-    const container = document.getElementById("stars");
-    if (!container) return;
-    for (let i = 0; i < 180; i++) {
-        const star = document.createElement("div");    // cria um div por estrela
-        star.className = "star";                       // aplica o estilo .star do CSS
-        const size = Math.random() * 2.5 + 0.5;       // tamanho aleatório entre 0.5px e 3px
-        star.style.cssText = `
-            width:${size}px; height:${size}px;
-            left:${Math.random() * 100}%; top:${Math.random() * 100}%;
-            --dur:${Math.random() * 4 + 2}s;
-            animation-delay:${Math.random() * 4}s;
-        `;
-        container.appendChild(star);    // adiciona a estrela ao contentor
-    }
-}
-
 // ── Localização ───────────────────────────────────────────────────────────────
 // Tenta detetar a localização real do utilizador para mostrar no label do menu
 function detetarLocalizacao() {
@@ -220,7 +201,7 @@ function desenharIconeApod() {
 }
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
-criarEstrelas();        // gera as estrelas animadas no fundo
+window.criarEstrelas(); // gera as estrelas animadas no fundo
 detetarLocalizacao();   // tenta obter e mostrar a localização do utilizador
 
 // desenha os ícones canvas nos cards do menu

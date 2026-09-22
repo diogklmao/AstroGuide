@@ -1,7 +1,8 @@
 # ============================================================
 #  iss.py — Estação Espacial Internacional (ISS)
 #  Vai buscar os elementos orbitais (TLE) à Celestrak e usa-os
-#  para saber onde a ISS está no céu de Vila Nova de Gaia.
+#  para saber onde a ISS está no céu de quem está a ver — a
+#  localização da conta, ou Vila Nova de Gaia por omissão.
 #
 #  Vive em ficheiro próprio, ao lado do apod.py, porque é o
 #  único sítio do projeto que junta rede e órbita: o
@@ -16,7 +17,7 @@ import requests                          # pedido do TLE à Celestrak
 from skyfield.api import EarthSatellite  # propaga um satélite a partir do seu TLE
 
 # --- Módulos internos ---
-from sky_engine import ts, observador    # o tempo e o ponto de observação do projeto
+from sky_engine import ts, observador, observador_de   # o tempo e o ponto de observação
 
 log = logging.getLogger(__name__)
 
@@ -118,8 +119,9 @@ def get_satelite():
 
 # ── Posição da ISS ────────────────────────────────────────────────────────────
 
-def get_posicao_iss(momento=None):
-    # Onde é que a ISS está no instante pedido (ou agora), vista de Gaia.
+def get_posicao_iss(momento=None, localizacao=None):
+    # Onde é que a ISS está no instante pedido (ou agora), vista do local de
+    # quem está a ver.
     # Devolve um dicionário com a MESMA forma dos outros astros, para poder
     # entrar na lista "astros" sem o frontend precisar de saber que é diferente.
     # None quando não há elementos orbitais.
@@ -129,9 +131,17 @@ def get_posicao_iss(momento=None):
 
     t = momento if momento is not None else ts.now()
 
-    # (sat - observador) é o vetor do observador até ao satélite; o .at(t) e o
+    # A localização tem de entrar aqui, e não só no sky_engine: a ISS é o único
+    # objeto do céu cuja posição depende tanto do sítio de quem observa. Está a
+    # cerca de 400 km de altitude, e a poucos milhares de km na horizontal — o
+    # suficiente para que, vista de Sydney, esteja num lado do céu
+    # completamente diferente do que está vista de Gaia. Sem isto, aparecia no
+    # céu de Sydney no ponto onde estava por cima de Portugal.
+    obs = observador if localizacao is None else observador_de(localizacao)
+
+    # (sat - obs) é o vetor do observador até ao satélite; o .at(t) e o
     # .altaz() a seguir dão o mesmo par altitude/azimute que o Sol e os planetas.
-    alt, az, dist = (sat - observador).at(t).altaz()
+    alt, az, dist = (sat - obs).at(t).altaz()
 
     # De propósito, NÃO se envia ra_aparente/dec_aparente como nas estrelas e
     # nos astros: esses campos existem para o frontend animar a mudança de hora

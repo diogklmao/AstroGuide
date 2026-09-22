@@ -1,0 +1,235 @@
+/* ── AstroGuide — página de entrada / registo ───────────────────────────
+   Só o que é exclusivo desta página. A moldura (fotografia de fundo,
+   vinheta, contentor centrado) vem do menu.css; o vidro vem do glass.css.
+   As cores e os raios são os mesmos tokens, para a página não parecer de
+   outro projeto. */
+
+/* Centra o cartão verticalmente. O .conteudo do menu alinha ao topo, porque
+   lá em cima há o título grande; aqui só existe um cartão. */
+.page-auth .conteudo {
+    justify-content: center;
+    min-height: 100vh;
+}
+
+/* O #btn-voltar vive no shared-ui-controls.css, que esta página também
+   carrega. O ajuste para ecrãs pequenos fica cá em baixo, na media query,
+   porque é um desvio só desta página. */
+
+
+/* ── Cartão ──────────────────────────────────────────────────────────── */
+.auth-cartao {
+    width: min(420px, 100%);
+    padding: 34px 32px 30px;
+    border-radius: 22px;
+    text-align: left;
+}
+
+.auth-titulo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.6rem;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.92);
+    letter-spacing: 0.12em;
+    line-height: 1;
+    text-align: center;
+    text-shadow: 0 0 18px rgba(160, 210, 255, 0.45);
+}
+
+.auth-sub {
+    text-align: center;
+    font-size: 0.82rem;
+    color: #7d8ba3;
+    letter-spacing: 0.06em;
+    margin: 8px 0 26px;
+}
+
+
+/* ── Abas ────────────────────────────────────────────────────────────── */
+.auth-abas {
+    display: flex;
+    gap: 6px;
+    padding: 5px;
+    margin-bottom: 24px;
+    background: rgba(4, 6, 20, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+}
+
+.auth-aba {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #556070;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.25s ease, color 0.25s ease;
+}
+
+.auth-aba:hover {
+    color: #dce3f0;
+}
+
+/* A aba escolhida. O realce é o mesmo tom do restante realce da aplicação. */
+.auth-aba.ativa {
+    background: rgba(110, 184, 255, 0.14);
+    color: var(--accent, #6eb8ff);
+    box-shadow: inset 0 0 0 1px rgba(110, 184, 255, 0.3);
+}
+
+.auth-aba:focus-visible {
+    outline: 2px solid var(--accent, #6eb8ff);
+    outline-offset: 2px;
+}
+
+
+/* ── Formulário ──────────────────────────────────────────────────────── */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+}
+
+/* O form inativo sai da caixa (display:none) e não apenas da vista: se
+   ficasse só invisível, os seus campos continuavam a apanhar o Tab e o
+   Enter, e o browser conseguia submeter o formulário errado. */
+.auth-form.escondido {
+    display: none;
+}
+
+.auth-form label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #7d8ba3;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+}
+
+.auth-form input {
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 18px;
+    background: rgba(4, 6, 20, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    color: #e8eefc;
+    font-family: inherit;
+    font-size: 0.95rem;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.auth-form input::placeholder {
+    color: #4a5468;
+}
+
+.auth-form input:focus {
+    outline: none;
+    border-color: var(--accent, #6eb8ff);
+    box-shadow: 0 0 0 3px rgba(110, 184, 255, 0.16);
+}
+
+/* Os browsers pintam os campos preenchidos automaticamente (autofill) com
+   fundo claro e texto escuro, o que aqui ficava uma mancha branca no meio do
+   vidro escuro. O "box-shadow inset" enorme é o truque habitual para pintar
+   por cima dessa cor de fundo, que não pode ser alterada diretamente. */
+.auth-form input:-webkit-autofill,
+.auth-form input:-webkit-autofill:hover,
+.auth-form input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #e8eefc;
+    -webkit-box-shadow: 0 0 0 1000px #0a0e20 inset;
+    caret-color: #e8eefc;
+}
+
+.auth-dica {
+    font-size: 0.72rem;
+    color: #556070;
+    margin: -10px 0 18px;
+}
+
+
+/* ── Botão principal ─────────────────────────────────────────────────── */
+.auth-btn {
+    width: 100%;
+    padding: 13px;
+    margin-top: 4px;
+    border: 1px solid rgba(110, 184, 255, 0.45);
+    border-radius: 10px;
+    background: rgba(110, 184, 255, 0.16);
+    color: #dceaff;
+    font-family: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.auth-btn:hover {
+    background: rgba(110, 184, 255, 0.26);
+    border-color: var(--accent, #6eb8ff);
+    box-shadow: 0 0 18px rgba(110, 184, 255, 0.22);
+}
+
+.auth-btn:focus-visible {
+    outline: 2px solid var(--accent, #6eb8ff);
+    outline-offset: 3px;
+}
+
+/* Enquanto o pedido está a caminho. Um botão que não dá sinal nenhum faz
+   carregar duas vezes — e a segunda cria um erro de "já existe". */
+.auth-btn:disabled {
+    opacity: 0.55;
+    cursor: progress;
+}
+
+
+/* ── Mensagem de erro ────────────────────────────────────────────────── */
+.auth-erro {
+    margin-top: 16px;
+    padding: 11px 14px;
+    border: 1px solid rgba(255, 112, 133, 0.4);
+    border-radius: 10px;
+    background: rgba(255, 112, 133, 0.12);
+    color: #ffb3c1;
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+/* Vazio = não ocupa espaço nenhum, por isso o cartão não tem sempre um
+   retângulo vermelho vazio por baixo do botão. */
+.auth-erro:empty {
+    display: none;
+}
+
+
+/* ── Nota de rodapé ──────────────────────────────────────────────────── */
+.auth-nota {
+    max-width: 420px;
+    margin-top: 22px;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: #556070;
+    text-align: center;
+}
+
+
+/* ── Ecrãs estreitos ─────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+    .auth-cartao {
+        padding: 26px 20px 22px;
+        border-radius: 18px;
+    }
+
+    .auth-titulo {
+        font-size: 2.1rem;
+    }
+
+    #btn-voltar {
+        top: 12px;
+        left: 12px;
+        padding: 8px 14px;
+    }
+}

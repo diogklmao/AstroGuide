@@ -44,5 +44,18 @@ desktop.ini
 *.tmp
 *.swp
 
+# ── Base de dados e chaves locais ────────────────────────
+# A base de dados tem contas de utilizador e o que cada um guardou. É um
+# ficheiro local, não código: pertence a quem corre a aplicação, e cada
+# máquina cria o seu na primeira execução. Se fosse para o repositório,
+# publicava os dados de quem já tivesse usado a aplicação.
+*.db
+*.db-journal
+
+# Chave que assina o cookie de sessão (ver _chave_secreta em server.py).
+# Quem a tiver consegue forjar uma sessão iniciada, por isso nunca vai para
+# o repositório — é gerada automaticamente na primeira execução.
+.secret_key
+
 # ── Claude ───────────────────────────────────────────────
 .claude/
