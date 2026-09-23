@@ -20,8 +20,8 @@ from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from db import consultar_um, consultar_todos, executar, agora_iso, PAPEL_ADMIN
-from config import LOCATION
+from py.database.db import consultar_um, consultar_todos, executar, agora_iso, PAPEL_ADMIN
+from py.config import LOCATION
 
 
 auth_bp = Blueprint("auth", __name__)

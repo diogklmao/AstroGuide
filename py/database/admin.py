@@ -18,8 +18,8 @@
 
 from flask import Blueprint, render_template, redirect
 
-from auth import utilizador_atual, e_admin
-from db import consultar_todos
+from py.database.auth import utilizador_atual, e_admin
+from py.database.db import consultar_todos
 
 
 admin_bp = Blueprint("admin", __name__)

@@ -26,8 +26,8 @@ e a Imagem Astronómica do Dia da NASA (APOD).
   git push
 
 Não é preciso criar a base de dados à mão. Na primeira execução
-o servidor cria o ficheiro astroguide.db e as tabelas todas, ao
-lado do código. A partir daí as contas ficam lá guardadas entre
+o servidor cria o ficheiro astroguide.db e as tabelas todas, na
+raiz do projeto. A partir daí as contas ficam lá guardadas entre
 execuções. As dependências continuam a ser as mesmas de antes:
 o SQLite vem dentro do Python e o resto já vinha com o Flask.
 
@@ -41,48 +41,78 @@ astroguide/
 │                            Cria o servidor Flask e define
 │                            as rotas da API e das páginas.
 │
-├── sky_engine.py          → Motor de cálculo astronómico
-│                            Usa as efemérides da NASA para
-│                            calcular posições de astros em
-│                            qualquer momento (passado/futuro).
+├── py/                    → Todo o código que é importado
+│                            Na raiz do projeto fica o que se
+│                            executa (o server.py, o
+│                            promover_admin.py e o teste) e os
+│                            dados; aqui dentro fica o resto.
 │
-├── eventos.py             → Base de dados de eventos
-│                            Chuvas de meteoros e eclipses
-│                            (inclui eclipses de 2026 e 2027).
+├── py/config.py           → Configurações globais
+│                            Localização por omissão (Vila Nova
+│                            de Gaia), nome, versão, fuso horário
+│                            e elevação.
 │
-├── estrelas.py            → Base de dados de estrelas e
-│                            constelações para o Observatório.
-│                            Nomes das constelações em Latim
-│                            (nomenclatura oficial da IAU).
+├── py/database/           → A base de dados e as contas
+│   │
+│   ├── db.py              → Base de dados SQLite
+│   │                        Contas de utilizador, localização
+│   │                        pessoal, favoritos e registo de
+│   │                        observações. Cria as tabelas na
+│   │                        1ª execução.
+│   │
+│   ├── auth.py            → Contas de utilizador
+│   │                        Registo, entrada e saída, e as
+│   │                        rotas do que é pessoal de cada
+│   │                        conta (localização, favoritos,
+│   │                        observações).
+│   │
+│   └── admin.py           → Página de administração
+│                            Só de leitura, e só para a conta
+│                            com o papel de admin: mostra as
+│                            contas registadas e o que cada uma
+│                            tem guardado. É renderizada no
+│                            servidor, para não haver um endpoint
+│                            em JSON a devolver os dados de todos.
 │
-├── apod.py                → Imagem Astronómica do Dia (NASA)
+├── py/astronomia/         → Cálculo e rede
+│   │                        O que pensa (o sky_engine.py) e os
+│   │                        dois sítios que vão à internet.
+│   │
+│   ├── sky_engine.py      → Motor de cálculo astronómico
+│   │                        Usa as efemérides da NASA para
+│   │                        calcular posições de astros em
+│   │                        qualquer momento (passado/futuro).
+│   │
+│   ├── iss.py             → Estação Espacial Internacional
+│   │                        Vai buscar os elementos orbitais
+│   │                        (TLE) à Celestrak e calcula onde a
+│   │                        ISS está no céu de quem está a ver.
+│   │
+│   └── apod.py            → Imagem Astronómica do Dia (NASA)
 │                            Vai buscar a APOD à API pública
 │                            da NASA, com cache diário em
 │                            memória para poupar pedidos.
 │
-├── config.py              → Configurações globais
-│                            Localização, nome, versão,
-│                            fuso horário e elevação.
-│
-├── db.py                  → Base de dados SQLite
-│                            Contas de utilizador, localização
-│                            pessoal, favoritos e registo de
-│                            observações. Cria as tabelas na
-│                            1ª execução.
-│
-├── auth.py                → Contas de utilizador
-│                            Registo, entrada e saída, e as
-│                            rotas do que é pessoal de cada
-│                            conta (localização, favoritos,
-│                            observações).
-│
-├── admin.py               → Página de administração
-│                            Só de leitura, e só para a conta
-│                            com o papel de admin: mostra as
-│                            contas registadas e o que cada
-│                            uma tem guardado. É renderizada no
-│                            servidor, para não haver um endpoint
-│                            em JSON a devolver os dados de todos.
+├── py/ceu/                → Catálogos do céu
+│   │                        Ficheiros de DADOS: listas de
+│   │                        coordenadas, sem uma linha de
+│   │                        cálculo. Quem lhes dá posição no céu
+│   │                        é o py/astronomia/sky_engine.py.
+│   │
+│   ├── estrelas.py        → Base de dados de estrelas e
+│   │                        constelações para o Observatório.
+│   │                        Nomes das constelações em Latim
+│   │                        (nomenclatura oficial da IAU).
+│   │
+│   ├── ceu_profundo.py    → Catálogo de céu profundo
+│   │                        36 objetos de Messier visíveis de
+│   │                        Gaia: galáxias, nebulosas, enxames e
+│   │                        estrelas duplas. Ficaram de fora os
+│   │                        que precisam de telescópio.
+│   │
+│   └── eventos.py         → Base de dados de eventos
+│                            Chuvas de meteoros e eclipses
+│                            (inclui eclipses de 2026 e 2027).
 │
 ├── promover_admin.py      → Dá (ou tira) o papel de admin
 │                            Corre no terminal, na pasta do
@@ -92,13 +122,15 @@ astroguide/
 │                            uma conta passar a admin.
 │
 ├── astroguide.db          → Base de dados (criada ao correr)
-│                            Um ficheiro só, ao lado do
-│                            código. Cada máquina cria o seu.
+│                            Um ficheiro só, na raiz, ao lado
+│                            do server.py. Cada máquina cria o seu.
 │                            Não está no GitHub — tem os
 │                            dados de quem já usou a aplicação.
 │
 ├── _teste_contas.py       → Testes das contas e da localização
-│                            137 verificações automáticas.
+│                            139 verificações automáticas
+│                            (137 se não houver rede — a parte
+│                            da ISS salta 2, e diz que saltou).
 │                            Correr com: py _teste_contas.py
 │                            Não arranca servidor nem abre browser.
 │
@@ -390,8 +422,11 @@ a coluna no arranque seguinte, com todas as contas a ficar
 PYTHON (Backend)
   Responsável por todos os cálculos astronómicos e pelo
   servidor. Nunca é visível para o utilizador.
-  Ficheiros: server.py, sky_engine.py, eventos.py, config.py,
-             estrelas.py, apod.py
+  Ficheiros: server.py, promover_admin.py, _teste_contas.py,
+             py/config.py, py/database/ (db.py, auth.py,
+             admin.py), py/astronomia/ (sky_engine.py, iss.py,
+             apod.py), py/ceu/ (estrelas.py, ceu_profundo.py,
+             eventos.py)
 
 HTML (Estrutura)
   Define a estrutura das páginas e as secções da app.
@@ -436,8 +471,9 @@ tzdata (pip install tzdata)
 
 requests (pip install requests)
   Biblioteca para pedidos HTTP.
-  Usada em apod.py para ir buscar a Imagem Astronómica do
-  Dia à API pública da NASA (api.nasa.gov).
+  Usada no py/astronomia/apod.py (Imagem Astronómica do Dia,
+  à API pública da NASA) e no py/astronomia/iss.py (elementos
+  orbitais da ISS, à Celestrak).
 
 ## BIBLIOTECAS JAVASCRIPT USADAS
 

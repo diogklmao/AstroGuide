@@ -22,12 +22,14 @@ import datetime
 from flask import g
 
 
-# O ficheiro da base de dados fica ao lado deste módulo. Usa-se o caminho
-# absoluto (e não um caminho relativo) para o servidor funcionar
-# independentemente da pasta de onde foi arrancado: "py server.py" a partir da
-# raiz e "py AstroGuide/server.py" a partir da pasta de cima são o mesmo sítio.
-DIRETORIO = os.path.dirname(os.path.abspath(__file__))
-CAMINHO_BD = os.path.join(DIRETORIO, "astroguide.db")
+# O ficheiro da base de dados fica na RAIZ do projeto, ao lado do server.py —
+# não ao lado deste módulo. Este ficheiro está três pastas abaixo
+# (py/database/db.py), e os três dirname são o caminho de volta até à raiz.
+#
+# Usa-se o caminho absoluto (e não um caminho relativo) para o servidor
+# funcionar independentemente da pasta de onde foi arrancado.
+RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CAMINHO_BD = os.path.join(RAIZ, "astroguide.db")
 
 
 # ── Papéis ────────────────────────────────────────────────────────────────────

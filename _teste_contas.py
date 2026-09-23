@@ -14,7 +14,7 @@ sys.path.insert(0, RAIZ)
 # A chave de sessão vem do ambiente para o teste não criar o ficheiro .secret_key
 os.environ["ASTROGUIDE_SECRET_KEY"] = "chave-so-para-o-teste"
 
-import db
+from py.database import db
 TMP = os.path.join(tempfile.gettempdir(), "astroguide_teste.db")
 if os.path.exists(TMP):
     os.remove(TMP)
@@ -84,7 +84,8 @@ verificar("outro cliente (sem sessão) fica com Gaia", r.get_json()["location"] 
 
 # A prova de que a personalização chega mesmo à matemática: o mesmo instante,
 # duas localizações muito distantes, altitudes diferentes.
-import sky_engine, datetime
+from py.astronomia import sky_engine
+import datetime
 t = datetime.datetime(2026, 9, 22, 22, 0, tzinfo=datetime.timezone.utc)
 gaia = sky_engine.get_observatorio(t, {"nome": "Gaia", "latitude": 41.13, "longitude": -8.66, "elevacao": 75,
                                        "timezone": "Europe/Lisbon"})
@@ -271,7 +272,7 @@ verificar("outro cliente (sem sessão) fica com Gaia",
 # A ISS era o único objeto do céu que ficava sempre em Gaia: o iss.py usava o
 # observador do módulo em vez do de quem estava a ver. Visto de Sydney, o erro
 # dava dezenas de graus — a ISS aparecia no lado errado do céu.
-import iss
+from py.astronomia import iss
 momento = sky_engine.momento_de(t)
 iss_gaia = iss.get_posicao_iss(momento, {"nome": "Gaia", "latitude": 41.13, "longitude": -8.66,
                                          "elevacao": 75, "timezone": "Europe/Lisbon"})

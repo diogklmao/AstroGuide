@@ -12,9 +12,9 @@ import datetime                                  # manipulação de datas e hora
 import math                                      # cálculo do disco iluminado da Lua
 
 # --- Módulos internos ---
-from config import LOCATION                      # localização definida em config.py
-from estrelas import ESTRELAS_BD, CONSTELACOES_BD # base de dados de estrelas e constelações
-from ceu_profundo import CATALOGO_CEU_PROFUNDO    # base de dados de galáxias, nebulosas e enxames
+from py.config import LOCATION                      # localização definida em config.py
+from py.ceu.estrelas import ESTRELAS_BD, CONSTELACOES_BD # base de dados de estrelas e constelações
+from py.ceu.ceu_profundo import CATALOGO_CEU_PROFUNDO    # base de dados de galáxias, nebulosas e enxames
 
 # ── Inicialização global ──────────────────────────────────────────────────────
 # Estas variáveis são criadas uma vez quando o ficheiro é carregado

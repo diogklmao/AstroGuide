@@ -9,23 +9,23 @@ from flask import Flask, jsonify, render_template, send_from_directory
 import os
 import secrets
 
-from sky_engine import (
+from py.astronomia.sky_engine import (
     get_sol, get_lua, get_todos_planetas,
     get_fase_lua_dia, get_nascer_por_sol, get_fases_mes,
     get_observatorio, momento_de
 )
 
-from eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
-from apod import get_imagem_do_dia                           # importa Imagem Astronómica do Dia (NASA)
-from iss import get_posicao_iss                            # Estação Espacial Internacional (ISS)
-from config import LOCATION                                  # importa localização
-import datetime                                              # conversão e validação de datas/horas
-from zoneinfo import ZoneInfo                                # conversão de fuso horário
-from flask import request                                    # para ler query parameters
+from py.ceu.eventos import get_eventos_do_dia, get_eventos_do_mes  # importa funções de eventos
+from py.astronomia.apod import get_imagem_do_dia                   # importa Imagem Astronómica do Dia (NASA)
+from py.astronomia.iss import get_posicao_iss                      # Estação Espacial Internacional (ISS)
+from py.config import LOCATION                                     # importa localização
+import datetime                                                    # conversão e validação de datas/horas
+from zoneinfo import ZoneInfo                                      # conversão de fuso horário
+from flask import request                                          # para ler query parameters
 
-from db import criar_esquema, fechar_ligacao                 # base de dados (contas, favoritos, observações)
-from auth import auth_bp, localizacao_do_utilizador          # rotas de conta e localização pessoal
-from admin import admin_bp                                   # página de administração (/admin)
+from py.database.db import criar_esquema, fechar_ligacao           # base de dados (contas, favoritos, observações)
+from py.database.auth import auth_bp, localizacao_do_utilizador    # rotas de conta e localização pessoal
+from py.database.admin import admin_bp                             # página de administração (/admin)
 
 app = Flask(__name__)                               # cria a aplicação Flask
                                                     # __name__ diz ao Flask onde está a pasta do projeto

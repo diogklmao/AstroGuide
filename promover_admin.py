@@ -26,7 +26,7 @@ import sys
 import sqlite3
 from contextlib import closing
 
-import db
+from py.database import db
 
 
 def abrir_bd():

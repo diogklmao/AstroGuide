@@ -17,7 +17,7 @@ import requests                          # pedido do TLE à Celestrak
 from skyfield.api import EarthSatellite  # propaga um satélite a partir do seu TLE
 
 # --- Módulos internos ---
-from sky_engine import ts, observador, observador_de   # o tempo e o ponto de observação
+from py.astronomia.sky_engine import ts, observador, observador_de   # o tempo e o ponto de observação
 
 log = logging.getLogger(__name__)
 
