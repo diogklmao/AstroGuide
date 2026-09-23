@@ -314,6 +314,11 @@ const IMAGENS_ASTROS = {
     "Saturno": { src: "/static/images/saturn.png", size: 34 },
     "Úrano": { src: "/static/images/uranus.png", size: 25 },
     "Neptuno": { src: "/static/images/neptune.png", size: 24 },
+    // A ISS tem imagem própria porque é o objeto que se anda à procura no céu
+    // e um ponto branco, por muito que brilhe, não diz o que ali está. O
+    // "size" dela não quer dizer o mesmo que nos planetas: ver o ramo dela no
+    // desenho dos astros, mais abaixo, onde é ele que manda no tamanho.
+    "ISS": { src: "/static/images/iss.png", size: 20 },
 };
 
 const imgsAstros = {};
@@ -1817,6 +1822,20 @@ function desenharObservatorio() {
                     const drawW = size * 2.2;
                     const drawH = size * 2.2;
                     ctx.drawImage(imgAstro, pos.x - drawW / 2, pos.y - drawH / 2, drawW, drawH);
+                } else if (astro.nome === "ISS") {
+                    // A ISS leva o mesmo tratamento do Saturno, e pela mesma razão:
+                    // é um objeto LARGO. O recorte circular dos planetas pressupõe uma
+                    // imagem quadrada com o astro ao centro, e este não é o caso — a
+                    // fotografia da estação é 3:2, com os painéis solares a estenderem-se
+                    // para os lados. Ao desenhá-la no quadrado do recorte, ela saía
+                    // espremida 33% na horizontal; e o círculo, que mostra só os 80%
+                    // centrais da imagem, cortava as pontas dos painéis. Aqui a imagem
+                    // é desenhada inteira, num retângulo com a proporção dela — 3 de
+                    // largura por 2 de altura. Mexer no "size" da lista lá em cima é o
+                    // que a faz maior ou mais pequena.
+                    const drawW = size * 3;
+                    const drawH = drawW / 1.5;
+                    ctx.drawImage(imgAstro, pos.x - drawW / 2, pos.y - drawH / 2, drawW, drawH);
                 } else {
                     // Recorta a imagem em círculo e aplica zoom para eliminar quaisquer bordas
                     ctx.save();
@@ -1875,7 +1894,13 @@ function desenharObservatorio() {
                 nome: astro.nome,
                 x: pos.x,
                 y: pos.y,
-                raio: imgAstro ? size + 4 : 12,
+                // O raio é a área onde o clique apanha o objeto — e é também o
+                // que o destaque tracejado usa (raio + 4, mais abaixo). Nos astros
+                // de imagem redonda é o raio do disco desenhado; na ISS, que é
+                // desenhada larga e baixa, tem de cobrir a LARGURA toda. Com o
+                // size + 4 dos planetas, clicar nas pontas dos painéis solares
+                // não pegava — e são elas que ocupam quase toda a imagem.
+                raio: imgAstro ? (astro.nome === "ISS" ? size * 1.5 : size + 4) : 12,
                 tipo: astro.tipo,
                 mag: astro.tipo === "sol" ? "-26.7" : (astro.tipo === "lua" ? "-12.5" : "Variável"),
                 altitude: astro.altitude,

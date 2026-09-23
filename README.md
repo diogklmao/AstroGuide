@@ -245,6 +245,12 @@ astroguide/
     │   │
     │   ├── moon_render.png, sun.png → Imagens da Lua e Sol.
     │   │
+    │   ├── iss.png        → Fotografia da Estação Espacial
+    │   │                  Internacional (ISS), desenhada no
+    │   │                  Observatório sem o recorte circular
+    │   │                  dos planetas — é um objeto largo, e o
+    │   │                  círculo cortava-lhe as pontas.
+    │   │
     │   └── space.jpg      → Panorâmica da Via Láctea, usada
     │                        como fundo do céu no Observatório
     │                        360° (com efeito parallax).
