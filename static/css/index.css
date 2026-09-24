@@ -1006,6 +1006,43 @@ nav button:hover:not(.ativo) {
     flex-grow: 1;
 }
 
+/* Descer a câmara ao céu que está debaixo dos pés. É o par da caixa
+   "Ver abaixo do horizonte", logo acima — por isso é azul, a mesma cor da
+   caixa e dos nomes do céu, e não o lilás do "Tempo Real", que é do tempo. */
+.obs-btn-descer {
+    width: 100%;
+    padding: 8px 0;
+    margin-bottom: 12px;
+    background: rgba(110, 184, 255, 0.1);
+    color: #9ed4ff;
+    border: 1px solid rgba(110, 184, 255, 0.3);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+/* O :not(:disabled) é para o botão apagado não responder ao rato como se
+   estivesse vivo — sem ele, o hover acendia-o no Planisfério. */
+.obs-btn-descer:hover:not(:disabled) {
+    background: rgba(110, 184, 255, 0.25);
+    box-shadow: 0 0 14px rgba(110, 184, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.obs-btn-descer:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+/* No Planisfério não há céu de baixo para onde descer (ver alternarCeusSobOsPes,
+   no index.js). Apagado mas legível: o title continua a dizer o que ele faz. */
+.obs-btn-descer:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* ── Observatório em Ecrã Inteiro (Fullscreen Imersivo) ──────────────── */
 
 /* Quando o observatório está ativo, os menus superiores flutuam */
@@ -1603,6 +1640,7 @@ body.red-velvet-mode .config-linha-check label {
 body.red-velvet-mode .glass-select,
 body.red-velvet-mode .obs-input,
 body.red-velvet-mode .obs-btn-agora,
+body.red-velvet-mode .obs-btn-descer,
 body.red-velvet-mode #btn-toggle-painel {
     border-color: rgba(255, 60, 80, 0.45) !important;
     color: #ffb8c3 !important;
@@ -1610,6 +1648,7 @@ body.red-velvet-mode #btn-toggle-painel {
 }
 
 body.red-velvet-mode .obs-btn-agora:hover,
+body.red-velvet-mode .obs-btn-descer:hover:not(:disabled),
 body.red-velvet-mode #btn-toggle-painel:hover {
     background: rgba(255, 40, 65, 0.3) !important;
     color: #fff !important;

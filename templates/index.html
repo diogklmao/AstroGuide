@@ -143,6 +143,28 @@
                             <input type="checkbox" id="chk-ceu-profundo" checked onchange="desenharObservatorio()">
                             <label for="chk-ceu-profundo">🔭 Objetos de Céu Profundo</label>
                         </div>
+                        <!-- Tira o chão e mostra o que está debaixo do horizonte.
+                             O que escondia esses objetos não era o chão, era o
+                             teste de visibilidade de cada camada (ver
+                             verAbaixoDoHorizonte, no index.js) — o chão só
+                             tapava o sítio onde eles haviam de aparecer.
+                             Só faz efeito na Vista 360°: no Planisfério o que
+                             está abaixo do horizonte cai fora do círculo, e
+                             não há lá sítio para o desenhar. -->
+                        <div class="config-linha-check">
+                            <input type="checkbox" id="chk-ver-abaixo" onchange="desenharObservatorio()">
+                            <label for="chk-ver-abaixo">🌍 Ver abaixo do horizonte</label>
+                        </div>
+                        <!-- O par da caixa de cima: a caixa é o que existe para
+                             desenhar, este botão é para onde a câmara olha. Sem
+                             ele, chegar ao céu de baixo obrigava a arrastar o
+                             rato mais de um ecrã inteiro (a sensibilidade do
+                             arrasto sai da largura do ecrã) e a arrastar outro
+                             tanto para voltar. Por isso ele alterna: desce, e
+                             depois sobe. Ver alternarCeusSobOsPes, no index.js. -->
+                        <button type="button" id="btn-ceu-sob-pes" class="obs-btn-descer"
+                            title="Descer a câmara até ao céu que não se vê daqui — o polo celeste escondido"
+                            onclick="alternarCeusSobOsPes()">⤓ Céu sob os pés</button>
                         <div class="config-linha">
                             <label for="rng-mag">Brilho (Mag ≤)</label>
                             <input type="range" id="rng-mag" min="-1.5" max="5.0" step="0.5" value="5.0"

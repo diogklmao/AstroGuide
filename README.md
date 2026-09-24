@@ -639,6 +639,18 @@ DRY (Don't Repeat Yourself)
   [x] Fundo panorâmico real da Via Láctea, com parallax
   [x] Clique num astro/estrela/constelação para ver detalhes
   [x] Painel de filtros — constelações, nomes, magnitude
+  [x] "Ver abaixo do horizonte" — tira o chão e mostra as
+      estrelas, constelações e planetas que estão debaixo do
+      horizonte, desenhados mais apagados para se perceber
+      que não estão observáveis nesse instante (só na vista
+      360°: no Planisfério eles caem fora do círculo)
+  [x] Botão "⤓ Céu sob os pés" — desce a câmara de uma vez
+      até ao polo celeste escondido (o meio da metade do céu
+      que nunca se vê daqui) e volta a subir no clique
+      seguinte. Sem ele, chegar lá abaixo era arrastar o rato
+      mais de um ecrã inteiro, e outro tanto para voltar — a
+      caixa sozinha não chegava para ver aquilo que ela
+      própria destapa
   [x] Painel lateral com scroll independente
   [x] Viagem no Tempo — simular o céu em qualquer data/hora
   [x] Botão "↺ Tempo Real" para voltar ao céu atual

@@ -297,6 +297,17 @@ let cameraAzimuth = CAMERA_AZ_INICIAL;   // 0° = Norte, 90° = Este, 180° = Su
 let cameraAltitude = CAMERA_ALT_INICIAL;  // Altitude em graus (-85° a 85°)
 let cameraFOV = 80;       // Campo de visão horizontal em graus
 
+// O mínimo que o "Céu sob os pés" desce, em graus (ver
+// altitudeDoCeuEscondido). Existe por causa do equador, onde a conta dá zero.
+const MERGULHO_MINIMO = 40;
+
+// Abaixo desta altitude a câmara conta como estando a olhar para o céu de
+// baixo, e é isso que decide se o botão diz "Céu sob os pés" ou "Voltar ao céu
+// de cima". Não é o 0: no horizonte exato o rótulo ficava a piscar a cada
+// arrasto que passasse por ali, e uns graus abaixo já se vê o suficiente para
+// o botão fazer sentido.
+const ALT_DE_ESTAR_ABAIXO = -5;
+
 // Imagem de fundo do céu (Via Láctea real) — dá um efeito panorâmico ao rodar a câmara
 const imgCeuFundo = new Image();
 imgCeuFundo.src = "/static/images/space.jpg";
@@ -431,6 +442,19 @@ function alterarModoVisao() {
         cancelarAnimacaoCamera();
         cameraAzimuth = CAMERA_AZ_INICIAL;
         cameraAltitude = CAMERA_ALT_INICIAL;
+    }
+
+    // O "Céu sob os pés" só existe no Planisfério, não: ali não há céu de baixo
+    // para onde descer (ver alternarCeusSobOsPes). Desativado em vez de
+    // escondido — um botão que aparece e desaparece faz saltar o que vem
+    // abaixo no painel, e assim continua lá a explicar porque é que não dá.
+    const botaoSobOsPes = document.getElementById("btn-ceu-sob-pes");
+    if (botaoSobOsPes) {
+        const podeDescer = modo === "360";
+        botaoSobOsPes.disabled = !podeDescer;
+        botaoSobOsPes.title = podeDescer
+            ? "Descer a câmara até ao céu que não se vê daqui — o polo celeste escondido"
+            : "Só na Vista 360°: no Planisfério o céu de baixo cai fora do círculo";
     }
 }
 
@@ -1304,8 +1328,126 @@ function desenharSimboloCeuProfundo(ctx, x, y, raio, tipo) {
     ctx.restore();
 }
 
+// ── Ver abaixo do horizonte ───────────────────────────────────────
+// O que escondia o céu debaixo dos pés NÃO era o chão. É o "if (!visivel)"
+// que existe em cada camada, e que salta o objeto antes sequer de o tentar
+// desenhar (estrelas, céu profundo, astros, linhas de constelações). O chão
+// só tapava o sítio onde ele havia de aparecer — por isso torná-lo
+// transparente, sem mexer nesses testes, mostrava um céu vazio.
+//
+// Com a opção ligada: o chão deixa de ser PINTADO (a linha do horizonte fica,
+// para não se perder a orientação) e os objetos de baixo são desenhados, mais
+// apagados do que os de cima — para continuar a ver-se que não estão
+// observáveis neste instante.
+//
+// Lê-se a caixa a cada pergunta, em vez de guardar o estado numa variável:
+// assim não há dois estados a poderem divergir (a caixa e a variável). A
+// regra de só valer na vista 360° vive aqui, e não em cada sítio que
+// pergunta, senão o desenho e a pesquisa podiam discordar um do outro.
+function verAbaixoDoHorizonte() {
+    const caixa = document.getElementById("chk-ver-abaixo");
+    if (!caixa || !caixa.checked) return false;
+
+    // No Planisfério (2D) a opção não se aplica: ali a projeção é
+    // r = raioMax × (90 − altitude) / 90, por isso logo abaixo do horizonte o
+    // raio passa do raioMax e os objetos caem FORA do círculo, no rebordo do
+    // canvas. Não é uma escolha de desenho, é a geometria do planisfério —
+    // não há lá sítio para eles. O chão, esse, só existe na vista 360°.
+    const modoSelect = document.getElementById("sel-modo-visao");
+    return !modoSelect || modoSelect.value === "360";
+}
+
+// ── Céu sob os pés ────────────────────────────────────────────────
+// Isto é a CÂMARA, não o desenho: a caixa lá em cima decide o que existe para
+// ser desenhado, este botão decide para onde se está a olhar. São duas coisas
+// diferentes, e é por isso que são dois controlos — mas andam juntos, porque
+// nenhum deles serve de nada sem o outro.
+//
+// Ele existe porque a caixa sozinha não chegava. A sensibilidade do arrasto
+// sai da largura do ecrã (ver moverArrasto), por isso descer dos +15° do
+// início até ao céu escondido são mais de mil pixels de rato arrastado para
+// baixo — um ecrã inteiro, e outro tanto para voltar a subir. Com um botão,
+// vai-se e volta-se num clique.
+function alternarCeusSobOsPes() {
+    // No Planisfério não há céu de baixo nenhum: ali a projeção é
+    // r = raioMax × (90 − altitude) / 90 e o que está abaixo do horizonte cai
+    // fora do círculo. O botão nasce desativado nesse modo (ver
+    // alterarModoVisao) e este teste é a segunda rede — um botão desativado
+    // ainda pode ser chamado a partir da consola.
+    const modoSelect = document.getElementById("sel-modo-visao");
+    if (!modoSelect || modoSelect.value !== "360") return;
+
+    // Já se está lá em baixo: o que falta é voltar.
+    if (cameraAltitude < ALT_DE_ESTAR_ABAIXO) {
+        animarCameraPara(cameraAzimuth, CAMERA_ALT_INICIAL);
+        return;
+    }
+
+    // A caixa é ligada aqui, e não se espera que o utilizador a tenha ligado
+    // antes: descer a câmara com a caixa desligada era mergulhar dentro de um
+    // chão opaco. O botão parecia avariado e não estava.
+    const caixa = document.getElementById("chk-ver-abaixo");
+    if (caixa) caixa.checked = true;
+
+    animarCameraPara(cameraAzimuth, altitudeDoCeuEscondido());
+}
+
+// Para onde a câmara desce no "Céu sob os pés": o polo celeste que está
+// escondido. Quem está a norte nunca chega a ver o polo sul, e a latitude é
+// exatamente o quanto esse polo fica abaixo do horizonte (os -41,1° de Gaia);
+// a sul é a mesma coisa com o polo norte ao contrário. Nos dois casos o polo
+// escondido está a -|latitude|, e é ele o meio da metade do céu que não se vê
+// — é para lá que apontam as constelações que a caixa destapa.
+//
+// Não é o nadir (os -90°, o ponto mesmo debaixo dos pés). O nadir é só o
+// ponto geométrico oposto ao zénite, e apontar-lhe deixa quase todo o céu
+// escondido de fora, por cima do ecrã. O polo escondido é que é o meio da
+// metade do céu que não se vê, e é lá que se quer estar.
+function altitudeDoCeuEscondido() {
+    const latitude = observatorioDados ? observatorioDados.latitude : null;
+
+    // Sem latitude — céu ainda por carregar — não se sabe onde é que o céu
+    // esconde mais. Desce-se o mínimo, que é o que se pode prometer sem saber
+    // onde se está.
+    if (typeof latitude !== "number") return -MERGULHO_MINIMO;
+
+    // No equador os dois polos estão em cima do horizonte e a conta dá zero: o
+    // botão não descia nada. O mínimo garante que há sempre céu escondido no
+    // ecrã, que é o serviço que ele promete.
+    return Math.min(-Math.abs(latitude), -MERGULHO_MINIMO);
+}
+
+// O rótulo diz o que o botão vai fazer AGORA, e não o que faz sempre: quem já
+// está lá em baixo não quer descer outra vez, quer voltar. É chamado a cada
+// desenho — e não só no fim da viagem — porque a câmara também se pode pôr lá
+// em baixo à mão, a arrastar, sem passar pelo botão. A comparação antes de
+// escrever é o que torna isto barato: sem ela seria uma escrita no DOM por
+// cada frame de arrasto.
+function atualizarBotaoCeusSobOsPes() {
+    const botao = document.getElementById("btn-ceu-sob-pes");
+    if (!botao) return;
+
+    const abaixo = cameraAltitude < ALT_DE_ESTAR_ABAIXO;
+    const rotulo = abaixo ? "↥ Voltar ao céu de cima" : "⤓ Céu sob os pés";
+    if (botao.textContent !== rotulo) botao.textContent = rotulo;
+}
+
+// A opacidade com que se desenha o que está debaixo do horizonte. Não é 0
+// (não se veria nada, e é para ver que a opção existe) nem 1 (não se
+// distinguiria do que está acima, que é a informação que se perde ao tirar o
+// chão). Com o céu de baixo a ser visto de propósito — e não só de esguelha,
+// como era antes de haver o "Céu sob os pés" — o 0,45 deixava as estrelas a
+// perder-se no fundo escuro: a 0,6 ainda se lê como "não está observável" e
+// já se vê aquilo para que se desceu.
+const ALFA_ABAIXO = 0.6;
+
 // ── Renderização do Observatório ──────────────────────────────────
 function desenharObservatorio() {
+    // Antes do teste do canvas: o rótulo do botão depende só de onde a câmara
+    // está, e não de haver céu para desenhar. Assim fica certo mesmo que o
+    // desenho saia já a seguir.
+    atualizarBotaoCeusSobOsPes();
+
     const canvas = document.getElementById("observatorio-canvas");
     if (!canvas || !observatorioDados) return;
 
@@ -1318,6 +1460,11 @@ function desenharObservatorio() {
 
     const modoSelect = document.getElementById("sel-modo-visao");
     const modoVisao = modoSelect ? modoSelect.value : "360";
+
+    // Lido uma vez por desenho, e não a cada objeto: são ~98 estrelas, 36
+    // objetos de céu profundo e 73 linhas de constelação, e cada pergunta
+    // à caixa é um getElementById. O valor não muda a meio de um frame.
+    const verAbaixo = verAbaixoDoHorizonte();
 
     // Limpar canvas
     ctx.clearRect(0, 0, width, height);
@@ -1446,22 +1593,29 @@ function desenharObservatorio() {
             const horizY = horizonPoints[Math.floor(horizonPoints.length / 2)].y;
 
             // ── Solo: gradiente escuro e limpo ───────────────────
-            ctx.beginPath();
-            ctx.moveTo(horizonPoints[0].x, horizonPoints[0].y);
-            for (let i = 1; i < horizonPoints.length; i++) {
-                ctx.lineTo(horizonPoints[i].x, horizonPoints[i].y);
-            }
-            ctx.lineTo(width, height);
-            ctx.lineTo(0, height);
-            ctx.closePath();
+            // Com "Ver abaixo do horizonte" ligado, este preenchimento não é
+            // pintado: é ele que tapa precisamente a metade do céu que se quer
+            // ver. A linha do horizonte e a névoa, mais abaixo, ficam as duas —
+            // sem elas perder-se-ia a noção de onde o céu acaba, que é a única
+            // coisa que o chão dizia e que continua a fazer falta.
+            if (!verAbaixo) {
+                ctx.beginPath();
+                ctx.moveTo(horizonPoints[0].x, horizonPoints[0].y);
+                for (let i = 1; i < horizonPoints.length; i++) {
+                    ctx.lineTo(horizonPoints[i].x, horizonPoints[i].y);
+                }
+                ctx.lineTo(width, height);
+                ctx.lineTo(0, height);
+                ctx.closePath();
 
-            const gradGround = ctx.createLinearGradient(0, horizY, 0, height);
-            gradGround.addColorStop(0, "rgba(9, 11, 17, 0.97)");
-            gradGround.addColorStop(0.3, "rgba(7, 9, 14, 0.98)");
-            gradGround.addColorStop(0.65, "rgba(5, 6, 10, 0.99)");
-            gradGround.addColorStop(1, "rgba(2, 2, 4, 1.00)");
-            ctx.fillStyle = gradGround;
-            ctx.fill();
+                const gradGround = ctx.createLinearGradient(0, horizY, 0, height);
+                gradGround.addColorStop(0, "rgba(9, 11, 17, 0.97)");
+                gradGround.addColorStop(0.3, "rgba(7, 9, 14, 0.98)");
+                gradGround.addColorStop(0.65, "rgba(5, 6, 10, 0.99)");
+                gradGround.addColorStop(1, "rgba(2, 2, 4, 1.00)");
+                ctx.fillStyle = gradGround;
+                ctx.fill();
+            }
 
             // Nota: não há silhueta de montanhas no horizonte — foi removida
             // a pedido do utilizador. Não voltar a adicionar sem perguntar.
@@ -1593,21 +1747,49 @@ function desenharObservatorio() {
             // camada, desfocá-la e compô-la; com 73 linhas eram 73 dessas camadas
             // por frame, agora são 15 (uma por constelação). O traço fica igual.
             ctx.beginPath();
+            // As linhas que ficam inteiramente abaixo do horizonte são
+            // guardadas para um segundo traço, mais apagado, no fim — e só
+            // quando a opção está ligada. Guardá-las em vez de as traçar já é
+            // o que permite manter UM traço por constelação no caso normal:
+            // cada stroke() com brilho neon obriga o browser a criar uma
+            // camada e a compô-la, e foi por isso que as 73 linhas passaram a
+            // 15. Com a opção ligada são 15, mais as constelações que tiverem
+            // linhas debaixo do chão.
+            const linhasAbaixo = [];
             constelacao.linhas.forEach(linha => {
                 const estA = estrelas[linha[0]];
                 const estB = estrelas[linha[1]];
+                if (!estA || !estB) return;
 
-                if (estA && estB && (estA.visivel || estB.visivel)) {
-                    const posA = projectarEstrela(linha[0]);
-                    const posB = projectarEstrela(linha[1]);
+                // Basta uma das pontas estar acima: uma linha entre uma estrela
+                // que se vê e outra que já se pôs continua a ser uma linha do
+                // céu que se vê, e é a metade de cima que interessa.
+                const algumaAcima = estA.visivel || estB.visivel;
+                if (!algumaAcima && !verAbaixo) return;
 
-                    if (posA && posB) {
-                        ctx.moveTo(posA.x, posA.y);
-                        ctx.lineTo(posB.x, posB.y);
-                    }
+                const posA = projectarEstrela(linha[0]);
+                const posB = projectarEstrela(linha[1]);
+                if (!posA || !posB) return;
+
+                if (algumaAcima) {
+                    ctx.moveTo(posA.x, posA.y);
+                    ctx.lineTo(posB.x, posB.y);
+                } else {
+                    linhasAbaixo.push([posA, posB]);
                 }
             });
             ctx.stroke();
+
+            if (linhasAbaixo.length > 0) {
+                ctx.globalAlpha = ALFA_ABAIXO;
+                ctx.beginPath();
+                linhasAbaixo.forEach(([a, b]) => {
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
+                });
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
 
             // Calcular centróide da constelação (usado para nomes e cliques)
             let sumX = 0, sumY = 0, count = 0;
@@ -1616,7 +1798,7 @@ function desenharObservatorio() {
                 estrelasUnicas.add(linha[0]);
                 estrelasUnicas.add(linha[1]);
                 const estA = estrelas[linha[0]];
-                if (estA && estA.visivel) {
+                if (estA && (estA.visivel || verAbaixo)) {
                     const pos = projectarEstrela(linha[0]);
                     if (pos) {
                         sumX += pos.x;
@@ -1691,13 +1873,19 @@ function desenharObservatorio() {
 
         for (const dso_id in ceuProfundo) {
             const dso = ceuProfundo[dso_id];
-            if (!dso.visivel) continue;
+            if (!dso.visivel && !verAbaixo) continue;
             if (dso.mag > MAG_LIMITE_CEU_PROFUNDO) continue;
 
             const pos = projectar(dso.altitude, dso.azimute);
             if (!pos) continue; // fora do campo de visão, na projeção 360°
 
             const raio = raioSimboloCeuProfundo(dso.dimensao);
+
+            // Debaixo do horizonte desenha-se apagado (ver ALFA_ABAIXO). O
+            // desenharSimboloCeuProfundo faz o seu próprio save/restore e não
+            // lhe toca, por isso a opacidade atravessa-o e é preciso repô-la
+            // depois — este ctx é o mesmo para o resto do desenho.
+            ctx.globalAlpha = dso.visivel ? 1 : ALFA_ABAIXO;
 
             desenharSimboloCeuProfundo(ctx, pos.x, pos.y, raio, dso.tipo);
 
@@ -1706,6 +1894,8 @@ function desenharObservatorio() {
             // encher de texto, e quem o quiser clica e lê-o no painel.
             ctx.fillStyle = "rgba(255, 224, 170, 0.55)";
             ctx.fillText(" " + dso.nome.split(" (")[0], pos.x + raio + 2, pos.y);
+
+            ctx.globalAlpha = 1;
 
             // Registar elemento para cliques. O raio é maior do que o símbolo:
             // o desenho é a traço e com um buraco no meio, e quem clica acerta
@@ -1745,12 +1935,17 @@ function desenharObservatorio() {
 
     for (const est_id in estrelas) {
         const est = estrelas[est_id];
-        if (!est.visivel) continue;
+        if (!est.visivel && !verAbaixo) continue;
         if (est.mag > magLimite) continue;
 
         // Já pode estar calculada, se a estrela pertencer a uma constelação
         const pos = projectarEstrela(est_id);
         if (!pos) continue; // ignora se estiver fora da perspetiva 3D
+
+        // As estrelas debaixo do chão desenham-se apagadas (ver ALFA_ABAIXO).
+        // Numa estrela o campo "visivel" vem sempre preenchido, por isso aqui
+        // o teste é direto e não precisa de olhar para o modo.
+        ctx.globalAlpha = est.visivel ? 1 : ALFA_ABAIXO;
 
         // Tamanho da estrela com base na magnitude
         const maxStarSize = 4.5;
@@ -1790,6 +1985,8 @@ function desenharObservatorio() {
             ctx.fillText(" " + est.nome, pos.x + starSize + 2, pos.y);
         }
 
+        ctx.globalAlpha = 1;   // repor antes de passar à estrela seguinte
+
         // Registar elemento para cliques
         elementosNoEcra.push({
             id: est_id,
@@ -1808,13 +2005,19 @@ function desenharObservatorio() {
     if (showAstros) {
         const astros = observatorioDados.astros;
         astros.forEach(astro => {
-            if (!astro.visivel) return;
+            if (!astro.visivel && !verAbaixo) return;
 
             const pos = projectar(astro.altitude, astro.azimute);
             if (!pos) return; // ignora se estiver fora do FOV 3D
 
             const imgAstro = imagemAstro(astro.nome);
             const size = tamanhoAstro(astro.nome);
+
+            // Debaixo do horizonte o astro desenha-se apagado (ver ALFA_ABAIXO).
+            // Fica posto antes dos ramos das imagens: o ramo do recorte circular
+            // faz save/restore, e o restore devolve este mesmo valor — o save
+            // guarda-o e o restore repõe-no, não o deita fora.
+            ctx.globalAlpha = astro.visivel ? 1 : ALFA_ABAIXO;
 
             if (imgAstro) {
                 if (astro.nome === "Saturno") {
@@ -1886,6 +2089,8 @@ function desenharObservatorio() {
             ctx.textAlign = "center";
             ctx.textBaseline = "bottom";
             ctx.fillText(astro.nome, pos.x, pos.y - size - 4);
+
+            ctx.globalAlpha = 1;   // repor antes de passar ao astro seguinte
 
             // Fase da Lua em Emoji (só no painel de detalhes, não no canvas)
 
@@ -2355,7 +2560,10 @@ function procurarObjetos(termo) {
 // ── Onde apontar a câmara ─────────────────────────────────────────
 
 // O ponto do céu de uma constelação. Devolve null quando nenhuma das suas
-// estrelas está acima do horizonte.
+// estrelas serve para apontar — o que, por omissão, quer dizer nenhuma acima
+// do horizonte. Com "Ver abaixo do horizonte" ligado, as de baixo também
+// servem: elas estão a ser desenhadas no mapa, e a pesquisa e o tour têm de
+// concordar com o que se vê, senão recusam-se a ir a um sítio que está à vista.
 function alvoDaConstelacao(const_id) {
     if (!observatorioDados || !observatorioDados.constelacoes || !observatorioDados.estrelas) return null;
     const constelacao = observatorioDados.constelacoes[const_id];
@@ -2370,7 +2578,7 @@ function alvoDaConstelacao(const_id) {
     // escrito no ecrã, e é isso que a câmara tem de centrar.
     constelacao.linhas.forEach(linha => {
         const est = estrelas[linha[0]];
-        if (!est || !est.visivel) return;
+        if (!est || (!est.visivel && !verAbaixoDoHorizonte())) return;
 
         // Média de VETORES UNITÁRIOS, não de coordenadas. Altitude e azimute são
         // ângulos, e a média deles não é o meio de nada: entre 359° e 1° daria
@@ -2465,7 +2673,10 @@ function alvoDeApontar(item) {
     const posicao = posicaoAtualDe(item);
     if (!posicao) return { motivo: null };
 
-    if (!posicao.visivel) {
+    // Com "Ver abaixo do horizonte" ligado, o objeto está desenhado no mapa e
+    // não há razão nenhuma para o "ir para" se recusar a apontar-lhe: o aviso
+    // é para o caso de ele não se ver, e nesse modo vê-se.
+    if (!posicao.visivel && !verAbaixoDoHorizonte()) {
         // A ISS já escreve isto no seu painel; nos outros objetos é aqui que
         // se fica a saber.
         return item.tipo === "iss"
@@ -2707,6 +2918,11 @@ function iniciarTour() {
     for (const const_id in constelacoes) {
         // Só entram as que têm, agora, pelo menos uma estrela acima do
         // horizonte: uma paragem a apontar para o chão não é uma paragem.
+        //
+        // A exceção é o "Ver abaixo do horizonte": aí as que estão debaixo do
+        // chão também entram, porque estão a ser desenhadas no mapa — e um
+        // tour que salta metade do que se vê é que seria incompreensível. A
+        // decisão é do alvoDaConstelacao, que é quem sabe as duas coisas.
         //
         // O que NÃO se testa aqui é o "Linhas de Constelações" dos Controlos.
         // É de propósito: o tour é para ler as curiosidades, e uma visita que
