@@ -32,7 +32,7 @@
 
         <nav id="nav-bar" class="glass-panel glass-nav">
             <button id="btn-ceu" onclick="mudarEcra('ceu')">🌌 Céu Agora</button>
-            <button id="btn-calendario" onclick="mudarEcra('calendario')">📅 Calendário Lunar</button>
+            <button id="btn-calendario" onclick="mudarEcra('calendario')">📅 Calendário Cósmico</button>
             <button id="btn-observatorio" onclick="mudarEcra('observatorio')">🔭 Observatório</button>
             <button id="btn-apod" onclick="mudarEcra('apod')">📰 NASA - Imagem do Dia</button>
         </nav>
@@ -82,9 +82,8 @@
                     <div class="observatorio-pesquisa glass-panel">
                         <div class="card-titulo" style="color:#ffcc02">🔎 Pesquisa</div>
                         <input type="text" id="obs-pesquisa" class="obs-input" autocomplete="off"
-                            placeholder="Procurar estrela, constelação, planeta…"
-                            oninput="aoEscreverPesquisa()" onfocus="aoEscreverPesquisa()"
-                            onkeydown="tratarTeclaPesquisa(event)">
+                            placeholder="Procurar estrela, constelação, planeta…" oninput="aoEscreverPesquisa()"
+                            onfocus="aoEscreverPesquisa()" onkeydown="tratarTeclaPesquisa(event)">
                         <!-- A lista vive aqui dentro, em fluxo normal: o painel
                              lateral já tem scroll próprio e uma caixa fixa
                              partir-se-ia quando ele estivesse recolhido. -->
@@ -171,21 +170,26 @@
                                 oninput="document.getElementById('lbl-mag').textContent = parseFloat(this.value).toFixed(1); desenharObservatorio()">
                             <span id="lbl-mag">5.0</span>
                         </div>
-                        <div class="config-linha-check" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div class="config-linha-check"
+                            style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
                             <input type="checkbox" id="chk-night-mode" onchange="toggleNightMode(this.checked)">
-                            <label for="chk-night-mode" style="color: #ff7085; font-weight: 600;">🔴 Night Mode (Red Velvet)</label>
+                            <label for="chk-night-mode" style="color: #ff7085; font-weight: 600;">🔴 Night Mode (Red
+                                Velvet)</label>
                         </div>
                     </div>
                     <!-- Painel de Detalhes -->
                     <div id="observatorio-detalhes" class="glass-panel">
                         <div class="detalhe-titulo">ℹ️ Detalhes</div>
                         <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">
-                            Clique num astro, estrela, constelação ou objeto de céu profundo no mapa celeste para ver os seus detalhes astronómicos.</p>
+                            Clique num astro, estrela, constelação ou objeto de céu profundo no mapa celeste para ver os
+                            seus detalhes astronómicos.</p>
                     </div>
                 </div>
                 <!-- Mapa Celeste -->
                 <div class="observatorio-mapa-wrapper glass-panel">
-                    <button id="btn-night-mode" onclick="toggleNightMode()" class="btn-night-mode" title="Modo Noturno (Red Velvet) para preservar a visão noturna">🔴 Night Mode (Red Velvet)</button>
+                    <button id="btn-night-mode" onclick="toggleNightMode()" class="btn-night-mode"
+                        title="Modo Noturno (Red Velvet) para preservar a visão noturna">🔴 Night Mode (Red
+                        Velvet)</button>
                     <button id="btn-entrar-vr" onclick="mudarEcra('vr')" title="Abrir Observatório VR">🥽 VR</button>
                     <button id="btn-iss" onclick="mostrarDetalhesISS()"
                         title="Estação Espacial Internacional: ver onde ela está agora">🛰 ISS</button>
