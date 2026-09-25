@@ -197,8 +197,11 @@ verificar("o hash não contém a password", "password123" not in linha[0], linha
 verificar("o hash tem o formato do werkzeug", linha[0].count("$") >= 2)
 
 print("\n== 12. Páginas ==")
-r = c.get("/entrar")
-verificar("/entrar devolve 200", r.status_code == 200, r.status_code)
+# A entrada é pedida com um cliente SEM sessão: quem já entrou é mandado para o
+# perfil (ver pagina_entrar, no auth.py), e o que aqui se quer ver é a página
+# com os formulários.
+r = c2.get("/entrar")
+verificar("/entrar devolve 200 a quem não tem conta", r.status_code == 200, r.status_code)
 verificar("a página traz os dois formulários",
           b'id="form-entrar"' in r.data and b'id="form-registar"' in r.data)
 for rota in ["/", "/app", "/ceu", "/observatorio", "/apod", "/calendario"]:
@@ -213,7 +216,7 @@ for rota, esperado in [("/", b"conta.js"), ("/app", b"conta.js")]:
     verificar(f"{rota} carrega o shared-ui-controls.js antes do conta.js",
               r.data.find(b"shared-ui-controls.js") < r.data.find(b"conta.js"))
 
-r = c.get("/entrar")
+r = c2.get("/entrar")   # sem sessão — é a página de entrada que se quer ver
 verificar("/entrar carrega o auth.js", b"auth.js" in r.data)
 verificar("/entrar carrega o auth.css", b"auth.css" in r.data)
 
@@ -233,31 +236,41 @@ verificar("o menu.js chama a versão partilhada", b"window.criarEstrelas()" in r
 r = c.get("/static/js/auth.js")
 verificar("a página de entrada usa a versão partilhada", b"window.criarEstrelas()" in r.data)
 
-print("\n== 14. O botão de conta some-se nos modos imersivos ==")
+print("\n== 14. O botão de conta é a porta para o perfil ==")
 css = c.get("/static/css/conta.css").data.decode("utf-8")
 js  = c.get("/static/js/conta.js").data.decode("utf-8")
+
+# O botão é uma ligação, e não um botão que abre um painel por cima da página:
+# é o que o faz funcionar com o teclado, com o clique do meio e antes de o
+# JavaScript responder. O href é sempre o mesmo, com sessão ou sem ela — quem
+# não tem conta é a página de entrada que o recebe, e volta ao perfil depois de
+# entrar (ver pagina_perfil, no auth.py).
+verificar("o botão de conta é um <a>", 'createElement("a")' in js)
+verificar("e aponta para o perfil", 'botao.href = "/perfil"' in js)
+
+# O painel flutuante que ele abria foi substituído pela página. Se alguém o
+# voltasse a pôr — ou deixasse metade dele para trás —, o botão deixava de ser
+# uma porta e passava a haver duas contas com metade das ações em cada uma.
+verificar("o painel de conta já não existe", "painel-conta" not in js and "painel-conta" not in css)
+verificar("e já não há gestos de o fechar", "MutationObserver" not in js and "Escape" not in js)
+
+# O rótulo ("Entrar" ou o nome) sai do servidor, que é quem sabe quem está
+# dentro. Não é adivinhado a partir do endereço nem de nada na página.
+verificar("o rótulo sai do /api/me", 'fetch("/api/me")' in js)
+verificar("sem sessão diz Entrar", '"Entrar"' in js)
 
 # Os dois seletores têm de estar lá. Em VR a classe "observatorio-ativo" sai do
 # body (ver mudarEcra, no index.js), por isso deixar só um deles fazia o botão
 # reaparecer ao entrar no VR — é este o erro que o teste guarda.
 verificar("esconde o botão no Observatório", "body.observatorio-ativo #btn-conta" in css)
 verificar("esconde o botão no VR", "body.vr-ativo #btn-conta" in css)
-verificar("esconde o painel no Observatório", "body.observatorio-ativo #painel-conta" in css)
-verificar("esconde o painel no VR", "body.vr-ativo #painel-conta" in css)
 
-# A regra tem de ganhar às que definem o display destes elementos:
-#   #btn-conta        -> display: flex   (especificidade 1,0,0)
-#   #painel-conta     -> display: none   (1,0,0)
-#   #painel-conta.visivel -> display: block (1,1,0)
-# body.observatorio-ativo #btn-conta é (1,1,1), logo ganha às três.
-verificar("a regra de esconder usa a mesma especificidade alta dos dois lados",
+# A regra tem de ganhar à que define o display do botão:
+#   #btn-conta -> display: flex (especificidade 1,0,0)
+#   body.observatorio-ativo #btn-conta é (1,1,1), logo ganha.
+verificar("a regra de esconder usa a mesma especificidade alta",
           css.count("body.observatorio-ativo #btn-conta") == 1
           and css.count("body.vr-ativo #btn-conta") == 1)
-
-# O painel é fechado também no estado, e não só escondido no ecrã.
-verificar("o painel é fechado ao entrar num modo imersivo", "MutationObserver" in js)
-verificar("o fecho cobre os dois modos",
-          'classList.contains("observatorio-ativo")' in js and 'classList.contains("vr-ativo")' in js)
 
 print("\n== 15. O Observatório segue a localização da conta ==")
 # A rota, e não só o sky_engine: o /api/ceu já era testado no ponto 6, mas o
@@ -293,14 +306,19 @@ else:
               iss.get_posicao_iss(momento)["altitude"] == iss_gaia["altitude"])
 
 print("\n== 16. Localização escrita à mão ==")
-js  = c.get("/static/js/conta.js").data.decode("utf-8")
-css = c.get("/static/css/conta.css").data.decode("utf-8")
+# O painel flutuante onde estes campos nasceram foi substituído pela página do
+# perfil: o HTML está agora no perfil.html e o que ele faz no perfil.js. As
+# verificações são as mesmas — o que mudou foi onde elas olham.
+js   = c.get("/static/js/perfil.js").data.decode("utf-8")
+css  = c.get("/static/css/perfil.css").data.decode("utf-8")
+html = c.get("/perfil").get_data(as_text=True)
 
-verificar("o painel tem o botão de escrever coordenadas", "alternarFormularioManual" in js)
+verificar("a página do perfil carrega o perfil.js", "perfil.js" in html)
+verificar("a página tem o botão de escrever coordenadas", "alternarFormularioManual" in html)
 verificar("o formulário tem latitude e longitude",
-          'id="manual-lat"' in js and 'id="manual-lon"' in js)
+          'id="manual-lat"' in html and 'id="manual-lon"' in html)
 verificar("o formulário começa fechado",
-          'id="conta-form-manual" style="display:none"' in js)
+          'id="perfil-form-manual" style="display:none"' in html)
 
 # Os dois caminhos (o detetado pelo browser e o escrito à mão) gravam pelo
 # mesmo sítio. Se alguém duplicar a gravação, a próxima correção feita só num
@@ -329,16 +347,17 @@ verificar("campo em branco não passa por zero", 'textoLat === ""' in js)
 verificar("o fuso do dispositivo é reaproveitado nos dois caminhos",
           js.count("fusoDoDispositivo()") >= 2)
 
-for classe in [".conta-campo {", ".conta-campos-linha {"]:
+for classe in [".perfil-campo {", ".perfil-campos-linha {"]:
     verificar(f"{classe} está no CSS", classe in css)
 verificar("os campos podem encolher dentro da linha", "min-width: 0" in css)
 
-# Com o formulário de coordenadas aberto o painel fica mais alto do que um
-# ecrã pequeno. Sendo position: fixed, não acompanha o scroll da página —
-# sem scroll próprio, o botão de guardar saía fora do ecrã e não havia como
-# lá chegar. É por isso que isto é testado e não só escrito.
-verificar("o painel tem scroll próprio",
-          "max-height: calc(100vh - 96px)" in css and "overflow-y: auto" in css)
+# A página do perfil cresce com o número de favoritos e de observações. Com o
+# "overflow: hidden" do menu.css (que ela veste, pela moldura), o fim da página
+# desaparecia — e sem barra de scroll para lá chegar, porque o que está
+# escondido não se percorre. Era o painel que tinha scroll próprio; agora é a
+# página. (O /admin tem exatamente a mesma regra, pelo mesmo motivo.)
+verificar("a página do perfil tem scroll próprio",
+          "body.page-perfil" in css and "overflow-y: auto" in css)
 
 print("\n== 17. A página /admin ==")
 import io, contextlib
@@ -473,7 +492,124 @@ codigo, saida = correr_promover()
 verificar("com um admin, a listagem mostra-o", "diogo@exemplo.pt" in saida and "Administradores" in saida,
           saida.strip())
 
-print("\n== 18. Um registo novo nunca nasce admin ==")
+print("\n== 18. A página /perfil ==")
+# Sem sessão: para a página de entrada, com o "seguinte" que traz a pessoa de
+# volta — é ele que faz o botão do canto servir as duas coisas (a porta para
+# quem está de fora e o atalho para quem já entrou).
+r = c2.get("/perfil")
+verificar("sem sessão -> redireciona para a entrada", r.status_code == 302, r.status_code)
+verificar("e o destino traz de volta ao /perfil",
+          "seguinte=/perfil" in r.headers.get("Location", ""), r.headers.get("Location"))
+
+# A Maria tem sessão e não tem o papel: é o caso "entrei, mas não sou admin".
+r = c3.get("/perfil")
+texto_maria = r.get_data(as_text=True)
+verificar("quem tem sessão vê o perfil -> 200", r.status_code == 200, r.status_code)
+verificar("com o nome e o email da própria conta",
+          "Maria" in texto_maria and "maria@exemplo.pt" in texto_maria)
+verificar("e com a localização dela", "Lisboa" in texto_maria)
+# A ligação à administração aparece só a quem tem o papel (o Diogo foi
+# promovido no ponto anterior, a Maria não). Não é ela que protege a página —
+# quem escrever /admin à mão bate na mesma na verificação do servidor — mas um
+# botão que leva a uma porta fechada é um caminho inútil que se evita.
+verificar("não mostra a ligação à administração a quem não tem o papel",
+          'href="/admin"' not in texto_maria)
+
+texto_diogo = c.get("/perfil").get_data(as_text=True)
+verificar("o admin vê o papel e a ligação para a administração",
+          "Administrador" in texto_diogo and 'href="/admin"' in texto_diogo)
+
+# Um favorito de verdade, um favorito que já não existe no catálogo, e uma
+# observação — a página tem de mostrar as três coisas.
+# O nome da observação não pode ser "Saturno": é esse o exemplo que a frase do
+# caderno vazio dá, e a Maria (que não tem observações nenhumas) mostraria a
+# mesma palavra por outra razão — o teste passava por engano.
+c.post("/api/favoritos", json={"tipo": "constelacao", "objeto_id": "Ori"})
+c.post("/api/favoritos", json={"tipo": "estrela", "objeto_id": "ja-nao-existe"})
+c.post("/api/observacoes", json={"objeto_nome": "Vénus", "data": "2026-09-18",
+                                 "nota": "Anéis bem visíveis"})
+texto = c.get("/perfil").get_data(as_text=True)
+
+# O nome do favorito sai do catálogo do Python: o que está guardado é o id
+# ("Ori"), e quem sabe que ele se chama "Orion" é o servidor. É esta a razão
+# por que a página é desenhada no lado do servidor em vez de um endpoint em
+# JSON a mais.
+verificar("o favorito mostra o nome do catálogo, não o id", "Orion" in texto)
+# Um favorito é o registo de uma pessoa e não desaparece por o catálogo mudar:
+# o que já não tem nome mostra-se pelo id, que ainda diz o que era.
+verificar("um favorito que saiu do catálogo mostra o id", "ja-nao-existe" in texto)
+verificar("a observação aparece com a data legível", "Vénus" in texto and "18/09/2026" in texto)
+verificar("e com a nota escrita", "Anéis bem visíveis" in texto)
+
+# O isolamento entre contas, do lado da página e não só da API: o perfil é
+# desenhado a partir da conta que está a pedir, e não da última que mexeu em
+# nada. É o mesmo "AND utilizador_id = ?" das rotas, visto por outro caminho.
+texto_maria = c3.get("/perfil").get_data(as_text=True)
+verificar("a Maria não vê os favoritos nem as observações do Diogo",
+          "Orion" not in texto_maria and "Vénus" not in texto_maria)
+
+# Uma página que fica aberta no browser não leva segredos.
+verificar("não mostra hashes de password",
+          "password_hash" not in texto and "scrypt" not in texto)
+
+verificar("a página carrega o perfil.css", "perfil.css" in texto)
+verificar("e o conta.js, que desenha o botão do canto", "conta.js" in texto)
+for ficheiro in ["css/perfil.css", "js/perfil.js"]:
+    r = c.get("/static/" + ficheiro)
+    verificar(f"/static/{ficheiro} é servido", r.status_code == 200, r.status_code)
+
+# ── O ★ do painel de detalhes do Observatório ──
+# É o único sítio onde se marca um favorito. Sem ele, a lista do perfil nunca
+# se enchia — e é por isso que ele entra no mesmo ponto que a página.
+index_js = c.get("/static/js/index.js").data.decode("utf-8")
+verificar("o painel de detalhes tem o botão dos favoritos", "alternarFavorito(this)" in index_js)
+# Um clique marca e desmarca: o mesmo botão, os dois pedidos da mesma rota.
+verificar("o mesmo botão marca e desmarca", 'jaEstava ? "DELETE" : "POST"' in index_js)
+# Os tipos que o ★ manda têm de ser os que o servidor aceita (TIPOS_FAVORITO).
+# O contrário — o servidor ter tipos que o ★ não conhece — não é erro: é só um
+# favorito que ainda não se pode marcar a partir do céu.
+from py.database.auth import TIPOS_FAVORITO
+for tipo in ("constelacao", "ceu_profundo", "estrela"):
+    verificar(f"o botão dos favoritos sabe guardar um objeto do tipo {tipo}",
+              all([tipo in TIPOS_FAVORITO, f'item.tipo === "{tipo}"' in index_js]))
+# Sem sessão a rota responde 401: em vez de uma mensagem de erro, manda-se a
+# pessoa entrar e volta-se ao Observatório — o ?seguinte= é o que a página de
+# entrada usa para a trazer de volta (ver auth.js), e é fixo porque é essa a
+# página que abre já neste ecrã.
+verificar("sem sessão manda entrar e voltar ao Observatório",
+          '"/entrar?seguinte=/observatorio"' in index_js)
+
+print("\n== 19. Depois de entrar, aterra-se no perfil ==")
+# O botão do canto é desenhado antes de o /api/me responder, e um clique nesse
+# instante levava a /entrar quem já está dentro da conta — a olhar para um
+# pedido de password que não faz sentido. Quem resolve isso é o servidor.
+r = c.get("/entrar")
+verificar("/entrar com sessão -> redireciona para o perfil", r.status_code == 302, r.status_code)
+verificar("e o destino é mesmo o perfil", r.headers.get("Location", "").endswith("/perfil"),
+          r.headers.get("Location"))
+r = c2.get("/entrar")
+verificar("sem sessão, /entrar continua a ser a página de entrada", r.status_code == 200, r.status_code)
+
+# O destino depois de entrar é decidido no browser (ver auth.js): o ?seguinte=
+# ganha quando existe — é dele que o /admin depende — e o perfil é a omissão.
+auth_js = c.get("/static/js/auth.js").data.decode("utf-8")
+verificar("o destino por omissão é o perfil", 'DESTINO_POR_OMISSAO = "/perfil"' in auth_js)
+verificar("e o ?seguinte= continua a ganhar quando existe",
+          "caminhoInterno ? pedido : DESTINO_POR_OMISSAO" in auth_js)
+# O valor do endereço é do utilizador e não é de confiança: um "seguinte"
+# externo levava a pessoa a aterrar num site alheio logo a seguir a ter
+# escrito a password aqui.
+verificar("e só passa caminhos internos",
+          'pedido.startsWith("/") && !pedido.startsWith("//")' in auth_js)
+
+# A outra ponta do mesmo ?seguinte=: quem é mandado para a entrada a meio do
+# /admin volta ao /admin, e não ao perfil. É o lado do servidor daquilo que o
+# auth.js promete do lado do browser.
+r = c2.get("/admin")
+verificar("o /admin continua a trazer de volta ao /admin",
+          "seguinte=/admin" in r.headers.get("Location", ""), r.headers.get("Location"))
+
+print("\n== 20. Um registo novo nunca nasce admin ==")
 c4 = server.app.test_client()
 r = c4.post("/api/registar", json={"nome": "Novo", "email": "novo@exemplo.pt", "password": "password123"})
 verificar("a resposta do registo diz admin: false",
@@ -483,7 +619,7 @@ verificar("e /api/me confirma", r.get_json()["utilizador"]["admin"] is False)
 r = c4.get("/admin")
 verificar("o registo novo não abre /admin", r.status_code == 403, r.status_code)
 
-print("\n== 19. Base de dados anterior ganha a coluna \"papel\" ==")
+print("\n== 21. Base de dados anterior ganha a coluna \"papel\" ==")
 # O DEFAULT do SQL é texto literal — o Python não interpola ali a constante.
 # Se alguém mudar uma das duas pontas (db.PAPEL_UTILIZADOR ou o esquema) e
 # esquecer a outra, as contas novas passam a nascer com um papel que o resto

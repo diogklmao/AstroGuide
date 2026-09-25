@@ -789,6 +789,71 @@ nav button:hover:not(.ativo) {
     color: rgba(255, 226, 150, 0.9);
 }
 
+/* ── O ★ dos favoritos, no painel de detalhes ────────────────────────
+   Fica logo por baixo do título e do aviso, no mesmo sítio e pela mesma razão
+   que eles: o painel tem altura máxima com scroll, e um botão no fim ficava
+   fora de vista — que é o mesmo que não existir.
+   A forma é a do botão do Tour (é o outro botão de largura inteira do painel),
+   e a cor é o dourado, que é a cor do "guardado" em todo o AstroGuide. */
+.obs-favorito {
+    margin-top: 12px;
+}
+
+.obs-btn-favorito {
+    width: 100%;
+    padding: 8px 0;
+    background: rgba(255, 213, 79, 0.1);
+    color: #ffd54f;
+    border: 1px solid rgba(255, 213, 79, 0.3);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.obs-btn-favorito:hover {
+    background: rgba(255, 213, 79, 0.22);
+    box-shadow: 0 0 14px rgba(255, 213, 79, 0.2);
+    transform: translateY(-1px);
+}
+
+.obs-btn-favorito:active {
+    transform: translateY(0);
+}
+
+.obs-btn-favorito:focus-visible {
+    outline: 2px solid rgba(255, 213, 79, 0.85);
+    outline-offset: 2px;
+}
+
+/* Enquanto o pedido está em curso (ver alternarFavorito, no index.js). */
+.obs-btn-favorito:disabled {
+    opacity: 0.6;
+    cursor: progress;
+}
+
+/* Já está guardado: o botão fica mais cheio, para o estado se ler de relance
+   sem se estar a ler o texto. */
+.obs-btn-favorito.guardado {
+    background: rgba(255, 213, 79, 0.22);
+    border-color: rgba(255, 213, 79, 0.6);
+}
+
+/* O aviso do ★ (sem servidor, sem sessão) — o mesmo papel do .obs-aviso-ir. */
+.obs-favorito-aviso {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: #ffb3c1;
+}
+
+.obs-favorito-aviso:empty {
+    display: none;
+}
+
 /* Evita que o label "Modo de Visão" parta para a linha seguinte */
 .config-linha label {
     white-space: nowrap;
@@ -1673,6 +1738,32 @@ body.red-velvet-mode .tour-btn:hover {
     border-color: rgba(255, 80, 100, 0.8) !important;
     color: #fff !important;
     box-shadow: 0 0 14px rgba(255, 40, 65, 0.5) !important;
+}
+
+/* O dourado do ★ é mais uma cor que não existe no Red Velvet. Aqui o
+   "guardado" passa a vermelho vivo, que é o que resta para dizer "está feito"
+   num céu que é todo vermelho. */
+body.red-velvet-mode .obs-btn-favorito {
+    background: rgba(255, 40, 65, 0.12) !important;
+    border-color: rgba(255, 60, 80, 0.4) !important;
+    color: #ff8a9c !important;
+}
+
+body.red-velvet-mode .obs-btn-favorito:hover {
+    background: rgba(255, 40, 65, 0.3) !important;
+    border-color: rgba(255, 80, 100, 0.8) !important;
+    color: #fff !important;
+    box-shadow: 0 0 14px rgba(255, 40, 65, 0.5) !important;
+}
+
+body.red-velvet-mode .obs-btn-favorito.guardado {
+    background: rgba(255, 40, 65, 0.32) !important;
+    border-color: rgba(255, 90, 110, 0.75) !important;
+    color: #ffd9de !important;
+}
+
+body.red-velvet-mode .obs-favorito-aviso {
+    color: #ffb8c3 !important;
 }
 
 body.red-velvet-mode .obs-resultado {

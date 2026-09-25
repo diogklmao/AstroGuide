@@ -1,9 +1,19 @@
-/* ── AstroGuide — botão e painel de conta ───────────────────────────────
-   Presente no menu e na aplicação (carregado pelas duas). Fica no canto
-   superior direito, a fazer canto com o botão de voltar (em cima à esquerda)
-   e com o botão de configurações (em baixo à direita), para não tapar nada.
-   Usa os tokens do glass.css para ser do mesmo material que o resto da UI. */
+/* ── AstroGuide — o botão de conta ──────────────────────────────────────
+   O botão do canto superior direito. É a única coisa que ficou neste ficheiro:
+   era aqui que vivia o painel flutuante que ele abria, e esse painel foi
+   substituído pela página do perfil. Tudo o que era do painel — os campos, os
+   botões, os avisos — passou para o perfil.css.
 
+   O botão continua presente no menu e na aplicação (é carregado pelas três),
+   e continua a fazer canto com o botão de voltar (em cima à esquerda) e com o
+   de configurações (em baixo à direita), para não tapar nada. Usa os tokens do
+   glass.css para ser do mesmo material que o resto da UI. */
+
+/* O que este botão é agora: uma porta. Não abre nada por cima da página —
+   leva ao /perfil, e quem não tem sessão é a página de entrada que o recebe
+   (ver pagina_perfil, no auth.py). Por isso é um <a> e não um <button>: assim
+   funciona com o teclado, com o clique do meio e antes de o JavaScript
+   responder, e o href certo é o mesmo para os dois casos. */
 #btn-conta {
     position: fixed;
     top: 20px;
@@ -24,6 +34,7 @@
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 600;
+    text-decoration: none;
     cursor: pointer;
     transition: color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
@@ -47,46 +58,6 @@
 }
 
 
-/* ── Painel ──────────────────────────────────────────────────────────── */
-#painel-conta {
-    position: fixed;
-    top: 76px;
-    /* 76px = altura do botão (≈42) + margem de cima (20) + folga */
-    right: 20px;
-    z-index: 9999;
-    width: min(320px, calc(100vw - 40px));
-    /* Com o formulário de coordenadas aberto o painel fica alto. Num ecrã
-       pequeno o fundo saía fora do ecrã e o botão "Guardar" ficava
-       inalcançável — position: fixed não acompanha o scroll da página, por
-       isso tem de ser o próprio painel a ter o seu. 96px = 76 do topo + 20
-       de folga em baixo, para ficar sempre a respirar. */
-    max-height: calc(100vh - 96px);
-    overflow-y: auto;
-    padding: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 16px;
-    background: #0a0a20;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
-    display: none;
-    /* escondido por defeito */
-    animation: fadeUp 0.2s ease;
-}
-
-#painel-conta.visivel {
-    display: block;
-}
-
-/* Em ecrãs estreitos o painel deixa de caber encostado à direita sem sair
-   do ecrã — passa a ocupar a largura toda com margens iguais. */
-@media (max-width: 420px) {
-    #painel-conta {
-        left: 12px;
-        right: 12px;
-        width: auto;
-    }
-}
-
-
 /* ── Observatório e VR: sem botão de conta ───────────────────────────── */
 /* Nos dois modos imersivos a página é toda céu, e o botão ficava a flutuar
    por cima dele sem nada à volta — o cabeçalho do Observatório só o tapava, e
@@ -99,226 +70,6 @@
    "observatorio-ativo" sai do body (ver mudarEcra, no index.js), por isso
    esconder só um deles fazia o botão reaparecer ao entrar no VR. */
 body.observatorio-ativo #btn-conta,
-body.vr-ativo #btn-conta,
-body.observatorio-ativo #painel-conta,
-body.vr-ativo #painel-conta {
-    display: none;
-}
-
-.conta-titulo {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #6eb8ff;
-    letter-spacing: 1px;
-    margin-bottom: 14px;
-}
-
-.conta-identidade {
-    padding-bottom: 14px;
-    margin-bottom: 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.conta-identidade .conta-quem {
-    font-size: 0.95rem;
-    color: #dce3f0;
-    font-weight: 600;
-    margin-bottom: 3px;
-}
-
-.conta-identidade .conta-email {
-    font-size: 0.75rem;
-    color: #556070;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Linha de rótulo + valor (localização atual, por exemplo) */
-.conta-linha {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 10px;
-    margin-bottom: 12px;
-    font-size: 0.78rem;
-}
-
-.conta-linha .conta-rotulo {
-    color: #556070;
-}
-
-.conta-linha .conta-valor {
-    color: #dce3f0;
-    text-align: right;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.conta-ajuda {
-    font-size: 0.72rem;
-    line-height: 1.5;
-    color: #556070;
-    margin: 10px 0 0;
-}
-
-
-/* ── Campos dos formulários do painel ────────────────────────────────── */
-/* Os rótulos dos campos. O .conta-rotulo nasceu na linha da localização
-   (ver .conta-linha), onde é um <span> que herda o tamanho dessa linha; aqui
-   é um <label> solto e precisa do seu. É o "label" no seletor que separa os
-   dois casos — sem ele, esta regra apanhava também o da linha. */
-#painel-conta label.conta-rotulo {
-    display: block;
-    margin-top: 10px;
-    font-size: 0.72rem;
-    color: #7c8798;
-}
-
-.conta-campo {
-    width: 100%;
-    margin: 6px 0 2px;
-    padding: 8px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    background: rgba(4, 6, 20, 0.55);
-    color: #e8eefc;
-    font-family: inherit;
-    font-size: 0.82rem;
-}
-
-.conta-campo:focus {
-    outline: none;
-    border-color: #6eb8ff;
-}
-
-.conta-campo::placeholder {
-    color: #3d4757;
-}
-
-/* As setinhas do <input type="number"> são cinzento-claro e destoam do
-   painel escuro. Não se perde nada: para escrever coordenadas não se anda a
-   passo de um, e o campo continua a aceitar e a validar números (ver os
-   min/max no conta.js). No telemóvel também evitam toques errados. */
-.conta-campo[type="number"] {
-    -moz-appearance: textfield;
-    appearance: textfield;
-}
-
-.conta-campo[type="number"]::-webkit-outer-spin-button,
-.conta-campo[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-/* Latitude e longitude lado a lado, porque são um par. O min-width a zero é
-   o que os deixa encolher: sem ele, a largura natural de um <input> impede-os
-   de descer abaixo disso e a linha estoura para fora do painel. */
-.conta-campos-linha {
-    display: flex;
-    gap: 8px;
-}
-
-.conta-campos-linha > div {
-    flex: 1;
-    min-width: 0;
-}
-
-
-/* ── Botões do painel ────────────────────────────────────────────────── */
-.conta-btn {
-    width: 100%;
-    padding: 9px;
-    margin-top: 8px;
-    border: 1px solid #1a1a3e;
-    border-radius: 8px;
-    background: #111130;
-    color: #dce3f0;
-    font-family: inherit;
-    font-size: 0.82rem;
-    cursor: pointer;
-    transition: border-color 0.2s ease, color 0.2s ease;
-}
-
-.conta-btn:hover {
-    border-color: #6eb8ff;
-    color: #6eb8ff;
-}
-
-.conta-btn:focus-visible {
-    outline: 2px solid var(--accent, #6eb8ff);
-    outline-offset: 2px;
-}
-
-.conta-btn:disabled {
-    opacity: 0.5;
-    cursor: progress;
-}
-
-/* O botão de sair é o único com tom de aviso — é o que se carrega sem querer. */
-.conta-btn-sair:hover {
-    border-color: #ff7085;
-    color: #ff7085;
-}
-
-/* Ligações (entrar / criar conta) com o mesmo corpo dos botões */
-.conta-ligacao {
-    display: block;
-    width: 100%;
-    padding: 10px;
-    margin-top: 8px;
-    border: 1px solid rgba(110, 184, 255, 0.45);
-    border-radius: 8px;
-    background: rgba(110, 184, 255, 0.16);
-    color: #dceaff;
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-align: center;
-    text-decoration: none;
-    transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.conta-ligacao:hover {
-    background: rgba(110, 184, 255, 0.26);
-    border-color: #6eb8ff;
-}
-
-.conta-ligacao:focus-visible {
-    outline: 2px solid var(--accent, #6eb8ff);
-    outline-offset: 2px;
-}
-
-/* A entrada da administração. Só muda a cor — a forma é a mesma das outras
-   ligações. É de propósito: em azul, ao lado de "Terminar sessão" e "Voltar a
-   Vila Nova de Gaia", lia-se como mais uma ação da conta, que é o que não é.
-   O tom quente separa-a sem precisar de um botão de outro tamanho. */
-.conta-ligacao-admin {
-    border-color: rgba(255, 204, 80, 0.4);
-    background: rgba(255, 204, 80, 0.12);
-    color: #ffe9a8;
-}
-
-.conta-ligacao-admin:hover {
-    border-color: #ffcc02;
-    background: rgba(255, 204, 80, 0.2);
-}
-
-.conta-ligacao-admin:focus-visible {
-    outline-color: #ffcc02;
-}
-
-/* O aviso de erro/sucesso dentro do painel */
-.conta-aviso {
-    margin-top: 10px;
-    font-size: 0.75rem;
-    line-height: 1.4;
-    color: #ffb3c1;
-}
-
-.conta-aviso.ok {
-    color: #8ee6a8;
-}
-
-.conta-aviso:empty {
+body.vr-ativo #btn-conta {
     display: none;
 }

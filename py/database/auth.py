@@ -17,11 +17,20 @@ import re
 import datetime
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, render_template, request, jsonify, session
+from flask import Blueprint, render_template, request, jsonify, session, redirect
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from py.database.db import consultar_um, consultar_todos, executar, agora_iso, PAPEL_ADMIN
 from py.config import LOCATION
+
+# Os catálogos onde os favoritos vão buscar o nome. O que fica guardado em
+# "favoritos" é o id do objeto ("Ori", "polaris", "m42"), porque os nomes
+# aparecem traduzidos e acentuados e mudá-los não deve deixar os favoritos de
+# ninguém a apontar para o vazio. Quem sabe traduzir o id para um nome é isto,
+# e é por isso que a página do perfil é desenhada no servidor: o browser só
+# tem o id, e o nome não existe em lado nenhum do lado de lá.
+from py.ceu.estrelas import CONSTELACOES_BD, ESTRELAS_BD
+from py.ceu.ceu_profundo import CATALOGO_CEU_PROFUNDO
 
 
 auth_bp = Blueprint("auth", __name__)
@@ -34,6 +43,16 @@ auth_bp = Blueprint("auth", __name__)
 NOME_MIN, NOME_MAX = 3, 30
 PASSWORD_MIN = 8
 TIPOS_FAVORITO = ("estrela", "ceu_profundo", "constelacao")
+
+# Os mesmos três tipos, pela ordem em que se lêem no perfil, com o título de
+# cada grupo. Os tipos são os de cima — esta lista só lhes dá ordem e nome
+# visível, e um tipo que entre no TIPOS_FAVORITO e não entre aqui ficava
+# guardado sem nunca aparecer na página.
+_GRUPOS_FAVORITO = (
+    ("constelacao",  "Constelações"),
+    ("estrela",      "Estrelas"),
+    ("ceu_profundo", "Objetos de céu profundo"),
+)
 
 # O nome de utilizador é o que aparece no ecrã e o que se escreve para entrar,
 # por isso aceita acentos e espaços (nomes portugueses como "João Silva" têm
@@ -68,11 +87,15 @@ def utilizador_atual():
     # voltar a entrar. É também o que faz um papel tirado no terminal (ver
     # promover_admin.py) valer no pedido seguinte, sem esperar que a sessão
     # expire.
+    #
+    # O criado_em vem na consulta — e não numa segunda, só para o perfil — por
+    # ser a mesma linha da mesma tabela: pedi-la em separado era ir buscar
+    # outra vez o que já cá está.
     uid = session.get("utilizador_id")
     if uid is None:
         return None
     return consultar_um(
-        "SELECT id, nome, email, papel FROM utilizadores WHERE id = ?", (uid,)
+        "SELECT id, nome, email, criado_em, papel FROM utilizadores WHERE id = ?", (uid,)
     )
 
 
@@ -120,6 +143,51 @@ def localizacao_do_utilizador():
     }
 
 
+# ── Nomes e datas para a página do perfil ─────────────────────────────────────
+
+# Os catálogos, indexados pelo tipo de favorito. É o mapa que evita um
+# if/elif por cada tipo novo.
+_CATALOGOS = {
+    "constelacao":  CONSTELACOES_BD,
+    "estrela":      ESTRELAS_BD,
+    "ceu_profundo": CATALOGO_CEU_PROFUNDO,
+}
+
+
+def _nome_do_favorito(tipo, objeto_id):
+    # O nome que o catálogo dá ao objeto. Se o id já não existir (o catálogo
+    # muda, e um favorito é o registo de uma pessoa), mostra-se o próprio id,
+    # que ainda diz o que era. É a mesma razão por que as observações guardam
+    # o nome copiado em vez de o irem buscar na altura de mostrar.
+    catalogo = _CATALOGOS.get(tipo) or {}
+    return (catalogo.get(objeto_id) or {}).get("nome") or objeto_id
+
+
+def _data_legivel(iso):
+    # "2026-09-18T14:32:10+00:00" -> "18/09/2026".
+    #
+    # Os instantes são gravados em UTC (ver agora_iso), e é essa a data que
+    # aqui sai: é a data do REGISTO, não a do relógio de quem está a ver. O
+    # "—" cobre o que não vier em ISO — mostra-se que não se sabe, em vez de
+    # rebentar a página inteira por causa de uma linha.
+    try:
+        return datetime.date.fromisoformat(iso[:10]).strftime("%d/%m/%Y")
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _iniciais(nome):
+    # "João Silva" -> "JS"; um só nome dá uma letra.
+    #
+    # É este o avatar da página: não há ficheiros de imagem nem upload, e por
+    # isso não há nada para guardar, para limitar de tamanho, nem para
+    # moderar. As iniciais já existem — vêm do nome que a conta tem.
+    partes = [p for p in (nome or "").split() if p]
+    if not partes:
+        return "?"
+    return (partes[0][0] + (partes[-1][0] if len(partes) > 1 else "")).upper()
+
+
 # ── Páginas ───────────────────────────────────────────────────────────────────
 
 @auth_bp.route("/entrar")
@@ -127,7 +195,85 @@ def pagina_entrar():
     # Uma só página serve a entrada e o registo — os dois formulários estão
     # lá, e o JavaScript alterna entre eles. Separá-los em duas páginas
     # obrigaria a duplicar o fundo, o campo de estrelas e os estilos todos.
+    #
+    # Quem já tem sessão e abre isto é mandado para o perfil. Não é só
+    # arrumação: o botão do canto é desenhado antes de o /api/me responder, e
+    # um clique nesse instante levava ao formulário de entrada quem já está
+    # dentro da conta — a olhar para um pedido de password que não faz sentido.
+    if utilizador_atual() is not None:
+        return redirect("/perfil")
+
     return render_template("entrar.html")
+
+
+@auth_bp.route("/perfil")
+def pagina_perfil():
+    u = utilizador_atual()
+
+    # Sem sessão: manda-se entrar, e o "seguinte" traz a pessoa de volta ao
+    # perfil depois de entrar — o mesmo caminho que o /admin usa (ver
+    # admin.py). É ele que faz o botão do canto servir as duas coisas: a porta
+    # para quem está de fora, e o atalho para quem já entrou.
+    if u is None:
+        return redirect("/entrar?seguinte=/perfil")
+
+    # Os favoritos são guardados com o id do objeto, e é aqui que lhes é dado
+    # o nome — o JavaScript não o sabe, e o catálogo onde ele vive é do lado
+    # do Python. Ficam agrupados pela ordem em que se lê: por tipo, e não pela
+    # ordem em que foram guardados, que misturava constelações com nebulosas.
+    por_tipo = {}
+    for linha in consultar_todos(
+        "SELECT tipo, objeto_id, criado_em FROM favoritos "
+        "WHERE utilizador_id = ? ORDER BY criado_em DESC",
+        (u["id"],),
+    ):
+        por_tipo.setdefault(linha["tipo"], []).append({
+            "tipo":      linha["tipo"],
+            "objeto_id": linha["objeto_id"],
+            "nome":      _nome_do_favorito(linha["tipo"], linha["objeto_id"]),
+            "criado_em": _data_legivel(linha["criado_em"]),
+        })
+
+    observacoes = [
+        {
+            "id":          linha["id"],
+            "objeto_nome": linha["objeto_nome"],
+            "data":        _data_legivel(linha["data"]),
+            "nota":        linha["nota"],
+        }
+        for linha in consultar_todos(
+            "SELECT id, objeto_nome, data, nota FROM observacoes "
+            "WHERE utilizador_id = ? ORDER BY data DESC, id DESC",
+            (u["id"],),
+        )
+    ]
+
+    # Se a localização é uma escolha ou a omissão: sem linha em "localizacoes"
+    # o céu é o de config.py, e a página di-lo em vez de mostrar Vila Nova de
+    # Gaia como se a pessoa a tivesse escolhido.
+    propria = consultar_um(
+        "SELECT 1 FROM localizacoes WHERE utilizador_id = ?", (u["id"],)
+    ) is not None
+
+    return render_template(
+        "perfil.html",
+        utilizador=u,
+        iniciais=_iniciais(u["nome"]),
+        admin=e_admin(u),
+        membro_desde=_data_legivel(u["criado_em"]),
+        localizacao=localizacao_do_utilizador(),
+        localizacao_propria=propria,
+        grupos=[
+            {"tipo": tipo, "titulo": titulo, "itens": por_tipo.get(tipo, [])}
+            for tipo, titulo in _GRUPOS_FAVORITO
+        ],
+        n_favoritos=sum(len(itens) for itens in por_tipo.values()),
+        observacoes=observacoes,
+        # Hoje, para o formulário do caderno já vir com a data preenchida: é o
+        # caso normal (regista-se o que se viu esta noite), e uma data em
+        # branco era um campo a mais a preencher à mão.
+        hoje=datetime.date.today().isoformat(),
+    )
 
 
 # ── Entrada, registo e saída ──────────────────────────────────────────────────

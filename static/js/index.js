@@ -2209,6 +2209,154 @@ function tratarCliqueCanvas(e) {
     }
 }
 
+// ── Favoritos — o ★ do painel de detalhes ────────────────────────────────────
+// O único sítio da aplicação onde se marca um favorito é aqui, no painel de
+// detalhes do Observatório. É de propósito: os favoritos são do catálogo (as
+// constelações, as estrelas, os objetos de céu profundo) e é no céu que se
+// escolhe o que interessa. A página do perfil lê-os a seguir, e é lá que se
+// tiram.
+//
+// O estado destes favoritos vive num Set de chaves "tipo:id" — o mesmo par que
+// a base de dados usa como chave (UNIQUE (utilizador_id, tipo, objeto_id)) — e
+// é lido uma só vez, quando o Observatório se abre. O painel redesenha-se a
+// cada objeto escolhido, e é do Set que sai o estado de cada ★: perguntar ao
+// servidor a cada clique punha uma ida e volta à rede entre o clique e o botão.
+
+const favoritosGuardados = new Set();
+let favoritosPedidos = false;   // o pedido ao servidor já foi feito?
+
+function chaveFavorito(tipo, objetoId) {
+    return tipo + ":" + objetoId;
+}
+
+// Que objetos podem ser favoritos, e com que id. Os ids são os do catálogo
+// (o "Ori" de Orion, o "m42" da nebulosa) e são os mesmos que o servidor
+// guarda; os astros — Sol, Lua, planetas, ISS — não entram: não estão no
+// catálogo e mudam de sítio, e um favorito é uma coisa que se volta a ver.
+function idsFavoritaveis(item) {
+    if (item.tipo === "constelacao") return { tipo: "constelacao", id: item.const_id };
+    if (item.tipo === "ceu_profundo") return { tipo: "ceu_profundo", id: item.id };
+    if (item.tipo === "estrela") return { tipo: "estrela", id: item.id };
+    return null;
+}
+
+// O que o botão diz, conforme o objeto esteja ou não guardado. Vive numa
+// função porque é dito em dois sítios: no HTML do painel (blocoFavorito) e no
+// botão já desenhado, quando o estado muda sem o painel ser refeito.
+function textoBotaoFavorito(guardado) {
+    return guardado ? "★ Na tua conta" : "☆ Guardar nos favoritos";
+}
+
+// O bloco do ★, para o HTML do painel. Devolve "" para tudo o que não pode ser
+// favorito — é o que deixa o Sol, a Lua e os planetas sem botão.
+function blocoFavorito(item) {
+    const alvo = idsFavoritaveis(item);
+    if (!alvo || !alvo.id) return "";
+
+    const guardado = favoritosGuardados.has(chaveFavorito(alvo.tipo, alvo.id));
+    // O tipo e o id vão em data-*, e não dentro do onclick: assim o JavaScript
+    // lê-os do próprio botão, e nada do que vem do catálogo chega a ser lido
+    // como código.
+    return `
+        <div class="obs-favorito">
+            <button type="button" class="obs-btn-favorito${guardado ? " guardado" : ""}"
+                    data-tipo="${alvo.tipo}" data-objeto="${alvo.id}"
+                    onclick="alternarFavorito(this)"
+                    title="${guardado ? "Tirar da tua conta" : "Guardar na tua conta"}">${textoBotaoFavorito(guardado)}</button>
+            <div class="obs-favorito-aviso" role="status" aria-live="polite"></div>
+        </div>
+    `;
+}
+
+// Escreve o estado no botão que já está no painel.
+function desenharBotaoFavorito(botao) {
+    const guardado = favoritosGuardados.has(chaveFavorito(botao.dataset.tipo, botao.dataset.objeto));
+    botao.classList.toggle("guardado", guardado);
+    botao.textContent = textoBotaoFavorito(guardado);
+    botao.title = guardado ? "Tirar da tua conta" : "Guardar na tua conta";
+}
+
+function avisarFavorito(mensagem) {
+    const caixa = document.querySelector("#observatorio-detalhes .obs-favorito-aviso");
+    if (caixa) caixa.textContent = mensagem;
+}
+
+// Marca ou desmarca. O mesmo clique serve para as duas coisas porque é isso
+// que o ★ quer dizer: o botão mostra o estado, e carregar nele inverte-o.
+window.alternarFavorito = async function alternarFavorito(botao) {
+    const tipo     = botao.dataset.tipo;
+    const objetoId = botao.dataset.objeto;
+    const chave    = chaveFavorito(tipo, objetoId);
+    const jaEstava = favoritosGuardados.has(chave);
+
+    botao.disabled = true;
+    avisarFavorito("");
+
+    const resposta = await fetch("/api/favoritos", {
+        method: jaEstava ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: tipo, objeto_id: objetoId }),
+    }).catch(function () { return null; });
+    botao.disabled = false;
+
+    if (!resposta) {
+        avisarFavorito("Não foi possível contactar o servidor.");
+        return;
+    }
+
+    // Sem sessão não há favoritos para ninguém. Em vez de uma mensagem de
+    // erro, manda-se a pessoa entrar e volta-se ao Observatório: o ?seguinte=
+    // é o que a página de entrada usa para a trazer de volta (ver auth.js), e
+    // é fixo, "/observatorio", porque é essa a página que abre já neste ecrã
+    // (o index.js vê o endereço para saber em que aba começar) — voltar ao
+    // /app deixava a pessoa no Céu Agora, a olhar para outro sítio.
+    if (resposta.status === 401) {
+        window.location.href = "/entrar?seguinte=/observatorio";
+        return;
+    }
+    if (!resposta.ok) {
+        avisarFavorito("Não foi possível guardar. Tenta outra vez.");
+        return;
+    }
+
+    // O servidor respondeu: o estado local passa a ser este. Vale a pena mexer
+    // no Set em vez de voltar a pedir a lista toda — a resposta já diz o que
+    // ficou, e a lista é a mesma com uma linha a mais ou a menos.
+    if (jaEstava) favoritosGuardados.delete(chave);
+    else favoritosGuardados.add(chave);
+    desenharBotaoFavorito(botao);
+};
+
+// Lê a lista uma vez. Chamada quando o Observatório se abre (ver o fim deste
+// ficheiro), e não no arranque da página: fora do Observatório não há nenhum ★
+// para preencher, e não vale a pena pedir a lista a quem está no Calendário.
+async function carregarFavoritos() {
+    if (favoritosPedidos) return;   // já se perguntou uma vez
+    favoritosPedidos = true;
+
+    let resposta;
+    try {
+        resposta = await fetch("/api/favoritos");
+    } catch (erro) {
+        // Sem resposta ficam todos com "☆", e não se insiste: um clique
+        // continua a funcionar (o servidor responde com o estado certo e o
+        // botão corrige-se), e a próxima vez que a página abrir volta a
+        // perguntar. A lista de favoritos não é coisa para rebentar o ecrã.
+        return;
+    }
+
+    const dados = await resposta.json().catch(function () { return {}; });
+    favoritosGuardados.clear();
+    (dados.favoritos || []).forEach(function (f) {
+        favoritosGuardados.add(chaveFavorito(f.tipo, f.objeto_id));
+    });
+
+    // O painel pode já estar aberto num objeto: foi escrito antes de a
+    // resposta chegar e o ★ dele estaria a dizer o que ainda não se sabia.
+    const botao = document.querySelector("#observatorio-detalhes .obs-btn-favorito");
+    if (botao) desenharBotaoFavorito(botao);
+}
+
 // Escreve o painel de detalhes para um objeto do céu. O `item` tem a forma de
 // uma entrada de canvas.elementosNoEcra — é a mesma coisa que o clique lhe
 // passa —, o que quer dizer que um objeto que não esteja a ser desenhado (a
@@ -2237,6 +2385,7 @@ function mostrarDetalhesDe(item, aviso) {
         painel.innerHTML = `
             <div class="detalhe-titulo">⭐ ${item.nome}</div>
             ${avisoHTML}
+            ${blocoFavorito(item)}
             ${imagemHTML}
             <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:#6eb8ff">CONSTELAÇÃO</span></div>
             <div class="detalhe-linha"><span class="detalhe-icon">🔤</span><span class="detalhe-label">Abreviatura</span><span class="detalhe-valor" style="font-family:monospace;color:#ce93d8">${item.const_id}</span></div>
@@ -2267,6 +2416,7 @@ function mostrarDetalhesDe(item, aviso) {
         painel.innerHTML = `
             <div class="detalhe-titulo">🌌 ${item.nome}</div>
             ${avisoHTML}
+            ${blocoFavorito(item)}
             <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:#ffd54f">${tipo.toUpperCase()}</span></div>
             <div class="detalhe-linha"><span class="detalhe-icon">🔆</span><span class="detalhe-label">Magnitude</span><span class="detalhe-valor" style="font-family:monospace">${item.mag} <span style="color:#778899;font-size:0.75rem;">integrada</span></span></div>
             <div class="detalhe-linha"><span class="detalhe-icon">📐</span><span class="detalhe-label">Tamanho</span><span class="detalhe-valor" style="font-family:monospace">${tamanho}</span></div>
@@ -2298,6 +2448,7 @@ function mostrarDetalhesDe(item, aviso) {
         painel.innerHTML = `
             <div class="detalhe-titulo">🔭 ${item.nome}</div>
             ${avisoHTML}
+            ${blocoFavorito(item)}
             <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:${corTipo}">${labelTipo}</span></div>
             <div class="detalhe-linha"><span class="detalhe-icon">🔆</span><span class="detalhe-label">Magnitude</span><span class="detalhe-valor" style="font-family:monospace">${item.mag}</span></div>
             <div class="detalhe-linha"><span class="detalhe-icon">📈</span><span class="detalhe-label">Altitude</span><span class="detalhe-valor" style="font-family:monospace;color:#ffcc80">${item.altitude}°</span></div>
@@ -3146,6 +3297,10 @@ if (pagina === "/calendario") {
 } else if (pagina === "/observatorio") {
     inicializarSeletorHora();
     mudarEcra("observatorio");
+    // A lista dos favoritos só faz falta aqui (é o painel de detalhes que tem
+    // os ★). Esta chamada é a do caso em que a página abre já neste ecrã — a
+    // outra está no mudarEcra, mais abaixo.
+    carregarFavoritos();
 } else if (pagina === "/apod") {
     mudarEcra("apod");
 } else {
@@ -3161,7 +3316,10 @@ window.mudarEcra = function (nome) {
     if (nome !== "observatorio") pararTour();
 
     _mudarEcraOriginal(nome);
-    if (nome === "observatorio") inicializarSeletorHora();
+    if (nome === "observatorio") {
+        inicializarSeletorHora();
+        carregarFavoritos();   // a lista dos ★ (só se pergunta uma vez)
+    }
 };
 
 setTimeout(autoRefresh, 30000);

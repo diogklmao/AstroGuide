@@ -7,8 +7,11 @@
   "use strict";
 
   // Para onde ir depois de entrar, quando o endereço não pede nada em
-  // contrário. O menu é o destino natural.
-  const DESTINO_POR_OMISSAO = "/";
+  // contrário. É o perfil: quem acabou de entrar quer ver o que a conta tem —
+  // a localização, os favoritos, o caderno — e é de lá que se segue para o
+  // céu. O menu continua à distância do botão "◀ Menu", que o perfil tem como
+  // todas as outras páginas.
+  const DESTINO_POR_OMISSAO = "/perfil";
 
   // ── Destino depois de entrar ────────────────────────────────────────
   // Aceita ?seguinte=/observatorio, para quem foi mandado para aqui a meio de
