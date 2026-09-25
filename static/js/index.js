@@ -1526,6 +1526,31 @@ function desenharObservatorio() {
         return pos;
     }
 
+    // Onde é que o segmento entre duas estrelas cruza o horizonte, já projetado.
+    // Serve para acabar a linha no horizonte em vez de a deixar seguir por cima
+    // do chão: a metade que continua para debaixo do horizonte é céu que já não
+    // se vê. O cruzamento sai exato porque o seno da altitude varia linearmente
+    // ao longo da corda que une as duas estrelas na esfera, e normalizar essa
+    // corda não muda onde o seno se anula — o t que o anula é a altitude 0.
+    // Devolve null quando as duas pontas estão do mesmo lado do horizonte (não
+    // há nada para cortar) ou quando o cruzamento cai atrás da câmara.
+    function cruzarHorizonte(estA, estB) {
+        const rad = Math.PI / 180;
+        const sinA = Math.sin(estA.altitude * rad);
+        const sinB = Math.sin(estB.altitude * rad);
+        // Mesmo teste do "visivel" do backend (altitude > 0): se as duas
+        // concordam, a linha não atravessa o horizonte.
+        if ((sinA > 0) === (sinB > 0)) return null;
+
+        const t = sinA / (sinA - sinB);
+        const altA = estA.altitude * rad, azA = estA.azimute * rad;
+        const altB = estB.altitude * rad, azB = estB.azimute * rad;
+        const x = (1 - t) * Math.cos(altA) * Math.cos(azA) + t * Math.cos(altB) * Math.cos(azB);
+        const y = (1 - t) * Math.cos(altA) * Math.sin(azA) + t * Math.cos(altB) * Math.sin(azB);
+        const az = ((Math.atan2(y, x) / rad) + 360) % 360;
+        return projectar(0, az);
+    }
+
     // 1. Desenhar fundos e grelhas específicas do modo
     if (modoVisao === "360") {
 
@@ -1772,8 +1797,16 @@ function desenharObservatorio() {
                 if (!posA || !posB) return;
 
                 if (algumaAcima) {
-                    ctx.moveTo(posA.x, posA.y);
-                    ctx.lineTo(posB.x, posB.y);
+                    // Com o chão pintado (isto é, sem "Ver abaixo do horizonte")
+                    // a linha acaba onde cruza o horizonte: a ponta que já se
+                    // pôs é substituída por esse cruzamento, em vez de a linha
+                    // seguir por cima do chão. Com a opção ligada, o que está
+                    // debaixo do horizonte é para ver e a linha fica inteira.
+                    const corte = verAbaixo ? null : cruzarHorizonte(estA, estB);
+                    const inicio = (corte && !estA.visivel) ? corte : posA;
+                    const fim = (corte && !estB.visivel) ? corte : posB;
+                    ctx.moveTo(inicio.x, inicio.y);
+                    ctx.lineTo(fim.x, fim.y);
                 } else {
                     linhasAbaixo.push([posA, posB]);
                 }
