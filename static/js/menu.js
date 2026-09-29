@@ -1,38 +1,14 @@
 // ── Localização ───────────────────────────────────────────────────────────────
-// Tenta detetar a localização real do utilizador para mostrar no label do menu
-function detetarLocalizacao() {
-    if (navigator.geolocation) {
-        // o browser suporta geolocalização — pede permissão ao utilizador
-        navigator.geolocation.getCurrentPosition(
-            pos => {
-                // sucesso — mostra as coordenadas no label
-                // O hemisfério (N/S) e o lado do meridiano (E/O) são calculados
-                // a partir do sinal da coordenada. Estavam escritos à mão no
-                // texto ("N" e "W"), o que dava resultados errados em quase todo
-                // o mundo: em São Paulo mostrava "-23.55°N" e em Berlim
-                // "13.40°W". O Math.abs(lon) tirava o sinal e depois rotulava
-                // sempre como W, mesmo quando era leste.
-                // Num app de astronomia isto não é cosmético: o hemisfério
-                // decide o que é visível no céu (as Nuvens de Magalhães só se
-                // veem do sul, a Polaris só do norte).
-                // Usa-se N/S/E/O, que é a convenção portuguesa — o W do código
-                // anterior é a convenção inglesa.
-                const lat = pos.coords.latitude;
-                const lon = pos.coords.longitude;
-                const latTxt = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"}`;
-                const lonTxt = `${Math.abs(lon).toFixed(2)}°${lon >= 0 ? "E" : "O"}`;
-                document.getElementById("lbl-localizacao").textContent = `📍 ${latTxt}, ${lonTxt}`;
-            },
-            () => {
-                // utilizador recusou a permissão — mostra localização padrão
-                document.getElementById("lbl-localizacao").textContent = "📍 Vila Nova de Gaia, Portugal";
-            }
-        );
-    } else {
-        // browser não suporta geolocalização — mostra localização padrão
-        document.getElementById("lbl-localizacao").textContent = "📍 Vila Nova de Gaia, Portugal";
-    }
-}
+// A localização que aparece debaixo do título ("📍 Lisboa, Portugal") é escrita
+// pelo servidor no próprio HTML (ver menu.html e o _pagina_do_menu, no
+// server.py) e não tem nada para fazer aqui.
+//
+// Antes havia aqui uma função que perguntava a localização ao browser e
+// escrevia as coordenadas neste rótulo. Foi tirada por duas razões: a
+// localização da aplicação passou a ser a que se escolhe no perfil — a mesma
+// que o céu, o calendário e o observatório usam — e um rótulo que dizia as
+// coordenadas do computador enquanto os cálculos eram feitos para outra terra
+// era o género de discordância que não se nota e faz duvidar de tudo.
 
 // ── Ícones Canvas dos Cards ───────────────────────────────────────────────────
 // Substitui os emojis por símbolos desenhados com a Canvas API
@@ -202,7 +178,6 @@ function desenharIconeApod() {
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 window.criarEstrelas(); // gera as estrelas animadas no fundo
-detetarLocalizacao();   // tenta obter e mostrar a localização do utilizador
 
 // desenha os ícones canvas nos cards do menu
 // o if (!canvas) dentro de cada função protege contra erros em páginas sem esses elementos

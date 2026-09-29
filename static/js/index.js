@@ -1,6 +1,10 @@
 // ── Variáveis globais ─────────────────────────────────────────────
-let calAno = new Date().getFullYear();
-let calMes = new Date().getMonth() + 1;
+// O calendário abre no mês em que se está — no fuso da localização escolhida,
+// e não no do computador. Pelas 00:30 de 1 de outubro em Sydney, o computador
+// em Lisboa ainda está em setembro; abrir o calendário em setembro era mostrar
+// um mês que já passou.
+let calAno = horaEDataNoLocal().ano;
+let calMes = horaEDataNoLocal().mes;
 
 const MESES_PT = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const DIAS_PT = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
@@ -54,10 +58,72 @@ function criarEstrelas() {
     }
 }
 
+// ── A hora do local escolhido ─────────────────────────────────────
+// A localização escolhida no perfil traz um fuso horário, e é ele que decide
+// que horas são na aplicação — não o relógio do computador de quem está a ver.
+//
+// Isto não é arrumação: o céu é o do instante, e o instante é um só no mundo
+// inteiro. Quem está em Lisboa a ver o céu de Sydney precisa de saber que horas
+// são LÁ para perceber o que está a olhar. O servidor escreve a localização no
+// HTML (ver o index.html), e é daqui que ela se lê.
+
+function fusoDoLocal() {
+    // Sem localização no HTML cai-se em undefined, e o Intl trata isso como
+    // "usa o fuso do computador" — que é o que a aplicação fazia antes de isto
+    // existir. Nunca devia acontecer (o servidor escreve-a sempre), mas um
+    // relógio parado é um erro pior do que um relógio no fuso errado.
+    return (window.LOCALIZACAO && window.LOCALIZACAO.timezone) || undefined;
+}
+
+function horaEDataNoLocal() {
+    // A data e a hora de agora no fuso da localização escolhida.
+    //
+    // Devolve as peças já separadas — "data" para os campos <input type="date">
+    // (que só aceitam AAAA-MM-DD) e os números à parte para o calendário, que
+    // precisa de comparar ano, mês e dia com o que está a desenhar. Devolver
+    // uma string obrigava cada sítio a voltar a parti-la.
+    const pecas = {};
+    try {
+        new Intl.DateTimeFormat("en-GB", {
+            timeZone: fusoDoLocal(),
+            year: "numeric", month: "2-digit", day: "2-digit",
+            hour: "2-digit", minute: "2-digit", second: "2-digit",
+            // h23 em vez de h12: com h12 vinha "12:30" da meia-noite e não
+            // havia maneira de saber se era meia-noite ou meio-dia.
+            hourCycle: "h23",
+        }).formatToParts(new Date()).forEach(p => { pecas[p.type] = p.value; });
+    } catch (erro) {
+        // Um fuso que o browser não conhece (o servidor valida-o, mas quem
+        // mexesse na base de dados à mão podia lá pôr outro) cai aqui. É o
+        // mesmo caminho de quando não há localização nenhuma: a hora do
+        // computador, que é o que se fazia antes disto.
+        const agora = new Date();
+        return {
+            data: agora.toLocaleDateString("sv-SE"),
+            hora: `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
+            segundo: String(agora.getSeconds()).padStart(2, "0"),
+            ano: agora.getFullYear(), mes: agora.getMonth() + 1, dia: agora.getDate(),
+        };
+    }
+
+    return {
+        data: `${pecas.year}-${pecas.month}-${pecas.day}`,
+        // Alguns motores devolvem "24" à meia-noite mesmo com h23. É a mesma
+        // hora que "00", e é assim que os campos <input type="time"> a lêem.
+        hora: `${pecas.hour === "24" ? "00" : pecas.hour}:${pecas.minute}`,
+        segundo: pecas.second,
+        ano: Number(pecas.year), mes: Number(pecas.month), dia: Number(pecas.day),
+    };
+}
+
 // ── Relógio ───────────────────────────────────────────────────────
 function atualizarRelogio() {
-    const agora = new Date();
-    document.getElementById("relogio").textContent = "🕐 " + agora.toLocaleDateString("pt-PT") + "  " + agora.toLocaleTimeString("pt-PT");
+    const alvo = document.getElementById("relogio");
+    if (!alvo) return;
+
+    const agora = horaEDataNoLocal();
+    const [ano, mes, dia] = agora.data.split("-");   // AAAA-MM-DD -> partes
+    alvo.textContent = `🕐 ${dia}/${mes}/${ano}  ${agora.hora}:${agora.segundo}`;
 }
 
 // ── Navegação: SPA (Single Page Application) ──────────────────────────────────
@@ -184,10 +250,14 @@ async function carregarCalendario() {
         data.fases.forEach(f => fasesPorDia[f.dia] = f);
         data.eventos.forEach(e => eventosPorDia[e.dia] = true);
 
-        const hoje = new Date();
-        const hojeAno = hoje.getFullYear();
-        const hojesMes = hoje.getMonth() + 1;
-        const hojesDia = hoje.getDate();
+        // "Hoje" é hoje no fuso da localização escolhida: é a mesma razão do
+        // mês com que o calendário abre (ver o topo do ficheiro). O resto do
+        // calendário não muda com isto — os dias e as fases vêm do servidor,
+        // já calculados para a localização da conta.
+        const hoje = horaEDataNoLocal();
+        const hojeAno = hoje.ano;
+        const hojesMes = hoje.mes;
+        const hojesDia = hoje.dia;
         const primeiroDia = new Date(calAno, calMes - 1, 1).getDay();
         const offset = (primeiroDia === 0) ? 6 : primeiroDia - 1;
         const totalDias = new Date(calAno, calMes, 0).getDate();
@@ -530,8 +600,13 @@ async function carregarObservatorio(animar = false) {
         // frame, do género que se nota sem se perceber de onde vem.
         if (anterior) reporCeu(anterior);
 
-        // Atualiza a localização no cabeçalho
-        document.getElementById("localizacao").textContent = "📍 Vila Nova de Gaia";
+        // Atualiza a localização no cabeçalho. O nome vem do próprio céu que
+        // acabou de chegar (o /api/observatorio calcula-o para a localização da
+        // conta), e só se não vier é que se usa o que o servidor escreveu no
+        // HTML — para o cabeçalho não ficar a dizer "Vila Nova de Gaia" a quem
+        // escolheu Madrid.
+        document.getElementById("localizacao").textContent =
+            "📍 " + (apiData.localizacao_nome || (window.LOCALIZACAO && window.LOCALIZACAO.nome) || "");
 
         alterarModoVisao();
         redimensionarCanvas();
@@ -887,11 +962,13 @@ function inicializarSeletorHora() {
         inputData.value = tempoSimuladoObs.data;
         inputHora.value = tempoSimuladoObs.hora;
     } else {
-        const agora = new Date();
-        inputData.value = agora.toLocaleDateString("sv-SE");   // formato YYYY-MM-DD
-        const hh = String(agora.getHours()).padStart(2, "0");
-        const mm = String(agora.getMinutes()).padStart(2, "0");
-        inputHora.value = `${hh}:${mm}`;
+        // A hora real, no fuso da localização escolhida: é a hora que o
+        // servidor vai usar para calcular o céu de agora (ver o
+        // /api/observatorio, no server.py), e os campos têm de dizer o mesmo
+        // que o céu mostra.
+        const agora = horaEDataNoLocal();
+        inputData.value = agora.data;
+        inputHora.value = agora.hora;
     }
 
     atualizarLabelTempoSimulado();
@@ -935,13 +1012,11 @@ function atualizarObservatorioComHora() {
         return;
     }
 
-    const agora = new Date();
-    const dataAtual = agora.toLocaleDateString("sv-SE");
-    const horaAtual = String(agora.getHours()).padStart(2, "0") + ":" + String(agora.getMinutes()).padStart(2, "0");
-
     // Escolher exatamente a data/hora atuais quer dizer "voltar ao tempo real";
     // qualquer outro valor passa a ser o tempo simulado partilhado com o VR.
-    tempoSimuladoObs = (data === dataAtual && hora === horaAtual) ? null : { data, hora };
+    // As duas têm de ser lidas no mesmo fuso dos campos — o do local escolhido.
+    const agora = horaEDataNoLocal();
+    tempoSimuladoObs = (data === agora.data && hora === agora.hora) ? null : { data, hora };
 
     atualizarLabelTempoSimulado();
 

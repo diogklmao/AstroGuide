@@ -35,7 +35,13 @@
                 <div class="frosted-sub">Observatório Digital</div>
             </div>
         </div>
-        <div id="lbl-localizacao">📍 A detetar localização...</div>
+        <!-- A localização que está a valer, escrita pelo servidor: ou a que a
+             pessoa escolheu no perfil, ou a de omissão (Vila Nova de Gaia).
+             Antes isto vinha de uma pergunta ao browser, e o que aparecia aqui
+             era o sítio onde o computador estava — que não tem de ser o sítio
+             para onde o céu está a ser calculado (quem escolheu observar da
+             serra continua a ter o portátil em casa). -->
+        <div id="lbl-localizacao">📍 {{ localizacao.nome }}</div>
 
         <div class="cards">
             <a class="card card-ceu glass-card" href="/ceu">

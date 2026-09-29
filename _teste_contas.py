@@ -36,7 +36,11 @@ r = c.get("/api/me")
 d = r.get_json()
 verificar("/api/me devolve 200 sem sessão", r.status_code == 200, r.status_code)
 verificar("utilizador é null", d["utilizador"] is None)
-verificar("localização por omissão é Gaia", d["localizacao"]["nome"] == "Vila Nova de Gaia", d["localizacao"]["nome"])
+verificar("localização por omissão é Gaia", d["localizacao"]["nome"] == "Vila Nova de Gaia, Portugal",
+          d["localizacao"]["nome"])
+verificar("e traz a cidade e o país separados, não só o nome todo",
+          d["localizacao"]["cidade"] == "Vila Nova de Gaia" and d["localizacao"]["pais"] == "Portugal",
+          d["localizacao"])
 
 print("\n== 2. Registo: validação ==")
 r = c.post("/api/registar", json={"nome": "ab", "email": "a@b.pt", "password": "12345678"})
@@ -60,26 +64,143 @@ verificar("nome repetido (outra caixa) -> 409", r.status_code == 409, r.get_json
 r = c2.post("/api/registar", json={"nome": "Outro", "email": "DIOGO@exemplo.pt", "password": "password123"})
 verificar("email repetido (outra caixa) -> 409", r.status_code == 409, r.get_json().get("erro"))
 
-print("\n== 5. Localização pessoal ==")
-r = c.put("/api/localizacao", json={"nome": "Paris", "latitude": 48.8566, "longitude": 2.3522,
+print("\n== 5. Localização pessoal, escolhida por nome ==")
+# O que se grava é uma TERRA, não um par de números: cidade, país e região vão
+# junto das coordenadas e do fuso que o seletor resolveu (ver py/localizacao).
+# Escrever latitude e longitude à mão deixou de existir.
+r = c.put("/api/localizacao", json={"cidade": "Paris", "pais": "França", "regiao": "Île-de-France",
+                                    "latitude": 48.8566, "longitude": 2.3522,
                                     "elevacao": 35, "timezone": "Europe/Paris"})
 verificar("guardar localização -> 200", r.status_code == 200, r.get_json())
-r = c.put("/api/localizacao", json={"nome": "X", "latitude": 200, "longitude": 2})
+
+# Sem cidade não há localização: o nome é a única coisa que a pessoa viu e
+# escolheu, e uma linha sem ele aparecia no cabeçalho como um 📍 sozinho.
+r = c.put("/api/localizacao", json={"latitude": 48.85, "longitude": 2.35})
+verificar("sem cidade -> 400", r.status_code == 400, r.get_json().get("erro"))
+r = c.put("/api/localizacao", json={"cidade": "   ", "latitude": 48.85, "longitude": 2.35})
+verificar("cidade só com espaços -> 400", r.status_code == 400, r.get_json().get("erro"))
+r = c.put("/api/localizacao", json={"cidade": "P" * 81, "latitude": 48.85, "longitude": 2.35})
+verificar("cidade comprida demais -> 400", r.status_code == 400, r.get_json().get("erro"))
+
+r = c.put("/api/localizacao", json={"cidade": "X", "latitude": 200, "longitude": 2})
 verificar("latitude fora do intervalo -> 400", r.status_code == 400, r.get_json().get("erro"))
-r = c.put("/api/localizacao", json={"nome": "X", "latitude": 48, "longitude": 2, "timezone": "Marte/Olympus"})
+r = c.put("/api/localizacao", json={"cidade": "X", "latitude": 48, "longitude": 200})
+verificar("longitude fora do intervalo -> 400", r.status_code == 400, r.get_json().get("erro"))
+r = c.put("/api/localizacao", json={"cidade": "X", "latitude": 48, "longitude": 2, "elevacao": 99999})
+verificar("elevação fora do intervalo -> 400", r.status_code == 400, r.get_json().get("erro"))
+
+# O fuso é validado a sério (ZoneInfo) e não só copiado: um valor inventado
+# gravado hoje só rebentava na primeira vez que se abrisse o Calendário Lunar.
+r = c.put("/api/localizacao", json={"cidade": "X", "latitude": 48, "longitude": 2, "timezone": "Marte/Olympus"})
 verificar("fuso horário inválido -> 400", r.status_code == 400, r.get_json().get("erro"))
-r = c.put("/api/localizacao", json={"nome": "X", "latitude": "abc", "longitude": 2})
+r = c.put("/api/localizacao", json={"cidade": "X", "latitude": "abc", "longitude": 2})
 verificar("latitude não numérica -> 400", r.status_code == 400, r.get_json().get("erro"))
 
 r = c.get("/api/me")
-verificar("a localização ficou guardada", r.get_json()["localizacao"]["nome"] == "Paris",
-          r.get_json()["localizacao"])
+local = r.get_json()["localizacao"]
+# O nome que se vê é feito da cidade e do país (ver nome_legivel), e é por isso
+# que o teste olha para os três: cidade e país são o que ficou guardado, e o
+# nome é o que aparece no cabeçalho da aplicação.
+verificar("a localização ficou guardada", local["nome"] == "Paris, França", local)
+verificar("e com a cidade e o país à parte, como foram escolhidos",
+          local["cidade"] == "Paris" and local["pais"] == "França", local)
+verificar("e com o fuso que o seletor resolveu", local["timezone"] == "Europe/Paris", local.get("timezone"))
+
+print("\n== 5b. O seletor de cidades ==")
+# A procura que alimenta a lista do perfil: escreve-se o nome e o servidor
+# devolve as terras que conhece com as coordenadas e o fuso já resolvidos.
+r = c.get("/api/localidades?q=lisboa")
+cidades = r.get_json().get("resultados", [])
+verificar("procurar 'lisboa' -> 200", r.status_code == 200, r.status_code)
+verificar("e devolve Lisboa em primeiro", cidades and cidades[0]["cidade"] == "Lisboa",
+          [x["cidade"] for x in cidades])
+if cidades:
+    primeira = cidades[0]
+    verificar("com as coordenadas já resolvidas — nada para escrever à mão",
+              38 < primeira["latitude"] < 39 and -10 < primeira["longitude"] < -9, primeira)
+    verificar("e com o fuso horário", primeira["timezone"] == "Europe/Lisbon", primeira.get("timezone"))
+    verificar("e com o país, que é o que distingue terras com o mesmo nome",
+              primeira["pais"] == "Portugal", primeira.get("pais"))
+
+# Quem escreve depressa escreve com vírgula ("Lisboa, Portugal") e quem escreve
+# sem acentos não pode ficar sem resposta — são as duas maneiras como as pessoas
+# escrevem o nome de uma terra, e nenhuma delas é um erro.
+r = c.get("/api/localidades?q=Lisboa%2C%20Portugal")
+verificar("'Lisboa, Portugal' (com vírgula) encontra Lisboa",
+          r.get_json()["resultados"] and r.get_json()["resultados"][0]["cidade"] == "Lisboa",
+          [x["cidade"] for x in r.get_json()["resultados"]])
+r = c.get("/api/localidades?q=madrid")
+verificar("'madrid' encontra Madrid, em Espanha",
+          r.get_json()["resultados"] and r.get_json()["resultados"][0]["pais"] == "Espanha",
+          r.get_json()["resultados"][:1])
+
+r = c2.get("/api/localidades?q=lisboa")
+verificar("procurar cidades sem sessão -> 401", r.status_code == 401, r.status_code)
+
+# Uma letra chega. Quem escreve "S" está a percorrer a lista para escolher de
+# lá, e não a fazer uma pergunta — cortar isso obrigava a saber o nome todo de
+# cor, que é exatamente o que esta funcionalidade veio tirar.
+r = c.get("/api/localidades?q=s")
+letra = r.get_json().get("resultados", [])
+verificar("'s' (uma letra) devolve as terras que começam por S",
+          len(letra) >= 8 and all(x["cidade"].lower().startswith("s") for x in letra),
+          [x["cidade"] for x in letra[:6]])
+verificar("e todas trazem coordenadas e fuso, prontas a guardar",
+          all(x["latitude"] and x["longitude"] and x["timezone"] for x in letra), letra[:1])
+
+# Uma procura vazia não devolve o catálogo todo: quem ainda não escreveu nada
+# não quer 150 linhas a abrir-se debaixo do campo.
+r = c.get("/api/localidades?q=")
+verificar("procura vazia -> lista vazia (não o catálogo todo)",
+          r.get_json()["resultados"] == [], r.get_json()["resultados"])
+
+# Quando há terras que se chamam mesmo o que se escreveu, as que só
+# coincidiram por causa do país ou da região saem. Sem isto, "port" trazia o
+# Porto e mais três, e depois Beja, Braga e Faro — que lá estavam só porque a
+# região delas é "Portugal". Numa lista de sugestões isso lê-se como um erro,
+# e a pessoa desconfia também das linhas de cima, que estavam certas.
+r = c.get("/api/localidades?q=port")
+portos = r.get_json()["resultados"]
+verificar("'port' devolve os Portos e não as terras cuja região é Portugal",
+          portos and all(x["cidade"].lower().startswith("port") for x in portos),
+          [x["cidade"] for x in portos])
+
+# O outro lado da mesma regra: "espanha" não tem nome nenhum que lhe
+# corresponda, e é a lista das terras daquele país que se quer ver. Um filtro
+# fixo em vez de condicional deixava esta procura sem resposta nenhuma.
+r = c.get("/api/localidades?q=espanha")
+espanha = r.get_json()["resultados"]
+verificar("mas 'espanha' continua a dar as terras de Espanha",
+          len(espanha) >= 8 and all(x["pais"] == "Espanha" for x in espanha),
+          [x["cidade"] for x in espanha[:6]])
+
+print("\n== 5c. A procura ao contrário (o dispositivo) ==")
+# O botão "usar a localização deste dispositivo" manda as coordenadas do
+# browser e recebe o NOME da terra. Sem esta rota, guardava-se um par de
+# números sem nome nenhum.
+r = c.post("/api/localidades/reversa", json={"latitude": 999, "longitude": 2})
+verificar("coordenadas impossíveis -> 400 (sem sair à rede)", r.status_code == 400, r.get_json().get("erro"))
+r = c2.post("/api/localidades/reversa", json={"latitude": 41.13, "longitude": -8.66})
+verificar("sem sessão -> 401", r.status_code == 401, r.status_code)
+
+# Com coordenadas válidas o resultado depende da rede: 200 com o nome da terra,
+# ou 503 se não se conseguir saber qual é. O que não pode é inventar um nome —
+# era pior do que não responder, porque um nome errado no cabeçalho não se
+# distingue de um certo.
+r = c.post("/api/localidades/reversa", json={"latitude": 38.7169, "longitude": -9.1399})
+if r.status_code == 503:
+    print("    (saltado: sem rede para saber que terra são as coordenadas)")
+else:
+    verificar("coordenadas válidas -> 200 com o nome da terra", r.status_code == 200, r.get_json())
+    verificar("e o que volta é uma cidade com nome",
+              bool((r.get_json().get("localidade") or {}).get("cidade")), r.get_json())
 
 print("\n== 6. A localização chega ao cálculo do céu ==")
 r = c.get("/api/ceu")
-verificar("/api/ceu usa a localização da conta", r.get_json()["location"] == "Paris", r.get_json()["location"])
+verificar("/api/ceu usa a localização da conta", r.get_json()["location"] == "Paris, França",
+          r.get_json()["location"])
 r = c2.get("/api/ceu")
-verificar("outro cliente (sem sessão) fica com Gaia", r.get_json()["location"] == "Vila Nova de Gaia",
+verificar("outro cliente (sem sessão) fica com Gaia", r.get_json()["location"] == "Vila Nova de Gaia, Portugal",
           r.get_json()["location"])
 
 # A prova de que a personalização chega mesmo à matemática: o mesmo instante,
@@ -163,10 +284,12 @@ verificar("a observação do Diogo continua lá", len(r.get_json()["observacoes"
 r = c.delete(f"/api/observacoes/{obs_id}")
 r = c.get("/api/observacoes")
 verificar("o dono apaga", r.get_json()["observacoes"] == [])
-r = c3.put("/api/localizacao", json={"nome": "Lisboa", "latitude": 38.7, "longitude": -9.1})
+r = c3.put("/api/localizacao", json={"cidade": "Lisboa", "pais": "Portugal",
+                                     "latitude": 38.7169, "longitude": -9.1399,
+                                     "timezone": "Europe/Lisbon"})
 r = c.get("/api/me")
 verificar("a localização da Maria não mexeu na do Diogo",
-          r.get_json()["localizacao"]["nome"] == "Paris", r.get_json()["localizacao"]["nome"])
+          r.get_json()["localizacao"]["nome"] == "Paris, França", r.get_json()["localizacao"]["nome"])
 
 print("\n== 10. Sair e voltar a entrar ==")
 r = c.post("/api/sair")
@@ -174,8 +297,10 @@ r = c.get("/api/me")
 verificar("depois de sair fica sem sessão", r.get_json()["utilizador"] is None)
 r = c.get("/api/localizacao")
 verificar("PUT exige sessão -> 405/401", r.status_code in (401, 405), r.status_code)
-r = c.put("/api/localizacao", json={"nome": "X", "latitude": 1, "longitude": 1})
+r = c.put("/api/localizacao", json={"cidade": "X", "latitude": 1, "longitude": 1})
 verificar("guardar localização sem sessão -> 401", r.status_code == 401, r.status_code)
+r = c.get("/api/localidades?q=lisboa")
+verificar("procurar cidades sem sessão -> 401 (a mesma porta)", r.status_code == 401, r.status_code)
 
 r = c.post("/api/entrar", json={"identificador": "Diogo", "password": "errada"})
 verificar("password errada -> 401", r.status_code == 401, r.get_json().get("erro"))
@@ -187,7 +312,7 @@ r = c.post("/api/entrar", json={"identificador": "diogo@exemplo.pt", "password":
 verificar("entrar pelo EMAIL -> 200", r.status_code == 200, r.get_json())
 r = c.get("/api/me")
 verificar("localização guardada sobrevive ao sair/entrar",
-          r.get_json()["localizacao"]["nome"] == "Paris", r.get_json()["localizacao"]["nome"])
+          r.get_json()["localizacao"]["nome"] == "Paris, França", r.get_json()["localizacao"]["nome"])
 
 print("\n== 11. A password não fica em texto na base de dados ==")
 import sqlite3
@@ -277,18 +402,22 @@ print("\n== 15. O Observatório segue a localização da conta ==")
 # /api/observatorio — que é o ecrã onde a localização mais se nota — não era.
 r = c.get("/api/observatorio")
 verificar("/api/observatorio usa a localização da conta",
-          r.get_json().get("localizacao_nome") == "Paris", r.get_json().get("localizacao_nome"))
+          r.get_json().get("localizacao_nome") == "Paris, França", r.get_json().get("localizacao_nome"))
 r = c2.get("/api/observatorio")
 verificar("outro cliente (sem sessão) fica com Gaia",
-          r.get_json().get("localizacao_nome") == "Vila Nova de Gaia", r.get_json().get("localizacao_nome"))
+          r.get_json().get("localizacao_nome") == "Vila Nova de Gaia, Portugal",
+          r.get_json().get("localizacao_nome"))
 
 # A ISS era o único objeto do céu que ficava sempre em Gaia: o iss.py usava o
 # observador do módulo em vez do de quem estava a ver. Visto de Sydney, o erro
 # dava dezenas de graus — a ISS aparecia no lado errado do céu.
 from py.astronomia import iss
+from py.config import LOCATION
 momento = sky_engine.momento_de(t)
-iss_gaia = iss.get_posicao_iss(momento, {"nome": "Gaia", "latitude": 41.13, "longitude": -8.66,
-                                         "elevacao": 75, "timezone": "Europe/Lisbon"})
+# A "sem localização" é a de config.py, e é mesmo ela que se passa aqui: com
+# uma aproximação escrita à mão (41.13 em vez dos 41.1346... do config.py) a
+# comparação ficava à mercê do arredondamento do último algarismo.
+iss_gaia = iss.get_posicao_iss(momento, LOCATION)
 iss_sydney = iss.get_posicao_iss(momento, {"nome": "Sydney", "latitude": -33.87, "longitude": 151.21,
                                            "elevacao": 20, "timezone": "Australia/Sydney"})
 
@@ -305,50 +434,117 @@ else:
     verificar("sem localização a ISS sai como saía (não parte quem não passar nenhuma)",
               iss.get_posicao_iss(momento)["altitude"] == iss_gaia["altitude"])
 
-print("\n== 16. Localização escrita à mão ==")
-# O painel flutuante onde estes campos nasceram foi substituído pela página do
-# perfil: o HTML está agora no perfil.html e o que ele faz no perfil.js. As
-# verificações são as mesmas — o que mudou foi onde elas olham.
+print("\n== 16. O seletor de cidades, no perfil ==")
+# A localização escolhe-se pelo NOME. O painel flutuante onde os campos de
+# latitude e longitude nasceram foi substituído pela página do perfil, e com
+# ele foram-se os dois campos: ninguém sabe de cor que Madrid são 40,4168° N,
+# e um algarismo trocado punha o céu inteiro no sítio errado sem nada a avisar.
 js   = c.get("/static/js/perfil.js").data.decode("utf-8")
 css  = c.get("/static/css/perfil.css").data.decode("utf-8")
 html = c.get("/perfil").get_data(as_text=True)
 
 verificar("a página do perfil carrega o perfil.js", "perfil.js" in html)
-verificar("a página tem o botão de escrever coordenadas", "alternarFormularioManual" in html)
-verificar("o formulário tem latitude e longitude",
-          'id="manual-lat"' in html and 'id="manual-lon"' in html)
-verificar("o formulário começa fechado",
-          'id="perfil-form-manual" style="display:none"' in html)
 
-# Os dois caminhos (o detetado pelo browser e o escrito à mão) gravam pelo
-# mesmo sítio. Se alguém duplicar a gravação, a próxima correção feita só num
+# O campo onde se escreve o nome da terra, com a lista de resultados por baixo.
+verificar("a página tem o campo de procura de cidades",
+          'id="local-procura"' in html and 'type="search"' in html)
+verificar("o campo sabe que manda na lista (aria-controls)",
+          'aria-controls="local-resultados"' in html and 'aria-expanded="false"' in html)
+verificar("a lista de resultados começa escondida",
+          'id="local-resultados"' in html and 'class="perfil-resultados" role="listbox" hidden' in html)
+
+# A ligação que faltava. O campo, a lista, a rota e o procurarCidade estavam
+# todos lá — e escrever não fazia nada, porque ninguém avisava o JavaScript que
+# alguém estava a escrever. Nada disto se vê no ecrã (o campo até parecia
+# normal, com o cursor a piscar); o que se vê é a lista a não aparecer, e não
+# há como distinguir isso de "esta terra não existe".
+verificar("escrever no campo chama a procura (o campo está mesmo ligado)",
+          'campoProcura.addEventListener("input", procurarCidade)' in js)
+verificar("e o Escape continua a fechar a lista, no mesmo sítio",
+          'campoProcura.addEventListener("keydown", fecharResultadosComEscape)' in js)
+
+# Uma letra chega para procurar, e é a constante que o diz — não um 2 perdido
+# no meio do código. Procurar a partir de uma letra é o que faz a lista servir
+# para escolher em vez de obrigar a saber o nome todo de cor.
+verificar("a procura aceita uma letra só", "const MINIMO_DA_PROCURA = 1" in js)
+verificar("e o limiar é usado, e não só declarado",
+          "termo.length < MINIMO_DA_PROCURA" in js)
+
+# A cidade escolhida fica à espera de um "Guardar". Sem este passo, percorrer a
+# lista às setas mudava o céu a cada resultado por que se passasse.
+verificar("a escolha fica à espera de confirmação antes de gravar",
+          'id="local-escolhida"' in html and 'id="btn-guarda-local"' in html
+          and "guardarLocalizacaoEscolhida()" in html)
+verificar("e começa escondida, como a lista",
+          'id="local-escolhida" class="perfil-escolha" hidden' in html)
+verificar("e há o caminho do dispositivo, para quem não quer escrever nada",
+          'id="btn-local-dispositivo"' in html and "usarLocalizacaoDoBrowser()" in html)
+
+# O que saiu: os campos de coordenadas à mão e o que os abria.
+verificar("os campos de latitude e longitude à mão desapareceram",
+          "manual-lat" not in html and "manual-lon" not in html and "perfil-form-manual" not in html)
+verificar("e não sobrou código a abrir o formulário que já não existe",
+          "alternarFormularioManual" not in html and "alternarFormularioManual" not in js)
+
+# Os dois caminhos (a lista e o dispositivo) gravam pelo mesmo sítio. Não é à
+# toa: eles encontram-se no mostrarEscolha, e é daí que sai o único "Guardar"
+# que existe. Se alguém duplicar a gravação, a próxima correção feita só num
 # deles passa despercebida no outro.
 # Conta-se o PUT, e não os fetch("/api/localizacao"): o "voltar a Gaia" usa a
 # mesma rota com DELETE, e esse é outro pedido, não uma segunda gravação.
-verificar("a gravação é uma só e é usada pelos dois caminhos",
+verificar("a gravação é uma só, e os dois caminhos chegam à mesma",
           js.count("function guardarLocalizacao(") == 1
-          and js.count("await guardarLocalizacao(") == 2
-          and js.count('method: "PUT"') == 1,
+          and js.count("await guardarLocalizacao(") == 1
+          and js.count('method: "PUT"') == 1
+          and js.count("mostrarEscolha(") == 3,   # a definição e os dois caminhos
           f"definições={js.count('function guardarLocalizacao(')} "
           f"chamadas={js.count('await guardarLocalizacao(')} "
-          f"PUTs={js.count('method: \"PUT\"')}")
+          f"PUTs={js.count('method: \"PUT\"')} "
+          f"mostrarEscolha={js.count('mostrarEscolha(')}")
 
-# A validação do browser repete a do servidor (auth.py). Os limites têm de
-# bater certo: se o browser deixar passar o que o servidor recusa, o
-# utilizador só descobre o erro depois da ida e volta à rede.
-verificar("latitude validada no browser com os limites do servidor", "latitude < -90 || latitude > 90" in js)
-verificar("longitude validada no browser com os limites do servidor", "longitude < -180 || longitude > 180" in js)
-verificar("elevação validada no browser com os limites do servidor", "elevacao < -500 || elevacao > 9000" in js)
+# Nada do que vem do servidor chegou a ser interpretado como código: os
+# resultados da procura vão para data-* e o texto escreve-se com textContent.
+# Com innerHTML, bastava o nome de uma terra para injetar o que quisesse — e o
+# geocoding online devolve nomes que ninguém deste lado escreveu.
+verificar("os resultados da procura vão para data-*, e não para dentro de código",
+          "botao.dataset.cidade" in js and "botao.dataset.latitude" in js
+          and "botao.dataset.timezone" in js)
+verificar("e o que aparece no ecrã é escrito como texto",
+          "nome.textContent" in js and "detalhe.textContent" in js)
 
-# É o erro clássico do Number(""): sem um teste ao texto antes da conversão,
-# deixar a latitude em branco gravava 0° — o Golfo da Guiné — sem avisar.
-verificar("campo em branco não passa por zero", 'textoLat === ""' in js)
+# Os data-* são sempre texto: "38.7169" ia para o servidor como string, que o
+# recusa (ver _validar_coordenadas, no auth.py) — certo, mas obrigava a uma ida
+# e volta à rede para nada.
+verificar("as coordenadas lidas do DOM são convertidas em números",
+          "Number(botao.dataset.latitude)" in js and "Number(botao.dataset.longitude)" in js)
 
-verificar("o fuso do dispositivo é reaproveitado nos dois caminhos",
-          js.count("fusoDoDispositivo()") >= 2)
+# Escrever "Madrid" são seis teclas, e não se pode perguntar ao servidor por
+# cada uma: espera-se que a pessoa pare, e só então se pergunta.
+verificar("a procura espera que se pare de escrever antes de perguntar",
+          "ESPERA_DA_PROCURA" in js and "clearTimeout(temporizadorProcura)" in js)
+# Duas procuras seguidas podiam chegar trocadas — a resposta de "Mad" a chegar
+# depois da de "Madrid" — e a lista mostrava o que já não correspondia ao campo.
+verificar("e a resposta atrasada de uma procura antiga é deitada fora",
+          "meuPedido !== pedidoAtual" in js)
+verificar("o Escape fecha a lista sem apagar o que está escrito",
+          "fecharResultadosComEscape" in js and '"Escape"' in js)
 
-for classe in [".perfil-campo {", ".perfil-campos-linha {"]:
+# A hora local anda no fuso da localização escolhida, e não no do computador:
+# é a prova visível de que o fuso ficou bem guardado. O fuso vem do data-* que
+# o servidor escreveu, e não de uma segunda cópia no JavaScript — dois sítios
+# onde ele estivesse escrito eram dois fusos a poder discordar.
+verificar("o cartão mostra o fuso e as coordenadas da localização a valer",
+          "Fuso horário" in html and "Coordenadas" in html and 'id="perfil-hora-local"' in html)
+verificar("e a hora é calculada no fuso que o servidor escreveu no data-*",
+          "dataset.fuso" in js and "timeZone: fuso" in js and "data-fuso=" in html)
+
+for classe in [".perfil-campo {", ".perfil-resultados {", ".perfil-escolha {"]:
     verificar(f"{classe} está no CSS", classe in css)
+# O [hidden] do HTML não ganha à regra que dá "display: block" a um <ul>: sem
+# estas linhas, a lista de resultados aparecia aberta e vazia antes de se
+# procurar seja o que for.
+verificar("o CSS repõe o escondido que o display do browser ganhava",
+          ".perfil-resultados[hidden]" in css and ".perfil-escolha[hidden]" in css)
 verificar("os campos podem encolher dentro da linha", "min-width: 0" in css)
 
 # A página do perfil cresce com o número de favoritos e de observações. Com o
@@ -679,6 +875,74 @@ verificar("as tabelas em falta foram criadas", {"localizacoes", "favoritos", "ob
           sorted(tabelas))
 velha.close()
 os.remove(ANTIGA)
+
+print("\n== 22. A localização que já estava guardada ganha cidade ==")
+# A outra metade da migração, e a que toca a quem já usava a aplicação: uma
+# base de dados COM uma localização guardada, mas da forma antiga (sem
+# "cidade" nem "pais", porque os campos não existiam). Sem o ALTER TABLE, o
+# INSERT da localização partia com "no such column: cidade"; sem o UPDATE de
+# trás, a página do perfil mostrava a localização sem nome nenhum.
+ANTIGA2 = os.path.join(tempfile.gettempdir(), "astroguide_local_antiga.db")
+if os.path.exists(ANTIGA2):
+    os.remove(ANTIGA2)
+
+velha = sqlite3.connect(ANTIGA2)
+velha.executescript("""
+    CREATE TABLE utilizadores (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome          TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+        email         TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+        password_hash TEXT    NOT NULL,
+        criado_em     TEXT    NOT NULL,
+        papel         TEXT    NOT NULL DEFAULT 'utilizador'
+    );
+    INSERT INTO utilizadores (nome, email, password_hash, criado_em)
+    VALUES ('Antigo', 'antigo@exemplo.pt', 'hash-de-exemplo', '2026-01-01T00:00:00+00:00');
+
+    CREATE TABLE localizacoes (
+        utilizador_id INTEGER PRIMARY KEY REFERENCES utilizadores(id) ON DELETE CASCADE,
+        nome          TEXT    NOT NULL,
+        latitude      REAL    NOT NULL,
+        longitude     REAL    NOT NULL,
+        elevacao      REAL    NOT NULL DEFAULT 0,
+        timezone      TEXT    NOT NULL DEFAULT 'Europe/Lisbon'
+    );
+    INSERT INTO localizacoes (utilizador_id, nome, latitude, longitude, elevacao, timezone)
+    VALUES (1, 'Serra da Estrela', 40.3219, -7.6128, 1993, 'Europe/Lisbon');
+""")
+velha.commit()
+velha.close()
+
+guardado = db.CAMINHO_BD
+try:
+    db.CAMINHO_BD = ANTIGA2
+    db.criar_esquema()
+finally:
+    db.CAMINHO_BD = guardado
+
+velha = sqlite3.connect(ANTIGA2)
+velha.row_factory = sqlite3.Row
+colunas = {c["name"] for c in velha.execute("PRAGMA table_info(localizacoes)")}
+verificar("a localização antiga ganhou as colunas da cidade e do país",
+          {"cidade", "pais"} <= colunas, sorted(colunas))
+
+linha = velha.execute("SELECT * FROM localizacoes WHERE utilizador_id = 1").fetchone()
+verificar("e a localização que lá estava ficou com o nome antigo como cidade",
+          linha["cidade"] == "Serra da Estrela", dict(linha))
+verificar("sem país, porque nunca ninguém o escolheu", linha["pais"] == "", linha["pais"])
+verificar("e as coordenadas que lá estavam não se mexeram",
+          abs(linha["latitude"] - 40.3219) < 1e-9 and abs(linha["longitude"] + 7.6128) < 1e-9,
+          (linha["latitude"], linha["longitude"]))
+
+# E o que aparece no ecrã: sem país, o nome legível é só a cidade. Com vírgula
+# e país vazio, o cabeçalho mostrava "Serra da Estrela, " — que é o tipo de
+# coisa que só se vê depois de estar à frente de quem usa a aplicação.
+from py.localizacao import nome_legivel
+verificar("e o nome que se vê é a cidade, sem vírgula pendurada",
+          nome_legivel({"cidade": linha["cidade"], "pais": linha["pais"]}) == "Serra da Estrela",
+          nome_legivel({"cidade": linha["cidade"], "pais": linha["pais"]}))
+velha.close()
+os.remove(ANTIGA2)
 
 bd.close()
 os.remove(TMP)

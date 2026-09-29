@@ -21,11 +21,6 @@
 (function () {
   "use strict";
 
-  // Estado do pedido de localização ao browser. Vive aqui, e não no DOM,
-  // porque é o que fica à espera entre o momento em que o browser devolve as
-  // coordenadas e o momento em que a pessoa confirma com um nome.
-  let coordenadasDetetadas = null;
-
   // ── Avisos ──────────────────────────────────────────────────────────
   // Duas caixas na página (a da localização e a do caderno), e cada aviso vai
   // para a que lhe pertence — um erro a escrever no caderno não deve aparecer
@@ -49,6 +44,39 @@
   };
 
   // ── Localização ─────────────────────────────────────────────────────
+  // A localização escolhe-se pelo NOME. Quem procura escreve "Lisboa" ou
+  // "Madrid" e o servidor devolve as terras que conhece com esse nome, cada
+  // uma com as coordenadas e o fuso horário já resolvidos (ver
+  // /api/localidades, no auth.py). Escrever latitude e longitude à mão saiu
+  // daqui: ninguém sabe esses números de cor, e um algarismo trocado punha o
+  // céu inteiro no sítio errado sem nada a avisar.
+
+  // O que está escolhido mas ainda não foi gravado. Vive aqui, e não no DOM,
+  // porque é o que fica à espera entre o momento em que a pessoa escolhe (na
+  // lista ou pelo dispositivo) e o momento em que confirma com o Guardar.
+  let localEscolhida = null;
+
+  // A procura é escrita tecla a tecla, e não se pode pedir ao servidor uma
+  // lista por cada letra: escrever "Madrid" eram seis pedidos, cinco deles
+  // para procuras a meio ("M", "Ma", "Mad"...) que ninguém quis. Espera-se que
+  // a pessoa pare de escrever, e só então se pergunta.
+  let temporizadorProcura = null;
+  const ESPERA_DA_PROCURA = 250;
+
+  // Cada pedido leva um número, e só se aceita a resposta do último pedido
+  // feito. Sem isto, duas procuras seguidas podiam chegar trocadas — a
+  // resposta de "Mad" a chegar depois da de "Madrid" — e a lista mostrava
+  // resultados que já não correspondiam ao que está escrito no campo.
+  let pedidoAtual = 0;
+
+  // A partir de quantas letras se procura. É uma só: quem escreve "S" quer ver
+  // as terras que começam por S, para escolher de uma lista em vez de ter de
+  // adivinhar o nome todo — e a lista local responde a isso sem custo nenhum,
+  // porque é uma comparação de texto sobre ~150 linhas. (A procura online é
+  // outra história: essa só entra a partir de três letras, ver o
+  // _MINIMO_PARA_A_REDE no py/localizacao/__init__.py. Uma letra não é uma
+  // pergunta que se faça a um serviço externo — é uma navegação pela lista.)
+  const MINIMO_DA_PROCURA = 1;
 
   // O fuso horário do dispositivo. O browser já sabe em que fuso está, por
   // isso não é preciso ir a nenhum serviço externo nem perguntar ao
@@ -58,44 +86,279 @@
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Lisbon";
   }
 
-  window.usarLocalizacaoDoBrowser = function usarLocalizacaoDoBrowser() {
+  // As coordenadas escritas como se lêem: "41.12° N, 8.61° O". O hemisfério sai
+  // do sinal da coordenada, e não de um N e um O fixos no texto — num app de
+  // astronomia isso não é cosmético, porque é o hemisfério que decide o que se
+  // vê no céu. O O é a convenção portuguesa para oeste (o W é a inglesa).
+  //
+  // Isto é o mesmo que o _coordenadas_legiveis faz no auth.py, pela mesma
+  // razão que a validação está nos dois lados: as coordenadas que aparecem
+  // nesta página vêm de duas terras diferentes (o servidor, para a localização
+  // que está a valer, e a resposta da procura), e obrigar a uma ida à rede só
+  // para escrever um número era pior do que o repetir.
+  function coordenadasLegiveis(latitude, longitude) {
+    const ns = latitude >= 0 ? "N" : "S";
+    const eo = longitude >= 0 ? "E" : "O";
+    return `${Math.abs(latitude).toFixed(2)}° ${ns}, ${Math.abs(longitude).toFixed(2)}° ${eo}`;
+  }
+
+  // ── A hora local ────────────────────────────────────────────────────
+  // O relógio do perfil anda no fuso da localização escolhida, e não no do
+  // computador. É a demonstração mais direta de que o fuso ficou bem guardado:
+  // quem escolher Sydney vê ali as horas de Sydney, no mesmo instante em que o
+  // computador diz outra coisa.
+  function atualizarHoraLocal() {
+    const alvo = document.getElementById("perfil-hora-local");
+    if (!alvo) return;
+
+    const fuso = alvo.dataset.fuso;
+    const opcoes = {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+    };
+
+    try {
+      alvo.textContent = new Intl.DateTimeFormat("pt-PT", Object.assign({ timeZone: fuso }, opcoes))
+        .format(new Date());
+    } catch (erro) {
+      // Um fuso que o browser não conhece (o servidor valida-o, mas quem
+      // editasse a base de dados à mão podia lá pôr outro) cai aqui. Mostra-se
+      // a hora do computador em vez de deixar o campo em branco para sempre.
+      alvo.textContent = new Date().toLocaleString("pt-PT");
+    }
+  }
+
+  function esconderResultados() {
+    const lista = document.getElementById("local-resultados");
+    if (lista) {
+      lista.hidden = true;
+      lista.innerHTML = "";
+    }
+    const campo = document.getElementById("local-procura");
+    if (campo) campo.setAttribute("aria-expanded", "false");
+  }
+
+  function mostrarResultados(cidades) {
+    const lista = document.getElementById("local-resultados");
+    const campo = document.getElementById("local-procura");
+    if (!lista || !campo) return;
+
+    if (!cidades.length) {
+      lista.innerHTML =
+        '<li class="perfil-resultado-vazio">Não encontrámos essa terra. ' +
+        'Tenta escrever de outra maneira, ou usa a localização deste dispositivo.</li>';
+      lista.hidden = false;
+      campo.setAttribute("aria-expanded", "true");
+      return;
+    }
+
+    lista.innerHTML = "";
+    cidades.forEach(function (cidade) {
+      const item = document.createElement("li");
+
+      const botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "perfil-resultado";
+
+      // O que vem do servidor fica em data-*, e não dentro do onclick: assim o
+      // JavaScript lê-o do próprio elemento e nada do que veio da rede chega a
+      // ser interpretado como código. (É o mesmo cuidado dos favoritos, no
+      // perfil.html.)
+      botao.dataset.cidade    = cidade.cidade;
+      botao.dataset.pais      = cidade.pais;
+      botao.dataset.regiao    = cidade.regiao || "";
+      botao.dataset.latitude  = cidade.latitude;
+      botao.dataset.longitude = cidade.longitude;
+      botao.dataset.elevacao  = cidade.elevacao;
+      botao.dataset.timezone  = cidade.timezone;
+      botao.onclick = function () { escolherLocalidade(botao); };
+
+      // A região vai no texto porque é o que distingue as terras com o mesmo
+      // nome — há mais do que uma "Vila Nova", e sem ela a lista dava duas
+      // linhas iguais e a pessoa escolhia ao calhas.
+      const nome = document.createElement("span");
+      nome.className = "perfil-resultado-nome";
+      nome.textContent = cidade.pais ? `${cidade.cidade}, ${cidade.pais}` : cidade.cidade;
+
+      const detalhe = document.createElement("span");
+      detalhe.className = "perfil-resultado-detalhe";
+      detalhe.textContent = [
+        cidade.regiao,
+        coordenadasLegiveis(cidade.latitude, cidade.longitude),
+      ].filter(Boolean).join(" · ");
+
+      botao.appendChild(nome);
+      botao.appendChild(detalhe);
+      item.appendChild(botao);
+      lista.appendChild(item);
+    });
+
+    lista.hidden = false;
+    campo.setAttribute("aria-expanded", "true");
+  }
+
+  async function pedirCidades(termo) {
+    const meuPedido = ++pedidoAtual;
+
+    let resposta;
+    try {
+      resposta = await fetch("/api/localidades?q=" + encodeURIComponent(termo));
+    } catch (erro) {
+      mostrarResultados([]);
+      return;
+    }
+    // Chegou tarde: entretanto já se pediu outra coisa, e o que está escrito
+    // no campo não é o que esta resposta responde. Deita-se fora.
+    if (meuPedido !== pedidoAtual) return;
+
+    if (!resposta.ok) {
+      mostrarResultados([]);
+      return;
+    }
+
+    const dados = await resposta.json().catch(function () { return {}; });
+    if (meuPedido !== pedidoAtual) return;
+
+    mostrarResultados(dados.resultados || []);
+  }
+
+  window.procurarCidade = function procurarCidade() {
+    const campo = document.getElementById("local-procura");
+    if (!campo) return;
+
+    const termo = campo.value.trim();
+    clearTimeout(temporizadorProcura);
+
+    // Escolher outra cidade tira a que estava à espera de confirmação: deixá-la
+    // lá era guardar uma terra e estar a ver outra.
+    localEscolhida = null;
+    document.getElementById("local-escolhida").hidden = true;
+
+    if (termo.length < MINIMO_DA_PROCURA) {
+      esconderResultados();
+      return;
+    }
+
+    temporizadorProcura = setTimeout(function () { pedirCidades(termo); }, ESPERA_DA_PROCURA);
+  };
+
+  // Fecha a lista com o Escape sem apagar o que está escrito. É o gesto que se
+  // espera de uma lista de sugestões, e sem ele a única maneira de a fechar era
+  // apagar o campo — que é o contrário do que se quer.
+  function fecharResultadosComEscape(evento) {
+    if (evento.key === "Escape") esconderResultados();
+  }
+
+  // ── A escolha ───────────────────────────────────────────────────────
+  // Partilhada pelos dois caminhos (a lista e o dispositivo): o que muda entre
+  // eles é só de onde vêm os valores. Mostrar a escolha, deixá-la confirmar e
+  // gravá-la é igual nos dois, e é isso que vive aqui.
+  function mostrarEscolha(local) {
+    localEscolhida = local;
+
+    document.getElementById("escolha-nome").textContent =
+      local.pais ? `${local.cidade}, ${local.pais}` : local.cidade;
+    document.getElementById("escolha-regiao").textContent = local.regiao || "";
+    document.getElementById("escolha-dados").textContent =
+      `${coordenadasLegiveis(local.latitude, local.longitude)} · ${local.timezone}`;
+
+    document.getElementById("local-escolhida").hidden = false;
+    esconderResultados();
+
+    const campo = document.getElementById("local-procura");
+    if (campo) campo.value = "";
+  }
+
+  function escolherLocalidade(botao) {
+    mostrarEscolha({
+      cidade:    botao.dataset.cidade,
+      pais:      botao.dataset.pais,
+      regiao:    botao.dataset.regiao,
+      // Os data-* são sempre texto: sem estas conversões, "38.7169" ia para o
+      // servidor como texto, e o servidor recusa-o (ver o _validar_coordenadas,
+      // no auth.py) — que é o comportamento certo, mas obrigava a uma ida e
+      // volta à rede para nada.
+      latitude:  Number(botao.dataset.latitude),
+      longitude: Number(botao.dataset.longitude),
+      elevacao:  Number(botao.dataset.elevacao) || 0,
+      timezone:  botao.dataset.timezone,
+    });
+  }
+
+  window.usarLocalizacaoDoBrowser = async function usarLocalizacaoDoBrowser() {
+    const botao = document.getElementById("btn-local-dispositivo");
+
     if (!navigator.geolocation) {
       avisar("Este browser não sabe a localização.");
       return;
     }
+    botao.disabled = true;
     avisar("A pedir a localização ao browser…", true);
 
     navigator.geolocation.getCurrentPosition(
-      function (pos) {
-        coordenadasDetetadas = {
+      async function (pos) {
+        // As coordenadas vêm do dispositivo e ficam exatamente como vêm — é o
+        // ponto mais preciso que se consegue sem escrever nada. O que falta é
+        // o NOME da terra onde elas caem, e é isso que se vai perguntar (ver
+        // /api/localidades/reversa, no auth.py).
+        const coordenadas = {
           latitude:  pos.coords.latitude,
           longitude: pos.coords.longitude,
           // A altitude vem muitas vezes a null (é a informação que os
           // telemóveis dão com menos fiabilidade). Sem ela, assume-se o
           // nível do mar: para o céu, 0 ou 100 metros é a mesma coisa.
           elevacao:  pos.coords.altitude || 0,
-          // O fuso horário do dispositivo, sem precisar de ir a nenhum
-          // serviço externo — o browser já sabe em que fuso está.
-          timezone:  fusoDoDispositivo(),
         };
 
-        const campo = document.getElementById("perfil-nome-local");
-        campo.value = "A minha localização";
-        document.getElementById("perfil-form-local").style.display = "";
-        avisar(`Detetado: ${pos.coords.latitude.toFixed(3)}°, ${pos.coords.longitude.toFixed(3)}°. Dá-lhe um nome e guarda.`, true);
-        campo.focus();
-        campo.select();
+        let localidade = null;
+        try {
+          const resposta = await fetch("/api/localidades/reversa", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(coordenadas),
+          });
+          if (resposta.ok) {
+            const dados = await resposta.json();
+            localidade = dados.localidade;
+          }
+        } catch (erro) {
+          localidade = null;
+        }
+
+        botao.disabled = false;
+
+        if (!localidade) {
+          // Sem o nome não se inventa uma terra: as coordenadas ficavam certas
+          // e o nome errado, que é o pior dos dois mundos — quem visse
+          // "Lisboa" no cabeçalho a observar do Porto não voltava a confiar no
+          // resto. Diz-se o que se passou e deixa-se a escolha pela lista.
+          avisar("Encontrámos a tua posição, mas não conseguimos saber que terra é. " +
+                 "Procura pelo nome.");
+          return;
+        }
+
+        mostrarEscolha(Object.assign({
+          cidade:   localidade.cidade,
+          pais:     localidade.pais,
+          regiao:   localidade.regiao || "",
+          // O fuso do dispositivo: o browser sabe em que fuso está o
+          // computador, e estas coordenadas são as dele.
+          timezone: fusoDoDispositivo(),
+        }, coordenadas));
+
+        avisar("Detetado. Confirma em baixo para guardar.", true);
       },
       function () {
+        botao.disabled = false;
         avisar("Não conseguimos obter a localização. Confirma que deste permissão ao browser.");
       }
     );
   };
 
   // ── Gravação da localização ─────────────────────────────────────────
-  // Partilhada pelos dois caminhos (a localização detetada pelo browser e a
-  // escrita à mão): o que muda entre eles são só os valores. O pedido e o que
-  // se faz depois dele são iguais, e é isso que vive aqui.
+  // A única gravação que existe, seja qual for o caminho por onde a
+  // localização chegou. O que muda entre eles são só os valores: o pedido e o
+  // que se faz depois dele são iguais, e é isso que vive aqui.
   async function guardarLocalizacao(dados, botao) {
     botao.disabled = true;
 
@@ -113,94 +376,17 @@
     }
 
     // Recarrega para o céu, o calendário e o observatório serem recalculados
-    // para o local novo. Só atualizar a página por dentro deixaria os painéis
-    // já desenhados a mostrar o céu do local anterior, que é pior do que não
-    // fazer nada — parecia que a gravação não tinha pegado.
+    // para o local novo — e para a hora local do cartão passar a ser a de lá.
+    // Só atualizar a página por dentro deixaria os painéis já desenhados a
+    // mostrar o céu do local anterior, que é pior do que não fazer nada —
+    // parecia que a gravação não tinha pegado.
     avisar("Guardado. A recarregar com o céu do novo local…", true);
     window.location.reload();
   }
 
-  window.guardarLocalizacaoDetetada = async function guardarLocalizacaoDetetada() {
-    if (!coordenadasDetetadas) return;
-
-    const nome = (document.getElementById("perfil-nome-local").value || "").trim() || "A minha localização";
-    await guardarLocalizacao(
-      Object.assign({ nome: nome }, coordenadasDetetadas),
-      document.getElementById("btn-guarda-local")
-    );
-  };
-
-  // ── Localização escrita à mão ───────────────────────────────────────
-  // Para os sítios onde o browser não ajuda: um local que não é onde a pessoa
-  // está (um sítio de observação a que vai amanhã), ou um GPS que recusa ou
-  // erra. Sem isto, a única localização possível era a que o browser dava.
-  window.alternarFormularioManual = function alternarFormularioManual() {
-    const manual   = document.getElementById("perfil-form-manual");
-    const detetado = document.getElementById("perfil-form-local");
-    const abrir    = manual.style.display === "none";
-
-    manual.style.display = abrir ? "" : "none";
-
-    // Só um formulário aberto de cada vez: os dois gravam no mesmo sítio, e
-    // com os dois à vista dava a impressão de ser preciso preencher ambos.
-    if (abrir) detetado.style.display = "none";
-    if (!abrir) return;
-
-    // O fuso do dispositivo fica pré-preenchido. Para quem observa do sítio
-    // onde está — o caso normal — é o valor certo, e assim não precisa de
-    // saber o nome de um fuso horário só para guardar umas coordenadas.
-    const campoFuso = document.getElementById("manual-tz");
-    if (!campoFuso.value) campoFuso.value = fusoDoDispositivo();
-
-    document.getElementById("manual-nome").focus();
-  };
-
-  window.guardarLocalizacaoManual = async function guardarLocalizacaoManual() {
-    const nome      = (document.getElementById("manual-nome").value || "").trim();
-    const textoLat  = (document.getElementById("manual-lat").value || "").trim();
-    const textoLon  = (document.getElementById("manual-lon").value || "").trim();
-    const textoElev = (document.getElementById("manual-elev").value || "").trim();
-    const timezone  = (document.getElementById("manual-tz").value || "").trim();
-
-    if (textoLat === "" || textoLon === "") {
-      avisar("Escreve a latitude e a longitude.");
-      return;
-    }
-
-    // Number("") dá 0, por isso o campo vazio é apanhado acima, antes de
-    // chegar aqui; e Number("abc") dá NaN, que o isFinite apanha.
-    const latitude  = Number(textoLat);
-    const longitude = Number(textoLon);
-    const elevacao  = textoElev === "" ? 0 : Number(textoElev);
-
-    // As mesmas regras que o servidor aplica (ver auth.py). Estão repetidas
-    // aqui de propósito: sem isto, um erro de escrita obrigava a uma ida e
-    // volta à rede só para o utilizador saber o que se passou. O servidor
-    // continua a ser quem manda — se as duas discordarem, ganha ele.
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      avisar("A latitude e a longitude têm de ser números.");
-      return;
-    }
-    if (latitude < -90 || latitude > 90) {
-      avisar("A latitude tem de estar entre -90 e 90.");
-      return;
-    }
-    if (longitude < -180 || longitude > 180) {
-      avisar("A longitude tem de estar entre -180 e 180.");
-      return;
-    }
-    if (!Number.isFinite(elevacao) || elevacao < -500 || elevacao > 9000) {
-      avisar("A elevação tem de estar entre -500 e 9000 metros.");
-      return;
-    }
-
-    await guardarLocalizacao({
-      nome:      nome || "A minha localização",
-      latitude:  latitude,
-      longitude: longitude,
-      elevacao:  elevacao,
-      timezone:  timezone || fusoDoDispositivo(),
-    }, document.getElementById("btn-guarda-manual"));
+  window.guardarLocalizacaoEscolhida = async function guardarLocalizacaoEscolhida() {
+    if (!localEscolhida) return;
+    await guardarLocalizacao(localEscolhida, document.getElementById("btn-guarda-local"));
   };
 
   window.reporLocalizacaoGaia = async function reporLocalizacaoGaia() {
@@ -292,4 +478,21 @@
 
   // ── Ecrã inicial ────────────────────────────────────────────────────
   window.criarEstrelas();   // o mesmo campo de estrelas do menu
+
+  // A hora local da localização escolhida, a andar segundo a segundo.
+  atualizarHoraLocal();
+  setInterval(atualizarHoraLocal, 1000);
+
+  // O campo da procura: quem o escreve é que sabe quando lhe estão a escrever
+  // dentro, por isso é ele que avisa. Fica aqui, e não num oninput/onkeydown do
+  // HTML, por ser o único sítio que os usa — e porque assim os dois gestos
+  // (escrever procura, Escape fecha) nascem lado a lado, onde se lê que são o
+  // mesmo campo. Foi esta ligação que faltou: a lista de resultados existia,
+  // a rota existia, o procurarCidade existia, e escrever no campo não fazia
+  // nada, porque ninguém o chamava.
+  const campoProcura = document.getElementById("local-procura");
+  if (campoProcura) {
+    campoProcura.addEventListener("input", procurarCidade);
+    campoProcura.addEventListener("keydown", fecharResultadosComEscape);
+  }
 })();

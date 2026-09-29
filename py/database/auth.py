@@ -22,6 +22,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from py.database.db import consultar_um, consultar_todos, executar, agora_iso, PAPEL_ADMIN
 from py.config import LOCATION
+from py.localizacao import nome_legivel, procurar, reverter
 
 # Os catálogos onde os favoritos vão buscar o nome. O que fica guardado em
 # "favoritos" é o id do objeto ("Ori", "polaris", "m42"), porque os nomes
@@ -127,7 +128,7 @@ def localizacao_do_utilizador():
         return dict(LOCATION)
 
     linha = consultar_um(
-        "SELECT nome, latitude, longitude, elevacao, timezone "
+        "SELECT cidade, pais, latitude, longitude, elevacao, timezone "
         "FROM localizacoes WHERE utilizador_id = ?",
         (u["id"],),
     )
@@ -135,12 +136,36 @@ def localizacao_do_utilizador():
         return dict(LOCATION)
 
     return {
-        "nome":      linha["nome"],
+        # O nome que aparece no ecrã sai da cidade e do país, e não de uma
+        # coluna própria: duas maneiras de escrever a mesma localização era
+        # uma delas a ficar para trás à primeira alteração. (A tabela ainda
+        # tem o "nome", que é o que as localizações guardadas antes disto
+        # usavam — mas é a cidade que manda, e é dela que ele é feito.)
+        "cidade":    linha["cidade"],
+        "pais":      linha["pais"],
+        "nome":      nome_legivel({"cidade": linha["cidade"], "pais": linha["pais"]}),
         "latitude":  linha["latitude"],
         "longitude": linha["longitude"],
         "elevacao":  linha["elevacao"],
         "timezone":  linha["timezone"],
     }
+
+
+def _coordenadas_legiveis(latitude, longitude):
+    # "41.12° N, 8.61° O" — a partir dos dois números.
+    #
+    # O hemisfério sai do sinal da coordenada, e não de um N e um O escritos à
+    # mão: num app de astronomia isso não é cosmético, porque é o hemisfério
+    # que decide o que se vê no céu (a Polaris só aparece a norte). E o O é a
+    # convenção portuguesa para oeste — o W é a inglesa.
+    #
+    # Isto também existe no perfil.js, feito da mesma maneira: o browser tem de
+    # formatar as coordenadas que acabou de receber da procura, e não pode
+    # pedir ao servidor para o fazer por cada resultado que mostra.
+    return (
+        f"{abs(latitude):.2f}° {'N' if latitude >= 0 else 'S'}, "
+        f"{abs(longitude):.2f}° {'E' if longitude >= 0 else 'O'}"
+    )
 
 
 # ── Nomes e datas para a página do perfil ─────────────────────────────────────
@@ -255,13 +280,19 @@ def pagina_perfil():
         "SELECT 1 FROM localizacoes WHERE utilizador_id = ?", (u["id"],)
     ) is not None
 
+    local = localizacao_do_utilizador()
+
     return render_template(
         "perfil.html",
         utilizador=u,
         iniciais=_iniciais(u["nome"]),
         admin=e_admin(u),
         membro_desde=_data_legivel(u["criado_em"]),
-        localizacao=localizacao_do_utilizador(),
+        localizacao=local,
+        # A localização que está a valer, já escrita para o ecrã: a página
+        # mostra as coordenadas dela, e não só o nome — é a maneira de a pessoa
+        # confirmar que a cidade que escolheu é a que a aplicação está a usar.
+        coordenadas=_coordenadas_legiveis(local["latitude"], local["longitude"]),
         localizacao_propria=propria,
         grupos=[
             {"tipo": tipo, "titulo": titulo, "itens": por_tipo.get(tipo, [])}
@@ -377,6 +408,87 @@ def api_me():
 
 
 # ── Localização de observação ─────────────────────────────────────────────────
+# A localização escolhe-se pelo NOME (cidade + país) e são as coordenadas e o
+# fuso horário que vêm atrás. Escrever latitude e longitude à mão era o que se
+# fazia antes disto, e é o que ninguém sabe de cor: quem quer observar de
+# Madrid não tem de saber que são 40,4168° N e 3,7038° O.
+
+# O texto de uma procura não tem razão nenhuma para ser comprido, e é escrito
+# por quem está a ver o ecrã. Corta-se em vez de recusar: uma procura longa só
+# pode ser engano, e devolver um erro a quem escreveu depressa era pior do que
+# responder ao que se percebeu.
+_MAXIMO_PROCURA = 60
+
+
+@auth_bp.route("/api/localidades")
+def api_procurar_localidades():
+    # Procura de cidades para o seletor do perfil — "lisboa" devolve Lisboa
+    # (Portugal) e "madrid" devolve Madrid (Espanha), com as coordenadas e o
+    # fuso de cada uma já resolvidos (ver py/localizacao/__init__.py).
+    u = utilizador_atual()
+    if u is None:
+        return jsonify({"erro": "Precisas de ter sessão iniciada."}), 401
+
+    termo = (request.args.get("q") or "").strip()[:_MAXIMO_PROCURA]
+    return jsonify({"resultados": procurar(termo)})
+
+
+@auth_bp.route("/api/localidades/reversa", methods=["POST"])
+def api_localidade_reversa():
+    # O caminho contrário: umas coordenadas (as do dispositivo, que o browser
+    # sabe sem ninguém as escrever) e devolve a terra onde elas caem.
+    #
+    # Sem isto, "usar a localização deste dispositivo" guardava um par de
+    # números sem nome nenhum. O nome não é enfeite: é o que aparece no
+    # cabeçalho e o que diz à pessoa onde é que a aplicação julga que ela está.
+    u = utilizador_atual()
+    if u is None:
+        return jsonify({"erro": "Precisas de ter sessão iniciada."}), 401
+
+    dados = request.get_json(silent=True) or {}
+
+    erro = _validar_coordenadas(dados)
+    if erro:
+        return jsonify({"erro": erro}), 400
+
+    latitude  = float(dados["latitude"])
+    longitude = float(dados["longitude"])
+
+    localidade = reverter(latitude, longitude)
+    if localidade is None:
+        # Não se sabe que terra é esta — tipicamente por não haver internet. Não
+        # é um erro do pedido: é uma resposta que não se conseguiu obter, e o
+        # perfil.js diz isso à pessoa e deixa-a escolher pela lista.
+        return jsonify({
+            "erro": "Não conseguimos saber que terra é esta. Procura pelo nome."
+        }), 503
+
+    return jsonify({"localidade": localidade})
+
+
+def _validar_coordenadas(dados):
+    # As regras para a latitude, a longitude e a elevação. Devolve a mensagem de
+    # erro, ou None se estiver tudo bem.
+    #
+    # Vive aqui, e não dentro de cada rota que as recebe, porque são duas (a
+    # gravação da localização e a procura ao contrário) e elas não podem
+    # discordar: uma latitude de 200 é inválida em ambas, e é o tipo de coisa
+    # que só se descobre depois de gravada.
+    try:
+        latitude  = float(dados.get("latitude"))
+        longitude = float(dados.get("longitude"))
+        elevacao  = float(dados.get("elevacao") or 0)
+    except (TypeError, ValueError):
+        return "Latitude e longitude têm de ser números."
+
+    if not (-90 <= latitude <= 90):
+        return "A latitude tem de estar entre -90 e 90."
+    if not (-180 <= longitude <= 180):
+        return "A longitude tem de estar entre -180 e 180."
+    if not (-500 <= elevacao <= 9000):
+        return "A elevação tem de estar entre -500 e 9000 metros."
+    return None
+
 
 @auth_bp.route("/api/localizacao", methods=["PUT", "DELETE"])
 def api_localizacao():
@@ -392,44 +504,57 @@ def api_localizacao():
 
     dados = request.get_json(silent=True) or {}
 
-    try:
-        latitude  = float(dados.get("latitude"))
-        longitude = float(dados.get("longitude"))
-        elevacao  = float(dados.get("elevacao") or 0)
-    except (TypeError, ValueError):
-        return jsonify({"erro": "Latitude e longitude têm de ser números."}), 400
+    erro = _validar_coordenadas(dados)
+    if erro:
+        return jsonify({"erro": erro}), 400
 
-    if not (-90 <= latitude <= 90):
-        return jsonify({"erro": "A latitude tem de estar entre -90 e 90."}), 400
-    if not (-180 <= longitude <= 180):
-        return jsonify({"erro": "A longitude tem de estar entre -180 e 180."}), 400
-    if not (-500 <= elevacao <= 9000):
-        return jsonify({"erro": "A elevação tem de estar entre -500 e 9000 metros."}), 400
-
-    nome = (dados.get("nome") or "").strip() or "A minha localização"
-    if len(nome) > 80:
-        return jsonify({"erro": "O nome do local não pode ter mais de 80 caracteres."}), 400
+    # A cidade é o que a pessoa escolheu, e é ela que dá nome ao local. Os
+    # limites são os mesmos do campo no ecrã (ver o perfil.html): sem isto, um
+    # erro no JavaScript gravava um nome de mil caracteres que depois aparecia
+    # no cabeçalho da aplicação.
+    cidade = (dados.get("cidade") or "").strip()
+    pais   = (dados.get("pais") or "").strip()
+    regiao = (dados.get("regiao") or "").strip()
+    if not cidade:
+        return jsonify({"erro": "Falta a cidade."}), 400
+    if len(cidade) > 80:
+        return jsonify({"erro": "O nome da cidade não pode ter mais de 80 caracteres."}), 400
+    if len(pais) > 60 or len(regiao) > 80:
+        return jsonify({"erro": "O nome do país é comprido demais."}), 400
 
     # O fuso horário é validado a sério, e não só copiado para a base de
     # dados: mais tarde é passado ao ZoneInfo() nos cálculos do calendário, e
     # um valor inválido gravado hoje só rebentava na primeira vez que alguém
-    # abrisse o Calendário Lunar.
+    # abrisse o Calendário Lunar — e é ele que decide que horas são no local
+    # escolhido, portanto não pode ser um valor de risco.
     timezone = (dados.get("timezone") or "Europe/Lisbon").strip()
     try:
         ZoneInfo(timezone)
     except Exception:
         return jsonify({"erro": "Fuso horário desconhecido."}), 400
 
+    local = {
+        "cidade":    cidade,
+        "pais":      pais,
+        "regiao":    regiao,
+        "latitude":  float(dados["latitude"]),
+        "longitude": float(dados["longitude"]),
+        "elevacao":  float(dados.get("elevacao") or 0),
+        "timezone":  timezone,
+    }
+
     # INSERT ... ON CONFLICT: as duas operações num só passo, para não haver
     # uma janela entre verificar se existe e inserir.
     executar(
-        "INSERT INTO localizacoes (utilizador_id, nome, latitude, longitude, elevacao, timezone) "
-        "VALUES (?, ?, ?, ?, ?, ?) "
+        "INSERT INTO localizacoes "
+        "  (utilizador_id, cidade, pais, nome, latitude, longitude, elevacao, timezone) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(utilizador_id) DO UPDATE SET "
-        "  nome = excluded.nome, latitude = excluded.latitude, "
-        "  longitude = excluded.longitude, elevacao = excluded.elevacao, "
-        "  timezone = excluded.timezone",
-        (u["id"], nome, latitude, longitude, elevacao, timezone),
+        "  cidade = excluded.cidade, pais = excluded.pais, nome = excluded.nome, "
+        "  latitude = excluded.latitude, longitude = excluded.longitude, "
+        "  elevacao = excluded.elevacao, timezone = excluded.timezone",
+        (u["id"], cidade, pais, nome_legivel(local), local["latitude"],
+         local["longitude"], local["elevacao"], timezone),
     )
 
     return jsonify({"localizacao": localizacao_do_utilizador()})

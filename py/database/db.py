@@ -68,9 +68,19 @@ CREATE TABLE IF NOT EXISTS utilizadores (
 -- config.py (Vila Nova de Gaia). Por isso é uma tabela separada em vez de
 -- colunas na tabela dos utilizadores — a ausência de linha significa
 -- exatamente "ainda não escolheu", sem precisar de valores nulos a fingir.
+--
+-- A localização escolhe-se por Cidade + País (a pessoa procura "Lisboa",
+-- "Madrid"), e são esses dois campos que ficam guardados ao lado das
+-- coordenadas que a procura devolveu. As coordenadas poderiam ser procuradas
+-- outra vez a partir do nome, mas não se faz: a lista de cidades muda entre
+-- versões e quem guardou "Fátima" tem direito a continuar a acordar no mesmo
+-- sítio. O "nome" é o que aparece no ecrã ("Lisboa, Portugal") e fica gravado
+-- por ser o que evita ter de reconstruir a apresentação a cada consulta.
 CREATE TABLE IF NOT EXISTS localizacoes (
     utilizador_id INTEGER PRIMARY KEY
                   REFERENCES utilizadores(id) ON DELETE CASCADE,
+    cidade    TEXT NOT NULL DEFAULT '',
+    pais      TEXT NOT NULL DEFAULT '',
     nome      TEXT NOT NULL,
     latitude  REAL NOT NULL,
     longitude REAL NOT NULL,
@@ -108,6 +118,18 @@ CREATE TABLE IF NOT EXISTS observacoes (
 CREATE INDEX IF NOT EXISTS idx_favoritos_utilizador  ON favoritos  (utilizador_id);
 CREATE INDEX IF NOT EXISTS idx_observacoes_utilizador ON observacoes (utilizador_id);
 """
+
+
+# As colunas que foram nascendo depois de o esquema já estar em uso, pela ordem
+# por que foram acrescentadas: (tabela, coluna, definição). Ficam aqui, e não
+# dentro do _acrescentar_colunas_em_falta, porque um esquema que só existe em
+# SQL e uma lista de remendos escrita em Python são duas coisas que têm de
+# concordar — e assim estão à vista uma ao lado da outra.
+_COLUNAS_ACRESCENTADAS = (
+    ("utilizadores", "papel", f"TEXT NOT NULL DEFAULT '{PAPEL_UTILIZADOR}'"),
+    ("localizacoes", "cidade", "TEXT NOT NULL DEFAULT ''"),
+    ("localizacoes", "pais", "TEXT NOT NULL DEFAULT ''"),
+)
 
 
 # ── Ligação ───────────────────────────────────────────────────────────────────
@@ -175,19 +197,36 @@ def _acrescentar_colunas_em_falta(bd):
     # O "CREATE TABLE IF NOT EXISTS" do ESQUEMA só cria tabelas que faltem
     # criar — a uma tabela que já lá esteja não lhe toca, nem para lhe juntar
     # uma coluna nova. Sem isto, quem já tivesse um astroguide.db de antes
-    # continuava sem a coluna "papel" e a aplicação partia na primeira consulta
-    # que a pedisse (o registo, a entrada e a página /admin).
+    # continuava sem a coluna "papel" (e a aplicação partia no registo, na
+    # entrada e na página /admin), e sem a "cidade" e o "pais" da localização.
     #
     # O ALTER TABLE ADD COLUMN do SQLite aceita NOT NULL desde que traga um
     # DEFAULT constante — as linhas que já existem ficam com esse valor, que é
-    # exatamente o que se quer: quem já tinha conta passa a ser utilizador
-    # normal, não admin.
-    colunas = {linha["name"] for linha in bd.execute("PRAGMA table_info(utilizadores)")}
-    if "papel" not in colunas:
-        bd.execute(
-            "ALTER TABLE utilizadores "
-            f"ADD COLUMN papel TEXT NOT NULL DEFAULT '{PAPEL_UTILIZADOR}'"
-        )
+    # exatamente o que se quer em ambos os casos: quem já tinha conta passa a
+    # ser utilizador normal (e não admin), e a localização que já estava
+    # guardada fica sem cidade e sem país, que é a verdade — ninguém os
+    # escolheu, porque os campos não existiam.
+    colunas_de = {
+        tabela: {linha["name"] for linha in bd.execute(f"PRAGMA table_info({tabela})")}
+        for tabela in ("utilizadores", "localizacoes")
+    }
+
+    for tabela, coluna, definicao in _COLUNAS_ACRESCENTADAS:
+        if coluna not in colunas_de[tabela]:
+            bd.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {definicao}")
+
+    # A localização que já existia não tem cidade nem país, e a lista de
+    # cidades não sabe adivinhar o país a partir de umas coordenadas. O que
+    # ela tem é o "nome" que a pessoa escreveu ("Paris", "Serra da Estrela"),
+    # e era esse o nome da terra — passa a ser a cidade, para a página do
+    # perfil poder mostrar de onde é que a localização atual veio em vez de um
+    # campo em branco.
+    #
+    # O país fica vazio, e é a verdade: ninguém o escolheu, porque o campo não
+    # existia. O nome que aparece no ecrã é feito da cidade e do país (ver o
+    # nome_legivel), por isso esta linha continua a mostrar-se como antes —
+    # só o nome, sem vírgula nem país atrás.
+    bd.execute("UPDATE localizacoes SET cidade = nome WHERE cidade = ''")
 
 
 def criar_esquema():

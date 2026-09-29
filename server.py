@@ -117,31 +117,52 @@ def devtools_workspace():
 # ── Rotas de páginas ──────────────────────────────────────────────────────────
 # Rotas são URLs — quando o browser acede a um URL, Flask chama a função correspondente
 
+def _pagina_do_menu():
+    # O menu mostra a localização de quem está a ver (o "📍 Lisboa, Portugal"
+    # debaixo do título). Vem daqui, escrito pelo servidor, e não de uma
+    # pergunta ao browser: a localização da aplicação é a que a pessoa
+    # escolheu no perfil, e é essa que o céu, o calendário e o observatório
+    # usam — perguntar ao dispositivo dava um nome que não correspondia a nada
+    # do que a aplicação estava a calcular.
+    return render_template("menu.html", localizacao=localizacao_do_utilizador())
+
+
+def _pagina_aplicacao():
+    # As cinco rotas da aplicação (o céu, o calendário, o observatório, a
+    # imagem do dia) servem todas o mesmo index.html — é uma aplicação de um
+    # ecrã só, e o que muda entre elas é o que o JavaScript abre (ver o fim do
+    # index.js). A localização vai no HTML por ser o que o relógio do
+    # cabeçalho e o seletor de hora do observatório precisam para saber em que
+    # fuso horário estão: sem ela, os dois mostravam a hora do computador de
+    # quem está a ver, que é a hora errada para quem escolheu observar de
+    # Sydney.
+    return render_template("index.html", localizacao=localizacao_do_utilizador())
+
 @app.route("/")                                     # rota "/" = página principal (http://localhost:5000/)
 def menu():
-    return render_template("menu.html")
+    return _pagina_do_menu()
 
 @app.route("/app")                                   # serve o ficheiro templates/index.html ao browser
 def app_principal():
-    return render_template("index.html")
+    return _pagina_aplicacao()
 
 
 @app.route("/calendario")                           # serve o ficheiro templates/calendario.html ao browser
 def calendario():
-    return render_template("index.html")
+    return _pagina_aplicacao()
 
 
 @app.route("/ceu")                                  # serve o ficheiro templates/mapa.html ao browser
 def ceu():
-    return render_template("index.html")
+    return _pagina_aplicacao()
 
 @app.route("/observatorio")                         # serve o observatório ao browser
 def observatorio():
-    return render_template("index.html")
+    return _pagina_aplicacao()
 
 @app.route("/apod")                                  # serve a aba NASA - Imagem do Dia ao browser
 def apod_pagina():
-    return render_template("index.html")
+    return _pagina_aplicacao()
 
 # ── Rotas da API — devolvem JSON ──────────────────────────────────────────────
 # A API é o canal de comunicação entre o browser (JavaScript) e o Python

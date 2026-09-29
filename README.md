@@ -5,7 +5,10 @@
 
 O AstroGuide é uma aplicação web de astronomia que mostra
 dados reais do céu em tempo real, calculados com efemérides
-oficiais da NASA, para a localização de Vila Nova de Gaia.
+oficiais da NASA. Por omissão é o céu de Vila Nova de Gaia, e
+quem tem conta escolhe a sua terra pelo nome — "Lisboa",
+"Madrid", "Sydney" — para o céu, o calendário e o observatório
+passarem a ser calculados para lá.
 Inclui também um Observatório 3D com suporte WebXR
 (compatível com Meta Quest 3, com tracking real da cabeça)
 e a Imagem Astronómica do Dia da NASA (APOD).
@@ -53,8 +56,10 @@ astroguide/
 │
 ├── py/config.py           → Configurações globais
 │                            Localização por omissão (Vila Nova
-│                            de Gaia), nome, versão, fuso horário
-│                            e elevação.
+│                            de Gaia, Portugal), com cidade,
+│                            país, coordenadas, elevação e fuso
+│                            horário. É a que se usa enquanto
+│                            ninguém escolheu a sua.
 │
 ├── py/database/           → A base de dados e as contas
 │   │
@@ -79,6 +84,30 @@ astroguide/
 │                            tem guardado. É renderizada no
 │                            servidor, para não haver um endpoint
 │                            em JSON a devolver os dados de todos.
+│
+├── py/localizacao/        → Escolher uma localização pelo NOME
+│   │                        É o que faz não ser preciso escrever
+│   │                        latitude e longitude à mão: escreve-se
+│   │                        "Lisboa" e as coordenadas aparecem.
+│   │
+│   ├── cidades.py         → Lista de cidades, fora da rede
+│   │                        ~150 terras com coordenadas, elevação
+│   │                        e fuso horário. A procura ignora
+│   │                        acentos e pontuação e conhece os
+│   │                        nomes portugueses ("Londres" e
+│   │                        "London" dão a mesma terra).
+│   │
+│   ├── geocoding.py       → Geocoding, quando a lista não chega
+│   │                        Open-Meteo para procurar pelo nome e
+│   │                        BigDataCloud para o caminho contrário
+│   │                        (coordenadas do browser → nome da
+│   │                        terra). Sem chave de API, com cache em
+│   │                        memória de 10 minutos.
+│   │
+│   └── __init__.py        → A porta de entrada do módulo
+│                            procurar() e reverter(). A lista
+│                            local é tentada primeiro; a rede só
+│                            é tocada quando ela não encontra nada.
 │
 ├── py/astronomia/         → Cálculo e rede
 │   │                        O que pensa (o sky_engine.py) e os
@@ -135,9 +164,11 @@ astroguide/
 │
 ├── _teste_contas.py       → Testes das contas, do perfil e da
 │                            localização
-│                            172 verificações automáticas
-│                            (170 se não houver rede — a parte
-│                            da ISS salta 2, e diz que saltou).
+│                            217 verificações automáticas
+│                            (213 se não houver rede — a parte
+│                            da ISS salta 2 e a da localização do
+│                            dispositivo salta 2, e dizem que
+│                            saltaram).
 │                            Correr com: py _teste_contas.py
 │                            Não arranca servidor nem abre browser.
 │
@@ -225,9 +256,11 @@ astroguide/
     │   ├── auth.js        → Formulários da página de entrada:
     │   │                    alternar as abas, validar e enviar.
     │   │
-    │   ├── perfil.js      → Página do perfil: guardar e repor a
-    │   │                    localização (do dispositivo ou
-    │   │                    escrita à mão), remover favoritos,
+    │   ├── perfil.js      → Página do perfil: o seletor de
+    │   │                    cidades (a procura, a lista de
+    │   │                    resultados, a hora local no fuso
+    │   │                    escolhido), guardar e repor a
+    │   │                    localização, remover favoritos,
     │   │                    acrescentar e apagar observações, e
     │   │                    terminar sessão.
     │   │
@@ -235,10 +268,11 @@ astroguide/
     │   │                    de estrelas do fundo. Os dados já
     │   │                    vêm no HTML, do servidor.
     │   │
-    │   ├── menu.js        → Lógica do menu: deteção de
-    │   │                    localização e ícones Canvas
-    │   │                    desenhados à mão (estrela,
-    │   │                    lua crescente, telescópio, jornal).
+    │   ├── menu.js        → Lógica do menu: os ícones Canvas
+    │   │                    desenhados à mão (estrela, lua
+    │   │                    crescente, telescópio, jornal). A
+    │   │                    localização que o menu mostra já vem
+    │   │                    escrita no HTML, do servidor.
     │   │
     │   ├── index.js       → Lógica da app: navegação SPA,
     │   │                    dados do céu, calendário cósmico,
@@ -361,6 +395,18 @@ Rotas da API de conta (Precisa de sessão, marcadas com ✱):
   /api/sair        → Terminar sessão
   /api/localizacao ✱ → PUT guarda a localização pessoal,
                        DELETE volta à de config.py
+  /api/localidades ✱ → ?q=lisboa devolve as terras com esse nome,
+                       com as coordenadas e o fuso horário já
+                       resolvidos. É o que alimenta a lista do
+                       seletor de cidades — ninguém escreve
+                       coordenadas à mão.
+  /api/localidades/reversa ✱ → O caminho contrário: POST com
+                       latitude e longitude e devolve o NOME da
+                       terra onde elas caem. É o que permite ao
+                       botão "usar a localização deste dispositivo"
+                       saber o nome do sítio, e não só os números.
+                       503 se não se conseguir saber (tipicamente
+                       sem rede) — nunca um nome inventado.
   /api/favoritos   ✱ → GET lista, POST adiciona, DELETE remove
   /api/observacoes ✱ → GET lista, POST adiciona,
                        DELETE /api/observacoes/id remove
@@ -378,22 +424,61 @@ O que a conta acrescenta é o que só faz sentido para uma pessoa:
 
   📍 Localização pessoal
      O observador não é fixo em Vila Nova de Gaia. Cada conta
-     pode guardar a sua latitude, longitude, elevação e fuso
-     horário, e todos os cálculos passam a ser feitos para lá:
-     o céu, o calendário e o observatório. A ISS entra aqui
+     guarda a sua cidade, o país, as coordenadas, a elevação e o
+     fuso horário, e todos os cálculos passam a ser feitos para
+     lá: o céu, o calendário e o observatório. A ISS entra aqui
      também — é o objeto do céu cuja posição mais depende do
      sítio de quem olha, por estar só a 400 km de altitude.
+
+     A localização escolhe-se pelo NOME, e nunca escrevendo
+     latitude e longitude. Escrever um par de números era pedir a
+     quem usa a aplicação uma coisa que ninguém sabe de cor: quem
+     quisesse observar de Madrid tinha de saber que são 40,4168° N
+     e 3,7038° O, e um algarismo trocado punha o céu inteiro no
+     sítio errado sem nada a avisar — o erro não dá erro, dá um céu
+     errado. Agora escreve-se "Madrid" e as coordenadas, a
+     elevação e o fuso vêm com a terra escolhida.
+
+     A procura vive no py/localizacao/: primeiro procura-se na
+     lista de ~150 cidades (instantâneo, e funciona sem rede), e só
+     se ela não encontrar nada é que se pergunta ao serviço de
+     geocoding. A lista ignora acentos e pontuação — "Lisboa,
+     Portugal" e "lIsBoA" dão a mesma terra — e conhece os nomes
+     portugueses ao lado dos originais, por isso "Londres" e
+     "London" também.
+
      Há três caminhos na página de perfil:
-       · "usar a localização deste dispositivo" — pede as
-         coordenadas ao browser e o fuso ao sistema;
-       · "escrever as coordenadas" — para quando o browser não
-         ajuda: um sítio de observação onde ainda não se está,
-         ou um GPS que recusa. Aí o fuso vem pré-preenchido com
-         o do dispositivo, e só é preciso mexer nele se o local
-         for noutro fuso horário;
+       · escrever o nome da cidade — a lista de resultados aparece
+         debaixo do campo à medida que se escreve, e cada linha
+         mostra a região e as coordenadas, que é o que distingue as
+         terras com o mesmo nome. Basta UMA letra: quem escreve "S"
+         vê as terras que começam por S e escolhe de lá, em vez de
+         ter de saber o nome todo de cor. Escrever o nome do país
+         também serve ("Espanha" dá as terras de Espanha) — mas
+         quando há terras que se chamam mesmo o que se escreveu,
+         as que só coincidiram por causa da região saem da lista,
+         porque "port" a devolver o Porto e, atrás dele, Beja e
+         Braga lê-se como um erro. Escolher na lista não grava
+         nada: a escolha fica à espera do "Guardar esta
+         localização", porque uma lista percorrida às setas mudava
+         o céu a cada resultado por que se passasse;
+       · "usar a localização deste dispositivo" — o browser dá as
+         coordenadas e o fuso, e a aplicação vai buscar o NOME da
+         terra a essas coordenadas (BigDataCloud). Sem esse nome
+         não se grava nada: as coordenadas certas com um nome
+         errado era pior do que não gravar, porque um nome errado
+         no cabeçalho não se distingue de um certo;
        · "voltar a Vila Nova de Gaia" — repõe a localização de
-         config.py. Só aparece a quem tem uma localização
-         própria, porque sem ela já se está em Gaia.
+         config.py. Só aparece a quem tem uma localização própria,
+         porque sem ela já se está em Gaia.
+
+     O cartão mostra o que está a valer, com as coordenadas e o
+     fuso à vista — é a maneira de confirmar que a cidade escolhida
+     é mesmo a que a aplicação está a usar, sem ter de acreditar só
+     no nome — e uma hora local a andar segundo a segundo nesse
+     fuso, e não no do computador. Quem escolher Sydney vê ali as
+     horas de Sydney no mesmo instante em que o computador diz
+     outra coisa.
 
   ⭐ Favoritos
      Estrelas, constelações e objetos de céu profundo, guardados
@@ -540,14 +625,20 @@ flask (pip install flask)
 tzdata (pip install tzdata)
   Base de dados de fusos horários.
   Necessário no Windows para converter horas UTC
-  para hora local (Europe/Lisbon).
+  para hora local (Europe/Lisbon, Europe/Madrid,
+  Australia/Sydney...).
+  É também o que o py/database/auth.py usa para
+  verificar, à entrada, que um fuso horário existe
+  mesmo (ZoneInfo), em vez de o gravar às cegas.
   Incluído no requirements.txt.
 
 requests (pip install requests)
   Biblioteca para pedidos HTTP.
   Usada no py/astronomia/apod.py (Imagem Astronómica do Dia,
-  à API pública da NASA) e no py/astronomia/iss.py (elementos
-  orbitais da ISS, à Celestrak).
+  à API pública da NASA), no py/astronomia/iss.py (elementos
+  orbitais da ISS, à Celestrak) e no py/localizacao/geocoding.py
+  (o nome de uma terra a partir das coordenadas do dispositivo,
+  ao BigDataCloud).
 
 ## BIBLIOTECAS JAVASCRIPT USADAS
 
@@ -569,6 +660,22 @@ Canvas API (nativa do browser)
   (vista zenital 2D clássica). Permite clicar em astros,
   estrelas e constelações para ver detalhes, curiosidades
   e imagens.
+
+Intl.DateTimeFormat (nativa do browser)
+  É com ela que o perfil mostra a hora local da terra
+  escolhida, e que o Céu Agora sabe que dia é lá: a opção
+  timeZone formata a hora no fuso pedido, e o
+  formatToParts() dá as peças (ano, mês, dia, hora) uma a
+  uma. Sem isto, a aplicação usava a hora do computador —
+  que está certa para quem a usa e errada para o céu que
+  está a mostrar, se a localização escolhida for noutro fuso.
+
+Geolocation API (nativa do browser)
+  Usada no botão "usar a localização deste dispositivo"
+  (perfil.js). Dá as coordenadas, e o nome da terra vem
+  depois do servidor (ver /api/localidades/reversa).
+  Se o browser recusar ou não a tiver, diz-se — a lista de
+  cidades é o outro caminho, e está sempre lá.
 
 ---
 
@@ -668,6 +775,27 @@ DRY (Don't Repeat Yourself)
   API do Observatório 2D em vez de recalcular posições
   astronómicas.
 
+Geocoding
+  Traduzir um NOME numa posição (e o contrário). É o que
+  permite que a localização se escolha escrevendo "Madrid":
+  alguém já fez a lista de que Madrid são 40,4168° N, 3,7038° O
+  e o fuso Europe/Madrid, e a aplicação vai buscá-la em vez de
+  a pedir a quem está a usar.
+  Aqui é feito em duas camadas: a lista local de
+  py/localizacao/cidades.py (instantânea, e funciona sem
+  rede) e, só quando ela não encontra nada, os serviços
+  públicos Open-Meteo e BigDataCloud — ambos sem chave de API.
+
+Fuso horário IANA
+  Os fusos são identificados pelo nome da região
+  ("Europe/Lisbon", "Australia/Sydney"), e não por um
+  deslocamento em horas. A diferença importa: o deslocamento
+  de Lisboa muda entre as 0 e as +1 horas conforme a hora de
+  verão, e um "0" gravado hoje estava errado metade do ano.
+  O nome traz as regras todas, incluindo as mudanças de hora
+  — e é o próprio Python que o confirma (ZoneInfo) antes de
+  ele ser gravado.
+
 ---
 
 ## FUNCIONALIDADES IMPLEMENTADAS
@@ -689,7 +817,11 @@ DRY (Don't Repeat Yourself)
   [x] NASA - Imagem do Dia (APOD) com cache diário
   [x] Painel de configurações com controlo de volume
   [x] Música ambiente com persistência entre páginas
-  [x] Deteção automática de localização no menu
+  [x] Localização no menu — mostra a localização da conta (ou a
+      de omissão), escrita pelo servidor. A deteção pelo browser
+      que ali estava saiu: competia com a escolha feita no perfil,
+      e o menu podia dizer uma terra e o céu estar a calcular
+      outra
   [x] Navegação SPA — todos os ecrãs sempre acessíveis
   [x] Atualização automática dos dados a cada 30 segundos
   [x] Relógio em tempo real
@@ -732,7 +864,9 @@ DRY (Don't Repeat Yourself)
   [x] Viagem no Tempo — simular o céu em qualquer data/hora
   [x] Botão "↺ Tempo Real" para voltar ao céu atual
   [x] Auto-refresh desativado automaticamente em simulação
-  [x] Conversão automática hora local → UTC (hora de verão)
+  [x] Conversão automática hora local → UTC (hora de verão,
+      segundo o fuso da localização escolhida: quem observa de
+      Sydney vê o céu de Sydney, e não o do computador)
   [x] Observatório VR — Fase 1: cena 3D com Three.js,
       reutilizando os dados do Observatório 2D, com estrelas
       e constelações reais e navegação por arrasto do rato
@@ -746,6 +880,11 @@ DRY (Don't Repeat Yourself)
   [x] Página /perfil — a localização de observação, os
       favoritos e o caderno de observações de uma conta, numa
       página só (as iniciais do nome como avatar)
+  [x] Localização escolhida pelo NOME — um seletor de cidade e
+      país que resolve as coordenadas e o fuso horário sozinho,
+      a partir de uma lista local de ~150 cidades com o serviço
+      de geocoding por trás dela. Escrever latitude e longitude
+      à mão deixou de ser preciso, e deixou de ser possível
   [x] Papel de administrador, atribuído a partir do terminal
       (py promover_admin.py) e nunca a partir do browser
   [x] Página /admin — só para quem tem esse papel: as contas

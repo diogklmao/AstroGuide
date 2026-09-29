@@ -202,25 +202,18 @@ textarea.perfil-campo {
     line-height: 1.55;
 }
 
-/* As setinhas do <input type="number"> são cinzento-claro e destoam do fundo
-   escuro. Não se perde nada: para escrever coordenadas não se anda a passo de
-   um, e o campo continua a aceitar e a validar números (ver perfil.js, que
-   repete as regras que o servidor aplica). No telemóvel também evitam toques
-   errados. */
-.perfil-campo[type="number"] {
-    -moz-appearance: textfield;
-    appearance: textfield;
+/* A cruz que o type="search" traz é desenhada pelo browser com as cores do tema
+   claro e desaparecia neste fundo escuro. O filtro inverte-a, e continua a ser
+   a cruz do browser — que já apaga o campo, já funciona no telemóvel e não
+   precisa de JavaScript nosso. */
+.perfil-campo[type="search"]::-webkit-search-cancel-button {
+    filter: invert(1) brightness(1.6);
+    cursor: pointer;
 }
 
-.perfil-campo[type="number"]::-webkit-outer-spin-button,
-.perfil-campo[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-/* Latitude e longitude lado a lado, porque são um par. O min-width a zero é o
-   que os deixa encolher: sem ele, a largura natural de um <input> impede-os de
-   descer abaixo disso e a linha estoura para fora do cartão. */
+/* Dois campos lado a lado, porque são um par. O min-width a zero é o que os
+   deixa encolher: sem ele, a largura natural de um <input> impede-o de descer
+   abaixo disso e a linha estoura para fora do cartão. */
 .perfil-campos-linha {
     display: flex;
     gap: 8px;
@@ -229,6 +222,119 @@ textarea.perfil-campo {
 .perfil-campos-linha > div {
     flex: 1;
     min-width: 0;
+}
+
+/* A hora local anda segundo a segundo (ver perfil.js). Com números de largura
+   fixa, o campo não muda de tamanho a cada segundo que passa — sem isto, o
+   valor mexia-se de lado a cada tique e puxava a atenção para ele. */
+#perfil-hora-local {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Seletor de cidade ───────────────────────────────────────────────── */
+/* A lista de resultados aparece debaixo do campo onde se escreve, e empurra o
+   que vem a seguir para baixo em vez de pairar por cima. Pairar tapava o botão
+   da localização do dispositivo — que é justamente a alternativa que a própria
+   lista sugere quando não encontra a terra. */
+.perfil-resultados {
+    list-style: none;
+    margin: 6px 0 2px;
+    padding: 4px;
+    max-height: 264px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(4, 6, 20, 0.55);
+}
+
+/* O [hidden] do HTML é o que esconde a lista e o cartão da escolha, mas o
+   "display: block" que o browser dá a um <ul> ganha-lhe na cascata quando há
+   uma regra nossa a mexer no display. Estas duas linhas repõem a única regra
+   que o hidden precisa de ganhar. */
+.perfil-resultados[hidden],
+.perfil-escolha[hidden] {
+    display: none;
+}
+
+/* Cada resultado é um botão, e não um <li> com um onclick: chega-se a ele com
+   o Tab, vê-se onde está o foco com o teclado, e o Enter escolhe — tudo o que
+   um <li> não faz sozinho. */
+.perfil-resultado {
+    display: block;
+    width: 100%;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.perfil-resultado:hover,
+.perfil-resultado:focus-visible {
+    background: rgba(110, 184, 255, 0.16);
+    outline: none;
+}
+
+.perfil-resultado-nome {
+    display: block;
+    font-size: 0.84rem;
+    color: #e8eefc;
+}
+
+/* A região e as coordenadas, em letra pequena: distinguem as terras com o
+   mesmo nome (há mais do que uma "Vila Nova") sem competir com o nome. */
+.perfil-resultado-detalhe {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.7rem;
+    color: #7c8798;
+}
+
+/* "Não encontrámos essa terra" — não é um resultado, é uma resposta. */
+.perfil-resultado-vazio {
+    padding: 7px 9px;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: #7c8798;
+}
+
+/* ── A escolha à espera de confirmação ───────────────────────────────── */
+/* Destacada do resto do cartão: é o que está escolhido mas ainda NÃO está a
+   valer, e a diferença entre as duas coisas tem de se ver. */
+.perfil-escolha {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(110, 184, 255, 0.35);
+    border-radius: 8px;
+    background: rgba(110, 184, 255, 0.09);
+}
+
+.perfil-escolha-cabeca {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.perfil-escolha-nome {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #dceaff;
+}
+
+.perfil-escolha-regiao {
+    font-size: 0.72rem;
+    color: #7c8798;
+}
+
+.perfil-escolha-dados {
+    margin-top: 4px;
+    font-size: 0.72rem;
+    color: #9fb0c8;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── Botões ──────────────────────────────────────────────────────────── */

@@ -249,6 +249,16 @@
         <source src="/static/audio/musica.mp3" type="audio/mpeg">
     </audio>
 
+    <!-- A localização com que o céu está a ser calculado, escrita pelo servidor.
+         É daqui que o relógio do cabeçalho e o seletor de hora do observatório
+         tiram o fuso horário: a hora local é a do local escolhido, e não a do
+         computador de quem está a ver. Tem de vir antes do index.js, que a lê
+         logo ao arrancar (ver o fim do index.js).
+
+         O tojson escapa o que lá vai — uma cidade com aspas ou com um "<" no
+         nome não pode sair daqui a valer como código. -->
+    <script>window.LOCALIZACAO = {{ localizacao | tojson }};</script>
+
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="/static/js/shared-ui-controls.js"></script>
     <script src="/static/js/conta.js"></script>

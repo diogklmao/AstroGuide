@@ -69,16 +69,46 @@
         </div>
 
         <!-- ── Localização de observação ──────────────────────────────────
-             Os mesmos três caminhos que existiam no painel flutuante: a
-             localização do dispositivo, as coordenadas escritas à mão, e
-             voltar a Vila Nova de Gaia. O que eles fazem vive agora no
-             perfil.js. -->
+             A localização escolhe-se pelo nome — escreve-se "Lisboa" ou
+             "Madrid" e a aplicação vai buscar as coordenadas e o fuso horário
+             (ver py/localizacao). Escrever latitude e longitude à mão deixou
+             de ser preciso, e deixou de ser possível: ninguém sabe de cor que
+             Madrid são 40,4168° N e 3,7038° O, e um número trocado punha o céu
+             inteiro no sítio errado sem nada a avisar.
+
+             Fica ainda o botão da localização do dispositivo, que é o outro
+             caminho para não escrever nada: o browser sabe onde está o
+             computador e a aplicação vai buscar o nome da terra a essas
+             coordenadas. O que ele faz vive no perfil.js. -->
         <div class="perfil-cartao glass-panel">
             <div class="perfil-secao-titulo">📍 Localização de observação</div>
 
+            <!-- O que está a valer, com as coordenadas à vista: é a maneira de
+                 confirmar que a cidade escolhida é mesmo a que a aplicação
+                 está a usar, sem ter de acreditar só no nome. -->
             <div class="perfil-linha">
                 <span class="perfil-rotulo">A valer agora</span>
                 <span class="perfil-valor">{{ localizacao.nome }}</span>
+            </div>
+            <div class="perfil-linha">
+                <span class="perfil-rotulo">Coordenadas</span>
+                <span class="perfil-valor">{{ coordenadas }}</span>
+            </div>
+            <div class="perfil-linha">
+                <span class="perfil-rotulo">Fuso horário</span>
+                <span class="perfil-valor">{{ localizacao.timezone }}</span>
+            </div>
+            <div class="perfil-linha">
+                <span class="perfil-rotulo">Hora local</span>
+                <!-- Escrito pelo perfil.js, segundo a segundo, no fuso da
+                     localização escolhida (e não no do computador): é a prova
+                     de que a hora que o observatório simula é a hora certa
+                     naquele sítio. O fuso vai em data-*, que é de onde o
+                     perfil.js o lê — não há aqui um segundo sítio onde ele
+                     esteja escrito, e por isso não há dois fusos a poder
+                     discordar. -->
+                <span class="perfil-valor" id="perfil-hora-local"
+                      data-fuso="{{ localizacao.timezone }}">—</span>
             </div>
 
             <p class="perfil-ajuda">
@@ -87,56 +117,49 @@
                 calendário e o observatório são calculados.
                 {% else %}
                 Ainda não escolheste nenhuma, por isso os cálculos são feitos
-                para {{ localizacao.nome }}. Guarda a tua e passam a ser
+                para {{ localizacao.nome }}. Escolhe a tua e passam a ser
                 feitos para aí.
                 {% endif %}
             </p>
 
-            <button type="button" class="perfil-btn" id="btn-deteta-local" onclick="usarLocalizacaoDoBrowser()">
+            <label for="local-procura" class="perfil-rotulo">Escolher uma cidade</label>
+            <!-- type="search" e não type="text": é um campo de procura, e o
+                 browser dá-lhe a cruz para apagar e o teclado certo no
+                 telemóvel. O autocomplete desligado é para não vir por cima a
+                 lista de endereços que o browser guardou de outros sítios —
+                 aqui o que se procura é uma cidade do mundo, não um formulário
+                 já preenchido. -->
+            <input type="search" id="local-procura" class="perfil-campo"
+                   placeholder="Escreve o nome — ex.: Lisboa, Madrid" autocomplete="off"
+                   maxlength="60" aria-controls="local-resultados" aria-expanded="false">
+
+            <!-- Os resultados da procura. Os botões são escritos pelo
+                 perfil.js a partir do que o servidor devolveu (ver
+                 /api/localidades), e o que fica em data-* é o que se lê de
+                 volta — nada do que veio da rede chega a ser interpretado como
+                 código. -->
+            <ul id="local-resultados" class="perfil-resultados" role="listbox" hidden></ul>
+
+            <!-- A cidade escolhida, à espera de confirmação. Só depois deste
+                 "Guardar" é que ela passa a valer: escolher na lista não grava
+                 nada, para uma lista percorrida às setas não mudar o céu a
+                 cada resultado por que se passa. -->
+            <div id="local-escolhida" class="perfil-escolha" hidden>
+                <div class="perfil-escolha-cabeca">
+                    <span class="perfil-escolha-nome" id="escolha-nome"></span>
+                    <span class="perfil-escolha-regiao" id="escolha-regiao"></span>
+                </div>
+                <div class="perfil-escolha-dados" id="escolha-dados"></div>
+                <button type="button" class="perfil-btn" id="btn-guarda-local"
+                        onclick="guardarLocalizacaoEscolhida()">
+                    Guardar esta localização
+                </button>
+            </div>
+
+            <button type="button" class="perfil-btn" id="btn-local-dispositivo"
+                    onclick="usarLocalizacaoDoBrowser()">
                 📍 Usar a localização deste dispositivo
             </button>
-            <div id="perfil-form-local" style="display:none">
-                <label for="perfil-nome-local" class="perfil-rotulo">Nome deste local</label>
-                <input type="text" id="perfil-nome-local" class="perfil-campo" maxlength="80">
-                <button type="button" class="perfil-btn" id="btn-guarda-local" onclick="guardarLocalizacaoDetetada()">
-                    Guardar
-                </button>
-            </div>
-
-            <button type="button" class="perfil-btn" id="btn-manual-local" onclick="alternarFormularioManual()">
-                ✏️ Escrever as coordenadas
-            </button>
-            <div id="perfil-form-manual" style="display:none">
-                <label for="manual-nome" class="perfil-rotulo">Nome deste local</label>
-                <input type="text" id="manual-nome" class="perfil-campo" maxlength="80"
-                       placeholder="Ex.: Serra da Estrela">
-
-                <div class="perfil-campos-linha">
-                    <div>
-                        <label for="manual-lat" class="perfil-rotulo">Latitude</label>
-                        <input type="number" id="manual-lat" class="perfil-campo"
-                               step="any" min="-90" max="90" placeholder="40.322">
-                    </div>
-                    <div>
-                        <label for="manual-lon" class="perfil-rotulo">Longitude</label>
-                        <input type="number" id="manual-lon" class="perfil-campo"
-                               step="any" min="-180" max="180" placeholder="-7.613">
-                    </div>
-                </div>
-
-                <label for="manual-elev" class="perfil-rotulo">Elevação em metros (opcional)</label>
-                <input type="number" id="manual-elev" class="perfil-campo"
-                       step="any" min="-500" max="9000" placeholder="0">
-
-                <label for="manual-tz" class="perfil-rotulo">Fuso horário</label>
-                <input type="text" id="manual-tz" class="perfil-campo" spellcheck="false">
-                <p class="perfil-ajuda">Só muda a hora que escreves na simulação do
-                Observatório. Se observas do sítio onde estás, deixa o que lá está.</p>
-
-                <button type="button" class="perfil-btn" id="btn-guarda-manual" onclick="guardarLocalizacaoManual()">
-                    Guardar
-                </button>
-            </div>
 
             {% if localizacao_propria %}
             <!-- Só faz sentido para quem tem uma localização própria: sem ela,
