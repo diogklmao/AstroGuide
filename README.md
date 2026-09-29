@@ -10,6 +10,10 @@ Inclui também um Observatório 3D com suporte WebXR
 (compatível com Meta Quest 3, com tracking real da cabeça)
 e a Imagem Astronómica do Dia da NASA (APOD).
 
+Tem contas de utilizador: cada uma pode guardar a sua própria
+localização de observação, os seus favoritos e um caderno de
+observações — tudo reunido na página /perfil.
+
 ---
 
 ## COMO CORRER A APLICAÇÃO
@@ -61,10 +65,12 @@ astroguide/
 │   │                        1ª execução.
 │   │
 │   ├── auth.py            → Contas de utilizador
-│   │                        Registo, entrada e saída, e as
-│   │                        rotas do que é pessoal de cada
-│   │                        conta (localização, favoritos,
-│   │                        observações).
+│   │                        Registo, entrada e saída, as rotas
+│   │                        do que é pessoal de cada conta
+│   │                        (localização, favoritos,
+│   │                        observações) e a página /perfil,
+│   │                        que é onde tudo isso aparece
+│   │                        reunido.
 │   │
 │   └── admin.py           → Página de administração
 │                            Só de leitura, e só para a conta
@@ -127,9 +133,10 @@ astroguide/
 │                            Não está no GitHub — tem os
 │                            dados de quem já usou a aplicação.
 │
-├── _teste_contas.py       → Testes das contas e da localização
-│                            139 verificações automáticas
-│                            (137 se não houver rede — a parte
+├── _teste_contas.py       → Testes das contas, do perfil e da
+│                            localização
+│                            172 verificações automáticas
+│                            (170 se não houver rede — a parte
 │                            da ISS salta 2, e diz que saltou).
 │                            Correr com: py _teste_contas.py
 │                            Não arranca servidor nem abre browser.
@@ -152,12 +159,20 @@ astroguide/
 │   │
 │   ├── index.html         → Interface principal da app
 │   │                        Céu Agora, Observatório,
-│   │                        Calendário Lunar, NASA - Imagem
+│   │                        Calendário Cósmico, NASA - Imagem
 │   │                        do Dia, e Observatório VR.
 │   │
 │   ├── entrar.html        → Página de entrada e registo
 │   │                        Os dois formulários na mesma
 │   │                        página, alternados por abas.
+│   │
+│   ├── perfil.html        → Página do perfil (O meu perfil)
+│   │                        Tudo o que só faz sentido para uma
+│   │                        conta, numa página: a localização
+│   │                        de observação, os favoritos e o
+│   │                        caderno de observações. Chega
+│   │                        pronta do servidor — a página não
+│   │                        se abre sem sessão iniciada.
 │   │
 │   └── admin.html         → Página de administração
 │                            A tabela das contas. O HTML chega
@@ -183,8 +198,14 @@ astroguide/
     │   ├── auth.css       → Página de entrada e registo
     │   │                    (campos, abas, botões).
     │   │
-    │   ├── conta.css      → Botão e painel de conta, no menu
-    │   │                    e na app.
+    │   ├── conta.css      → O botão de conta do canto (menu,
+    │   │                    app e perfil). O painel que ele
+    │   │                    abria antes passou a ser a página
+    │   │                    /perfil.
+    │   │
+    │   ├── perfil.css     → Página do perfil: o cabeçalho com
+    │   │                    as iniciais, os cartões das secções
+    │   │                    e as caixas dos formulários.
     │   │
     │   └── admin.css      → Página de administração (tabela
     │                        das contas, totais, cartão de
@@ -195,12 +216,20 @@ astroguide/
     │   │                    (música, volume, configurações e o
     │   │                    campo de estrelas do fundo).
     │   │
-    │   ├── conta.js       → Botão e painel de conta: quem tem
-    │   │                    sessão iniciada, guardar a localização
-    │   │                    do dispositivo, terminar sessão.
+    │   ├── conta.js       → O botão de conta do canto: desenha-o
+    │   │                    e escreve-lhe o nome de quem tem
+    │   │                    sessão (ou "Entrar"). É tudo o que
+    │   │                    restou dele — o resto do que fazia
+    │   │                    passou para o perfil.js.
     │   │
     │   ├── auth.js        → Formulários da página de entrada:
     │   │                    alternar as abas, validar e enviar.
+    │   │
+    │   ├── perfil.js      → Página do perfil: guardar e repor a
+    │   │                    localização (do dispositivo ou
+    │   │                    escrita à mão), remover favoritos,
+    │   │                    acrescentar e apagar observações, e
+    │   │                    terminar sessão.
     │   │
     │   ├── admin.js       → Página de administração: só o campo
     │   │                    de estrelas do fundo. Os dados já
@@ -212,11 +241,12 @@ astroguide/
     │   │                    lua crescente, telescópio, jornal).
     │   │
     │   ├── index.js       → Lógica da app: navegação SPA,
-    │   │                    dados do céu, calendário lunar,
+    │   │                    dados do céu, calendário cósmico,
     │   │                    APOD, e o Observatório interativo
     │   │                    (canvas 360°/2D) com estrelas,
     │   │                    constelações, planetas com imagem
-    │   │                    real e auto-refresh a cada 30s.
+    │   │                    real, pesquisa, Night Mode, o ★ dos
+    │   │                    favoritos e auto-refresh a cada 30s.
     │   │
     │   └── vr-observatorio.js → Observatório VR
     │                        Cena 3D em Three.js — reutiliza
@@ -251,9 +281,20 @@ astroguide/
     │   │                  dos planetas — é um objeto largo, e o
     │   │                  círculo cortava-lhe as pontas.
     │   │
+    │   ├── 618.jpg        → Fotografia de fundo do menu, da
+    │   │                    entrada, do perfil e da
+    │   │                    administração — a mesma moldura nas
+    │   │                    quatro páginas.
+    │   │
+    │   ├── SolarSystem.jpg, Moon.jpg, Sky.jpg
+    │   │                  → Imagens dos cartões de acesso rápido
+    │   │                    do menu (Céu Agora, Calendário
+    │   │                    Cósmico e Observatório).
+    │   │
     │   └── space.jpg      → Panorâmica da Via Láctea, usada
     │                        como fundo do céu no Observatório
-    │                        360° (com efeito parallax).
+    │                        360° (com efeito parallax) e como
+    │                        imagem do cartão da NASA no menu.
     │
     ├── audio/
     │   └── musica.mp3     → Música ambiente relaxante
@@ -266,25 +307,34 @@ astroguide/
 
 A aplicação usa um sistema de rotas simples:
   /            → Menu de entrada (Landing Page)
+  /app         → Interface principal, a abrir no Céu Agora
   /ceu         → Ecrã Céu Agora
-  /calendario  → Ecrã Calendário Lunar
+  /calendario  → Ecrã Calendário Cósmico
   /observatorio → Ecrã Observatório Astronómico
   /apod        → Ecrã NASA - Imagem do Dia
   /entrar      → Página de entrada e registo
+  /perfil      → Página do perfil (exige sessão iniciada)
   /admin       → Página de administração (exige o papel de
-                 admin — é a única rota com essa exigência)
+                 admin)
 
-Todas estas rotas, menos o /admin, estão abertas a quem não tem
-conta: quem não tiver sessão iniciada vê tudo, calculado para a
-localização de config.py.
+O /app e as quatro rotas dos ecrãs servem todas o mesmo
+templates/index.html: é o JavaScript que decide o ecrã que
+aparece, pela SPA.
+
+Todas estas rotas, menos o /perfil e o /admin, estão abertas a
+quem não tem conta: quem não tiver sessão iniciada vê tudo,
+calculado para a localização de config.py. O /perfil sem sessão
+manda entrar e traz a pessoa de volta a ele depois disso.
   /entrar?seguinte=/observatorio → Volta ao sítio onde estava
                                    depois de entrar (só aceita
                                    caminhos internos, por segurança)
   /entrar?aba=registar           → Abre já na aba de criar conta
+  (sem "seguinte", entrar leva ao /perfil)
 
 O /admin não tem API própria e não aparece no menu: é uma página
 só, para o dono da aplicação, e chega-se lá escrevendo o endereço
-ou pela ligação que aparece no painel de conta de quem é admin.
+ou pela ligação que aparece na página de perfil de quem tem o
+papel.
 
 (O Observatório VR não tem rota própria — abre-se a partir
 de um botão dentro do Observatório, dentro da mesma SPA.)
@@ -330,33 +380,43 @@ O que a conta acrescenta é o que só faz sentido para uma pessoa:
      O observador não é fixo em Vila Nova de Gaia. Cada conta
      pode guardar a sua latitude, longitude, elevação e fuso
      horário, e todos os cálculos passam a ser feitos para lá:
-     o céu, o calendário lunar e o observatório. A ISS entra
-     aqui também — é o objeto do céu cuja posição mais depende
-     do sítio de quem olha, por estar só a 400 km de altitude.
-     Há dois caminhos no painel de conta:
+     o céu, o calendário e o observatório. A ISS entra aqui
+     também — é o objeto do céu cuja posição mais depende do
+     sítio de quem olha, por estar só a 400 km de altitude.
+     Há três caminhos na página de perfil:
        · "usar a localização deste dispositivo" — pede as
          coordenadas ao browser e o fuso ao sistema;
        · "escrever as coordenadas" — para quando o browser não
          ajuda: um sítio de observação onde ainda não se está,
          ou um GPS que recusa. Aí o fuso vem pré-preenchido com
          o do dispositivo, e só é preciso mexer nele se o local
-         for noutro fuso horário.
+         for noutro fuso horário;
+       · "voltar a Vila Nova de Gaia" — repõe a localização de
+         config.py. Só aparece a quem tem uma localização
+         própria, porque sem ela já se está em Gaia.
 
   ⭐ Favoritos
      Estrelas, constelações e objetos de céu profundo, guardados
-     por conta. O objeto_id gravado é a chave do catálogo
+     por conta. Marcam-se no Observatório, com o ★ do painel de
+     detalhes, e a lista (agrupada por tipo) fica na página de
+     perfil. O objeto_id gravado é a chave do catálogo
      ("vega", "Ori"), e não o nome visível — mudar um nome no
      catálogo não deixa os favoritos de ninguém pendurados.
 
   📔 Registo de observações
-     "Vi Saturno em 18/09, anéis bem visíveis." O nome do objeto
-     fica copiado no registo, para a observação continuar a fazer
-     sentido mesmo que o objeto mude de nome ou saia do catálogo.
+     "Vi Saturno em 18/09, anéis bem visíveis." Escreve-se no
+     formulário da página de perfil, e a lista fica logo abaixo.
+     O nome do objeto fica copiado no registo, para a observação
+     continuar a fazer sentido mesmo que o objeto mude de nome ou
+     saia do catálogo.
 
-O botão de conta não aparece no Observatório nem no VR: nesses
-dois modos a página é toda céu e ele ficava a flutuar por cima,
-sem nada à volta. Voltar ao menu (botão "◀ Menu") traz o botão
-de novo.
+O botão de conta (👤, no canto superior direito) não aparece no
+Observatório nem no VR: nesses dois modos a página é toda céu e
+ele ficava a flutuar por cima, sem nada à volta. Voltar ao menu
+(botão "◀ Menu") traz o botão de novo. É ele que leva ao
+/perfil — com sessão ou sem ela, porque quem não a tem é a
+página de entrada que o recebe, e volta ao perfil depois de
+entrar.
 
 SEGURANÇA
 
@@ -383,6 +443,12 @@ SEGURANÇA
     não há na aplicação nenhum botão que o faça — um botão
     desses seria a peça mais valiosa do projeto: chegar a ele
     era passar a ver os dados de todas as contas.
+  · A /perfil verifica a sessão antes de renderizar, e mostra
+    apenas os dados da própria conta. As rotas dos favoritos e
+    das observações fazem todas o mesmo: perguntam ao servidor
+    quem tem sessão e filtram por esse id — o id nunca vem do
+    browser, por isso não há nada que se possa adivinhar para
+    chegar aos dados de outra pessoa.
   · A /admin verifica o papel ANTES de renderizar, e a página
     de acesso negado não leva um único dado lá dentro. Um
     endpoint em JSON que devolvesse a lista de contas seria
@@ -397,11 +463,9 @@ O /admin mostra o que a base de dados tem: a lista das contas
 com a localização de cada uma, quantos favoritos e quantas
 observações guardou, e a data de registo. No topo, os totais.
 
-É uma página só de leitura. Não apaga contas, não muda papéis,
-não apaga observações. Quem quiser mexer nos dados usa o
-DB Browser for SQLite, que é uma ferramenta feita para isso —
-esta página é para olhar, e cliques distraídos aqui não
-estragam nada.
+É uma página só de leitura: não apaga contas, não muda papéis,
+não apaga observações. É para olhar, e cliques distraídos aqui
+não estragam nada.
 
 Para passar uma conta a admin, uma vez, na pasta do projeto:
 
@@ -436,13 +500,16 @@ PYTHON (Backend)
 
 HTML (Estrutura)
   Define a estrutura das páginas e as secções da app.
-  Ficheiros: templates/menu.html, templates/index.html
+  Ficheiros: templates/menu.html, templates/index.html,
+             templates/entrar.html, templates/perfil.html,
+             templates/admin.html
 
 CSS (Estilo)
   Design system com glassmorphism e tema escuro.
   Animações de entrada, hover, shimmer e borderGlow.
   Ficheiros: shared-ui-controls.css, glass.css,
-             menu.css, index.css
+             menu.css, index.css, auth.css, conta.css,
+             perfil.css, admin.css
 
 JavaScript (Interatividade)
   Gere o estado da aplicação no browser. Comunica com o
@@ -450,7 +517,8 @@ JavaScript (Interatividade)
   com projeção 360° e 2D (planisfério), e uma versão 3D real
   em WebGL (Three.js) no Observatório VR.
   Ficheiros: shared-ui-controls.js, menu.js,
-             index.js, vr-observatorio.js
+             index.js, vr-observatorio.js, conta.js,
+             auth.js, perfil.js, admin.js
 
 ---
 
@@ -613,7 +681,7 @@ DRY (Don't Repeat Yourself)
   [x] Altitude, azimute e distância de cada astro
   [x] Visibilidade (acima/abaixo do horizonte)
   [x] Fase da Lua em tempo real com emoji
-  [x] Calendário lunar com fases calculadas pela NASA
+  [x] Calendário Cósmico com fases calculadas pela NASA
   [x] Eventos astronómicos — chuvas de meteoros e eclipses
       (2026 e 2027, incluindo o eclipse solar de 2/8/2027)
   [x] Detalhe do dia — nascer/pôr do sol, fase da lua
@@ -636,9 +704,18 @@ DRY (Don't Repeat Yourself)
   [x] Constelações com linhas e nomes (nomenclatura latina/IAU)
   [x] Curiosidades e ilustrações por constelação (ao clicar)
   [x] Sol, Lua e todos os planetas no mapa celeste, com imagens reais
+  [x] A ISS desenhada no céu, com a posição tirada da órbita
+      real (e por isso diferente de cada sítio), e um botão 🛰
+      que a localiza agora
   [x] Fundo panorâmico real da Via Láctea, com parallax
   [x] Clique num astro/estrela/constelação para ver detalhes
   [x] Painel de filtros — constelações, nomes, magnitude
+  [x] Pesquisa — procurar uma estrela, constelação ou planeta
+      pelo nome, com a lista de resultados a aparecer enquanto
+      se escreve (e navegável pelo teclado)
+  [x] Night Mode (Red Velvet) — o mapa todo em tons de
+      vermelho, para não estragar a visão noturna. Botão no
+      mapa e caixa nas configurações
   [x] "Ver abaixo do horizonte" — tira o chão e mostra as
       estrelas, constelações e planetas que estão debaixo do
       horizonte, desenhados mais apagados para se perceber
@@ -666,6 +743,9 @@ DRY (Don't Repeat Yourself)
       (immersive-vr) com tracking real da cabeça num Meta
       Quest 3, mantendo o arrasto do rato no PC
   [x] Observatório VR — Sol, Lua e planetas na cena 3D
+  [x] Página /perfil — a localização de observação, os
+      favoritos e o caderno de observações de uma conta, numa
+      página só (as iniciais do nome como avatar)
   [x] Papel de administrador, atribuído a partir do terminal
       (py promover_admin.py) e nunca a partir do browser
   [x] Página /admin — só para quem tem esse papel: as contas
@@ -677,11 +757,10 @@ DRY (Don't Repeat Yourself)
 ## ROADMAP — PRÓXIMAS FUNCIONALIDADES
 
   [x] Contas de utilizador e localização pessoal (feito)
-  [ ] Favoritos no Observatório — a API já está feita e a
-      funcionar; falta o botão de estrela ao clicar num objeto,
-      e a lista dos favoritos no painel lateral
-  [ ] Registo de observações na interface — a API já está feita;
-      falta o formulário para escrever e a lista do caderno
+  [x] Favoritos no Observatório — o ★ no painel de detalhes, e
+      a lista (agrupada por tipo) na página de perfil (feito)
+  [x] Registo de observações na interface — o formulário e a
+      lista do caderno, na página de perfil (feito)
   [ ] Catálogo de estrelas alargado (Hipparcos — 117k estrelas)
   [ ] Hosting online com URL público
   [ ] Versão mobile (React Native ou Capacitor)
