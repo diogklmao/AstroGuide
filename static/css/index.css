@@ -1461,6 +1461,19 @@ body.vr-ativo nav.glass-nav {
     display: none;
 }
 
+/* O botão das configurações só existe onde há o que configurar. O painel dele
+   tem o volume e o botão da música, e a música só toca no Observatório e no
+   VR (ver o definirEcraDaMusica, no shared-ui-controls.js) — nas outras abas
+   abria-se sobre o céu um painel sem nada que lhe pertencesse.
+   Os dois seletores vão juntos de propósito: em VR a classe
+   "observatorio-ativo" sai do body (ver mudarEcra, no index.js), por isso
+   esconder só um deles fazia o botão reaparecer ao entrar no VR. (É a mesma
+   nota do botão da conta, no conta.css.) */
+body:not(.observatorio-ativo):not(.vr-ativo) #btn-config,
+body:not(.observatorio-ativo):not(.vr-ativo) #painel-config {
+    display: none;
+}
+
 #ecra-vr {
     position: fixed;
     top: 0;

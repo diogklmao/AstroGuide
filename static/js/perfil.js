@@ -225,19 +225,14 @@
   }
 
   // Junta o que veio do serviço de geocoding POR BAIXO do que já está
-  // desenhado, debaixo de um separador. Não substitui nem reordena nada: as
-  // terras da lista local continuam onde estavam e continuam a ser as
-  // primeiras, porque são as que a aplicação conhece melhor.
+  // desenhado. Não substitui nem reordena nada — as terras da lista local
+  // continuam onde estavam — e não leva uma linha a separar as duas
+  // proveniências: o que chega da rede são sítios como os outros, e uma lista
+  // encabeçada por "Outros sítios com este nome" dizia o contrário.
   function acrescentarResultados(cidades) {
     const lista = document.getElementById("local-resultados");
     const campo = document.getElementById("local-procura");
     if (!lista || !campo || !cidades.length) return;
-
-    const separador = document.createElement("li");
-    separador.className = "perfil-resultados-separador";
-    separador.setAttribute("role", "presentation");
-    separador.textContent = "Outros sítios com este nome";
-    lista.appendChild(separador);
 
     cidades.forEach(function (cidade) {
       lista.appendChild(itemResultado(cidade));

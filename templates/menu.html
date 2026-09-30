@@ -88,22 +88,12 @@
         </div>
     </div>
 
-    <button id="btn-config" type="button" onclick="toggleConfig()" aria-label="Configurações"
-        aria-controls="painel-config" aria-expanded="false" title="Configurações">⚙️</button>
-
-    <div id="painel-config" class="glass-panel">
-        <div class="config-titulo">⚙ CONFIGURAÇÕES</div>
-        <div class="config-linha">
-            <label>🔊 Volume</label>
-            <input type="range" id="volume" min="0" max="100" value="40" oninput="mudarVolume(this.value)">
-            <span id="lbl-volume">40%</span>
-        </div>
-        <button class="btn-musica" onclick="toggleMusica()">▶ Ativar Música</button>
-    </div>
-
-    <audio id="musica" loop>
-        <source src="/static/audio/musica.mp3" type="audio/mpeg">
-    </audio>
+    <!-- O menu não tem música, nem o painel das configurações que a governa:
+         estão os dois no observatório e no VR, que é onde a música ambiente
+         acompanha o que se está a ver (ver o definirEcraDaMusica, no
+         shared-ui-controls.js). Aqui ficava um ⚙️ a abrir um painel com o
+         volume e o botão da música — dois controlos para um som que já não
+         existia nesta página. -->
 
     <script src="/static/js/shared-ui-controls.js"></script>
     <script src="/static/js/conta.js"></script>

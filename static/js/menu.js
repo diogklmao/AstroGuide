@@ -185,4 +185,3 @@ desenharIconeCeu();
 desenharIconeCalendario();
 desenharIconeObservatorio();
 desenharIconeApod();
-document.getElementById("musica").volume = 0.4;    // volume inicial da música ambiente

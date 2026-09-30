@@ -153,6 +153,15 @@ function mudarEcra(nome) {
         if (typeof sairSessaoVR === "function") sairSessaoVR();
     }
 
+    // A música ambiente acompanha só quem está a olhar para o céu — o
+    // Observatório (o 2D) e o VR. Nas outras abas (o céu de hoje, o
+    // calendário, a imagem do dia) são dados para ler, e uma música por cima
+    // não ajuda a ler nada. Sair daqui pausa-a e voltar traz-lhe o som de
+    // volta, sem se perder o estar ligada (ver o definirEcraDaMusica).
+    if (typeof definirEcraDaMusica === "function") {
+        definirEcraDaMusica(nome === "observatorio" || nome === "vr");
+    }
+
     // Carrega os dados do ecrã que ficou ativo
     if (nome === "calendario") carregarCalendario();
     if (nome === "ceu") carregarCeu();

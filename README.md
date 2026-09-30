@@ -188,9 +188,9 @@ astroguide/
 │
 ├── templates/
 │   ├── menu.html          → Menu de entrada (Landing Page)
-│   │                        Com animações espaciais,
-│   │                        configurações de áudio e os
-│   │                        4 cartões de acesso rápido.
+│   │                        Com animações espaciais e os
+│   │                        4 cartões de acesso rápido. Sem
+│   │                        música: ela é do Observatório.
 │   │
 │   ├── index.html         → Interface principal da app
 │   │                        Céu Agora, Observatório,
@@ -248,8 +248,9 @@ astroguide/
     │
     ├── js/
     │   ├── shared-ui-controls.js → Funções partilhadas
-    │   │                    (música, volume, configurações e o
-    │   │                    campo de estrelas do fundo).
+    │   │                    (o campo de estrelas do fundo e a
+    │   │                    música, que só toca no Observatório
+    │   │                    e no VR, com o volume dela).
     │   │
     │   ├── conta.js       → O botão de conta do canto: desenha-o
     │   │                    e escreve-lhe o nome de quem tem
@@ -335,7 +336,7 @@ astroguide/
     │                        imagem do cartão da NASA no menu.
     │
     ├── audio/
-    │   └── musica.mp3     → Música ambiente relaxante
+    │   └── musica.mp3     → Música ambiente do Observatório e do VR
     │
     └── favicon.svg        → Ícone da aplicação (estrela SVG)
 
@@ -462,8 +463,7 @@ O que a conta acrescenta é o que só faz sentido para uma pessoa:
      existe em vários países. Escrever "Granada" devolvia a
      espanhola e mais nada, quando há mais quatro no mundo. Os
      resultados da lista aparecem primeiro e os do serviço logo
-     abaixo, debaixo de um separador ("Outros sítios com este
-     nome"), e o que a lista já deu não se repete — a mesma
+     abaixo, e o que a lista já deu não se repete — a mesma
      Granada não aparece duas vezes por vir de duas fontes.
      Estão em pedidos separados por uma razão prática: juntá-los
      num só obrigava toda a procura a esperar pela internet para
@@ -478,8 +478,8 @@ O que a conta acrescenta é o que só faz sentido para uma pessoa:
          vê as terras que começam por S e escolhe de lá, em vez de
          ter de saber o nome todo de cor. A partir de três letras a
          lista é completada com o que o serviço de geocoding
-         conhece com aquele nome — chega debaixo de um separador
-         um instante depois, e é assim que "Granada" mostra as
+         conhece com aquele nome — chega um instante depois, por
+         baixo das primeiras, e é assim que "Granada" mostra as
          outras quatro que existem no mundo. Escrever o nome do
          país também serve ("Espanha" dá as terras de Espanha) — mas
          quando há terras que se chamam mesmo o que se escreveu,
@@ -849,7 +849,12 @@ Fuso horário IANA
   [x] Validação de datas nas rotas da API (mês/dia inválidos)
   [x] NASA - Imagem do Dia (APOD) com cache diário
   [x] Painel de configurações com controlo de volume
-  [x] Música ambiente com persistência entre páginas
+  [x] Música ambiente com persistência entre páginas — toca
+      só no Observatório (2D) e no VR, que é onde acompanha o
+      que se está a ver. No menu e nas outras abas não há
+      música nenhuma, e é por isso que o ⚙️ (que só tem o
+      volume e o botão da música lá dentro) só aparece
+      nesses dois ecrãs
   [x] Localização no menu — mostra a localização da conta (ou a
       de omissão), escrita pelo servidor. A deteção pelo browser
       que ali estava saiu: competia com a escolha feita no perfil,

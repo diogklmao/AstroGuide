@@ -104,8 +104,8 @@ def procurar_mais(termo, limite=_LIMITE_POR_OMISSAO):
         # Só o que tem mesmo este nome. A procura do Open-Meteo é tolerante e
         # traz coisas que se chamam outra coisa: procurar "Santiago" devolvia
         # também Naguabo, Vilasantar e Verea, que não têm Santiago nenhum no
-        # nome. Numa lista encabeçada por "Outros sítios com este nome" isso
-        # seria simplesmente falso.
+        # nome. Sugerir a quem escreveu "Santiago" uma terra que se chama outra
+        # coisa é dar-lhe uma resposta errada.
         if procurado not in sem_acentos(local["cidade"]):
             continue
 

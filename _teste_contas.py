@@ -215,8 +215,8 @@ else:
               all(x["pais"] != "Espanha" for x in outras),
               [f"{x['cidade']}/{x['pais']}" for x in outras])
     # A procura do Open-Meteo é tolerante e devolve coisas que se chamam outra
-    # coisa — "Santiago" trazia Naguabo e Vilasantar. Numa lista encabeçada por
-    # "Outros sítios com este nome", isso era simplesmente falso.
+    # coisa — "Santiago" trazia Naguabo e Vilasantar. Sugerir a quem escreveu
+    # Granada uma terra que não se chama Granada é uma resposta errada.
     verificar("e só com terras que se chamam mesmo Granada",
               all("granada" in x["cidade"].lower() for x in outras),
               [x["cidade"] for x in outras])

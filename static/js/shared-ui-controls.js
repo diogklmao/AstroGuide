@@ -1,14 +1,60 @@
-// Lógica de controlos de UI partilhada entre páginas (menu.html e index.html).
+// Lógica de controlos de UI partilhada entre páginas (o menu, a aplicação, a
+// entrada, o perfil e a administração).
 // Mantém as funções no window para funcionar com onclick="..." inline.
+//
+// A música é a única parte que não é de todas: o <audio> só existe no
+// index.html e, mesmo lá, só toca no Observatório e no VR — as duas vistas do
+// céu, onde uma música ambiente acompanha quem está a olhar. No menu, no céu
+// de hoje, no calendário, na imagem do dia e na conta não há música nenhuma, e
+// as páginas onde o elemento não existe passam pelo "if (!audio) return" mais
+// abaixo sem fazer nada.
 (function () {
+  // O pedido: se a música deve estar a tocar. É isto que atravessa a
+  // navegação, guardado no sessionStorage.
   window.musicaAtiva = false;
+
+  // A permissão: se o ecrã onde se está a deixa tocar. Quem sabe onde a música
+  // faz sentido é a página que conhece os ecrãs, e é ela que o diz a cada
+  // mudança de ecrã (ver o mudarEcra, no index.js). Começa a "não", para que
+  // incluir este ficheiro numa página não chegue para lá haver música.
+  let musicaPermitida = false;
+
+  // ── O ecrã onde a música toca ────────────────────────────────────
+  // Ao sair para um ecrã sem música ela pausa mas não se desliga: o pedido
+  // fica de pé, e é ele que a traz de volta ao regressar ao Observatório ou ao
+  // entrar no VR. Sem esta distinção, ir do Observatório ao VR e voltar
+  // obrigava a ligá-la outra vez de cada vez.
+  window.definirEcraDaMusica = function definirEcraDaMusica(permitida) {
+    musicaPermitida = permitida;
+    const audio = document.getElementById("musica");
+    if (!audio) return;
+    if (!permitida) {
+      audio.pause();
+    } else if (window.musicaAtiva) {
+      tocar().catch(function () {});
+    }
+  };
+
+  // Toca e põe o botão a dizê-lo. Não decide nada: quem a manda tocar já sabe
+  // que a música deve estar a tocar, e o que o browser responde é outra
+  // conversa — se ele recusar, o clique seguinte volta a tentar (ver o
+  // tentarAutoplay). Daí o catch vazio de quem chama.
+  function tocar() {
+    const audio = document.getElementById("musica");
+    const btn   = document.querySelector(".btn-musica");
+    if (!audio) return Promise.resolve();
+    return audio.play().then(function () {
+      window.musicaAtiva = true;
+      sessionStorage.setItem("musica_ativa", "true");
+      if (btn) btn.textContent = "⏸ Pausar Música";
+    });
+  }
 
   // ── Restaurar estado ao carregar a página ────────────────────────
   // Quando o utilizador navega entre páginas, o sessionStorage mantém
   // o estado da música para ela continuar do mesmo sítio.
   document.addEventListener("DOMContentLoaded", function () {
     const audio = document.getElementById("musica");
-    const btn   = document.querySelector(".btn-musica");
     if (!audio) return;
 
     // Lê o estado guardado antes da navegação
@@ -25,23 +71,19 @@
     if (slider) slider.value = Math.round(volume * 100);
     if (lbl)    lbl.textContent = `${Math.round(volume * 100)}%`;
 
+    // O pedido da visita anterior fica de pé mesmo que o ecrã onde se aterrou
+    // agora não deixe já tocar: é ele que traz a música de volta quando se
+    // chegar ao Observatório.
     if (estaAAtiva) {
-      // Tenta tocar imediatamente — funciona porque a navegação entre
-      // páginas conta como interação do utilizador para o browser.
-      audio.play()
-        .then(function () {
-          window.musicaAtiva = true;
-          if (btn) btn.textContent = "⏸ Pausar Música";
-        })
-        .catch(function () {
-          // Se o browser bloquear mesmo assim, aguarda o primeiro clique
-          window.musicaAtiva = false;
-          document.addEventListener("click", tentarAutoplay);
-        });
-    } else {
-      // Música estava parada — aguarda primeiro clique para autoplay
-      document.addEventListener("click", tentarAutoplay);
+      window.musicaAtiva = true;
+      // Tenta tocar imediatamente — funciona porque a navegação entre páginas
+      // conta como interação do utilizador para o browser. Se ele recusar, o
+      // primeiro clique trata disso (ver o tentarAutoplay).
+      if (musicaPermitida) tocar().catch(function () {});
     }
+
+    // Nos ecrãs sem música isto não faz nada; fica à espera deles.
+    document.addEventListener("click", tentarAutoplay);
 
     // Guarda o estado no sessionStorage antes de sair da página
     window.addEventListener("beforeunload", function () {
@@ -51,24 +93,25 @@
   });
 
   // ── Autoplay no primeiro clique ──────────────────────────────────
-  // Ativado quando a música estava parada ou o browser bloqueou o play.
+  // O browser só deixa tocar som depois de uma interação, e o primeiro clique
+  // é essa interação. O ouvinte fica armado até a música estar mesmo a tocar,
+  // e não só até ao primeiro clique: num ecrã sem música (o céu de hoje, o
+  // calendário) pode ser preciso clicar primeiro no "🔭 Observatório".
   function tentarAutoplay() {
     const audio = document.getElementById("musica");
-    const btn   = document.querySelector(".btn-musica");
-    if (!audio || window.musicaAtiva) return;
+    if (!audio) return;
 
-    audio.play()
-      .then(function () {
-        window.musicaAtiva = true;
-        if (btn) btn.textContent = "⏸ Pausar Música";
-        sessionStorage.setItem("musica_ativa", "true");
-      })
-      .catch(function () {
-        window.musicaAtiva = false;
-      });
+    // Já toca: não há nada a tentar, e o ouvinte já não faz falta.
+    if (!audio.paused) {
+      document.removeEventListener("click", tentarAutoplay);
+      return;
+    }
 
-    // Remove o listener — só precisamos do primeiro clique
-    document.removeEventListener("click", tentarAutoplay);
+    // Este ecrã não a deixa tocar. Fica à espera do clique que leve a um que
+    // deixe.
+    if (!musicaPermitida) return;
+
+    tocar().catch(function () {});
   }
 
   // ── Campo de estrelas do fundo ───────────────────────────────────
@@ -117,6 +160,8 @@
   };
 
   // ── Botão de ligar/pausar música ─────────────────────────────────
+  // Só é alcançável no Observatório e no VR: o painel das configurações, que é
+  // onde ele vive, não aparece fora desses ecrãs (ver o index.css).
   window.toggleMusica = async function toggleMusica() {
     const audio = document.getElementById("musica");
     const btn   = document.querySelector(".btn-musica");
@@ -130,11 +175,9 @@
       return;
     }
 
+    // O resto é o tocar(), que também guarda o pedido no sessionStorage.
     try {
-      await audio.play();
-      btn.textContent = "⏸ Pausar Música";
-      window.musicaAtiva = true;
-      sessionStorage.setItem("musica_ativa", "true");
+      await tocar();
     } catch (_) {
       btn.textContent = "▶ Ativar Música";
       window.musicaAtiva = false;
