@@ -174,6 +174,56 @@ verificar("mas 'espanha' continua a dar as terras de Espanha",
           len(espanha) >= 8 and all(x["pais"] == "Espanha" for x in espanha),
           [x["cidade"] for x in espanha[:6]])
 
+print("\n== 5b-bis. O resto do mundo (a segunda fonte) ==")
+# A lista local é uma amostra: "Granada" existe em cinco países e ela conhece
+# um. Antes disto, quem escrevia Granada via a espanhola e mais nada — as
+# outras existiam e não havia como lá chegar, que é o pior dos casos, porque
+# parece que só aquela existe. A segunda fonte traz as outras, num pedido à
+# parte, para o perfil.js as acrescentar por baixo das primeiras.
+
+# A primeira fonte continua a ser só a lista local, e continua a não sair à
+# rede — é isso que faz a lista de sugestões aparecer no instante em que se
+# para de escrever, e é por isso que "Granada" (a espanhola) vem sozinha.
+r = c.get("/api/localidades?q=granada")
+so_lista = r.get_json()["resultados"]
+verificar("'granada' sem fonte=rede devolve só a da lista local",
+          len(so_lista) == 1 and so_lista[0]["pais"] == "Espanha",
+          [f"{x['cidade']}/{x['pais']}" for x in so_lista])
+
+# Abaixo de três letras não se pergunta ao serviço — é o mesmo mínimo do
+# _MINIMO_PARA_A_REDE. Este pedido não sai à rede, por isso é determinístico
+# mesmo numa máquina sem internet.
+r = c.get("/api/localidades?q=gr&fonte=rede")
+verificar("'gr' com fonte=rede -> vazio, sem sair à rede",
+          r.status_code == 200 and r.get_json()["resultados"] == [], r.get_json())
+
+r = c2.get("/api/localidades?q=granada&fonte=rede")
+verificar("a segunda fonte também exige sessão -> 401", r.status_code == 401, r.status_code)
+
+# O resto depende de haver rede: com o serviço em baixo isto vem vazio, e vazio
+# aqui não é uma resposta errada — é a mesma coisa que a aplicação faz, ficar
+# com o que a lista local tinha. Salta-se em vez de falhar.
+r = c.get("/api/localidades?q=granada&fonte=rede")
+outras = r.get_json()["resultados"]
+if not outras:
+    print("    (saltado: sem rede, ou o serviço de geocoding não respondeu)")
+else:
+    verificar("e traz as outras Granadas do mundo",
+              len(outras) >= 3, [f"{x['cidade']}/{x['pais']}" for x in outras])
+    # O corte que evita a terra aparecer duas vezes, uma por cada fonte.
+    verificar("sem repetir a espanhola que a lista já deu",
+              all(x["pais"] != "Espanha" for x in outras),
+              [f"{x['cidade']}/{x['pais']}" for x in outras])
+    # A procura do Open-Meteo é tolerante e devolve coisas que se chamam outra
+    # coisa — "Santiago" trazia Naguabo e Vilasantar. Numa lista encabeçada por
+    # "Outros sítios com este nome", isso era simplesmente falso.
+    verificar("e só com terras que se chamam mesmo Granada",
+              all("granada" in x["cidade"].lower() for x in outras),
+              [x["cidade"] for x in outras])
+    verificar("todas com coordenadas e fuso, prontas a guardar",
+              all(x["latitude"] and x["longitude"] and x["timezone"] for x in outras),
+              outras[:1])
+
 print("\n== 5c. A procura ao contrário (o dispositivo) ==")
 # O botão "usar a localização deste dispositivo" manda as coordenadas do
 # browser e recebe o NOME da terra. Sem esta rota, guardava-se um par de

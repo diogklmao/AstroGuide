@@ -22,7 +22,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from py.database.db import consultar_um, consultar_todos, executar, agora_iso, PAPEL_ADMIN
 from py.config import LOCATION
-from py.localizacao import nome_legivel, procurar, reverter
+from py.localizacao import nome_legivel, procurar_na_lista, procurar_mais, reverter
 
 # Os catálogos onde os favoritos vão buscar o nome. O que fica guardado em
 # "favoritos" é o id do objeto ("Ori", "polaris", "m42"), porque os nomes
@@ -425,12 +425,26 @@ def api_procurar_localidades():
     # Procura de cidades para o seletor do perfil — "lisboa" devolve Lisboa
     # (Portugal) e "madrid" devolve Madrid (Espanha), com as coordenadas e o
     # fuso de cada uma já resolvidos (ver py/localizacao/__init__.py).
+    #
+    # São duas fontes e dois pedidos, de propósito. Sem "fonte", responde a
+    # lista local: não sai do computador, e é o que faz a lista de sugestões
+    # aparecer no instante em que se para de escrever. Com "fonte=rede",
+    # responde o serviço de geocoding com as terras daquele nome que a lista
+    # não tem, para o perfil.js acrescentar por baixo das primeiras.
+    #
+    # A alternativa — juntar as duas aqui e responder uma vez só — obrigava
+    # toda a procura a esperar pela internet (até 4s, ver o geocoding.py) para
+    # mostrar o que já estava em memória. "Porto" não tem nada que esperar.
     u = utilizador_atual()
     if u is None:
         return jsonify({"erro": "Precisas de ter sessão iniciada."}), 401
 
     termo = (request.args.get("q") or "").strip()[:_MAXIMO_PROCURA]
-    return jsonify({"resultados": procurar(termo)})
+
+    if request.args.get("fonte") == "rede":
+        return jsonify({"resultados": procurar_mais(termo)})
+
+    return jsonify({"resultados": procurar_na_lista(termo)})
 
 
 @auth_bp.route("/api/localidades/reversa", methods=["POST"])

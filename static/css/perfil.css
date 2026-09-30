@@ -301,6 +301,22 @@ textarea.perfil-campo {
     color: #7c8798;
 }
 
+/* "Outros sítios com este nome" — a linha que separa o que a lista local
+   conhece do que veio do serviço de geocoding. O traço em cima é o que diz que
+   as linhas seguintes são de outra proveniência, e não mais do mesmo: sem ele
+   as duas metades liam-se como uma lista só, e as de baixo pareciam tão boas
+   como as primeiras — que é o contrário do que se quer, porque as de cima são
+   as que a aplicação conhece melhor. */
+.perfil-resultados-separador {
+    margin-top: 6px;
+    padding: 7px 9px 3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.68rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #7c8798;
+}
+
 /* ── A escolha à espera de confirmação ───────────────────────────────── */
 /* Destacada do resto do cartão: é o que está escolhido mas ainda NÃO está a
    valer, e a diferença entre as duas coisas tem de se ver. */

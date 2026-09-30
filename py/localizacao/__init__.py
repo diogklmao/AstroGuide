@@ -4,20 +4,30 @@
 #  O que a aplicação usa para transformar "Lisboa, Portugal"
 #  nas coordenadas e no fuso horário de que o céu precisa.
 #
-#  Junta as duas fontes e esconde de quem chama qual delas
-#  respondeu:
+#  São duas fontes, e são pedidas em separado — quem as junta é
+#  o perfil.js, que mostra a primeira e acrescenta a segunda:
 #
 #   1. a lista local (cidades.py), que responde sempre e sem
 #      rede, e cobre as cidades onde alguém observa;
-#   2. o serviço de geocoding na internet (geocoding.py), só
-#      quando a lista não devolveu nada.
+#   2. o serviço de geocoding na internet (geocoding.py), que
+#      traz as terras com aquele nome que a lista não tem.
 #
-#  A ordem não é arbitrária: a lista responde em memória e não
-#  depende de haver internet, e é por isso que é ela que atende
-#  o caso comum. A rede fica para o que a lista não tem.
+#  Estarem separadas é o que permite às duas coisas serem
+#  verdade ao mesmo tempo: a lista responde em memória e não
+#  depende de haver internet, e é isso que faz a lista de
+#  sugestões aparecer no instante em que se para de escrever;
+#  a rede leva o seu tempo e pode falhar, e nenhuma procura
+#  comum deve esperar por ela.
+#
+#  A rede não é, por isso, um recurso de emergência para quando a
+#  lista não encontra nada — é o resto da resposta. A lista é uma
+#  amostra: "Granada" existe em cinco países e ela conhece um.
 # ============================================================
 
+import math
+
 from py.localizacao.cidades import procurar as _procurar_na_lista
+from py.localizacao.cidades import sem_acentos
 from py.localizacao.geocoding import procurar_online as _procurar_online
 from py.localizacao.geocoding import reverter_online as _reverter_online
 
@@ -56,22 +66,89 @@ def nome_legivel(local):
 _LIMITE_POR_OMISSAO = 12
 
 
-def procurar(termo, limite=_LIMITE_POR_OMISSAO):
-    # A lista de locais que correspondem ao que se escreveu, da mais provável
-    # para a menos provável (ver _pontuar, no cidades.py).
-    resultados = _procurar_na_lista(termo, limite)
+def procurar_na_lista(termo, limite=_LIMITE_POR_OMISSAO):
+    # As terras da lista local que correspondem ao que se escreveu, da mais
+    # provável para a menos provável (ver _pontuar, no cidades.py).
+    #
+    # Não sai à rede, de propósito: é esta a resposta que aparece no instante
+    # em que a pessoa para de escrever, e é ela que continua a haver quando não
+    # há internet. Quem chama pede também o procurar_mais, e é ao juntar as
+    # duas que a resposta fica completa.
+    return _procurar_na_lista(termo, limite)
 
-    # A rede só entra quando não há nada: se a lista já respondeu, a resposta
-    # dela é a que aparece, e a procura fica instantânea. É esta a diferença
-    # entre escrever "Porto" (sem sair do computador) e escrever "Gaziantep"
-    # (uma ida à internet).
-    if resultados:
-        return resultados
 
-    if len((termo or "").strip()) < _MINIMO_PARA_A_REDE:
+def procurar_mais(termo, limite=_LIMITE_POR_OMISSAO):
+    # O resto da resposta: as terras com este nome que só o serviço de
+    # geocoding conhece, para acrescentar POR BAIXO das da lista local.
+    #
+    # Existe porque a lista local é uma amostra das terras onde alguém aponta
+    # um telescópio, e uma amostra não pode responder sozinha a um nome que
+    # existe em vários países. Antes disto, escrever "Granada" devolvia a
+    # Granada espanhola e mais nada — e há mais quatro no mundo, incluindo uma
+    # na Nicarágua e o próprio país. A lista tapava-as: quem escrevia Granada
+    # via uma terra e não tinha como saber das outras, que é o pior dos casos,
+    # porque parece que só aquela existe.
+    #
+    # Quem chama já mostrou o que a lista deu (ver o procurar_na_lista), e o que
+    # ela já tinha sai daqui — senão a Granada espanhola aparecia duas vezes,
+    # uma por cada fonte.
+    alvo = (termo or "").strip()
+    if len(alvo) < _MINIMO_PARA_A_REDE:
         return []
 
-    return _procurar_online(termo, limite)
+    da_lista = _procurar_na_lista(alvo, _LIMITE_POR_OMISSAO)
+    procurado = sem_acentos(alvo)
+
+    resultados = []
+    for local in _procurar_online(alvo, limite):
+        # Só o que tem mesmo este nome. A procura do Open-Meteo é tolerante e
+        # traz coisas que se chamam outra coisa: procurar "Santiago" devolvia
+        # também Naguabo, Vilasantar e Verea, que não têm Santiago nenhum no
+        # nome. Numa lista encabeçada por "Outros sítios com este nome" isso
+        # seria simplesmente falso.
+        if procurado not in sem_acentos(local["cidade"]):
+            continue
+
+        # E nem o que a lista local já deu, ainda que o serviço lhe chame outra
+        # coisa — é o caso de "Santiago do Chile", que é o "Santiago, Chile" da
+        # lista. (Ver o _mesma_terra para o porquê de isto ser por distância e
+        # não pelo nome.)
+        if any(_mesma_terra(local, conhecida) for conhecida in da_lista):
+            continue
+
+        resultados.append(local)
+
+    return resultados
+
+
+# A partir de que distância duas terras deixam de ser a mesma. É largo de
+# propósito, e o número não vem da precisão das fontes: as duas dão o centro da
+# povoação com umas centenas de metros de diferença, e uma tolerância de 1 km
+# chegava para isso. Vem do que a aplicação faz com a localização — o céu de
+# duas terras a 15 km é o mesmo céu. Para escolher um sítio de observação,
+# mostrá-las como duas seria mostrar a mesma coisa duas vezes.
+_MESMA_TERRA_KM = 15
+
+
+def _mesma_terra(a, b):
+    # Compara-se a posição e não o nome porque o nome não é de confiança entre
+    # as duas fontes. As cidades coincidem quase sempre ("Lisboa" é "Lisboa"),
+    # mas os PAÍSES não: a lista escreve "Polónia" e "Chéquia" onde o serviço
+    # escreve "Polônia" e "República Checa", e um nome traduzido de outra
+    # maneira ("Santiago" -> "Santiago do Chile") dava a mesma terra duas vezes.
+    # A posição não se traduz.
+    return _distancia_km(
+        (a["latitude"], a["longitude"]), (b["latitude"], b["longitude"])
+    ) < _MESMA_TERRA_KM
+
+
+def _distancia_km(a, b):
+    # Distância em linha reta entre duas coordenadas, em km. A projeção
+    # equirretangular — os graus de longitude encolhem com o cosseno da latitude
+    # — chega bem para isto: ao lado de 15 km, o erro dela é de metros.
+    raio = 111.32
+    lat_media = math.radians((a[0] + b[0]) / 2)
+    return raio * math.hypot((b[1] - a[1]) * math.cos(lat_media), b[0] - a[0])
 
 
 def reverter(latitude, longitude):

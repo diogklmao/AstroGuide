@@ -97,17 +97,21 @@ astroguide/
 │   │                        nomes portugueses ("Londres" e
 │   │                        "London" dão a mesma terra).
 │   │
-│   ├── geocoding.py       → Geocoding, quando a lista não chega
-│   │                        Open-Meteo para procurar pelo nome e
-│   │                        BigDataCloud para o caminho contrário
-│   │                        (coordenadas do browser → nome da
-│   │                        terra). Sem chave de API, com cache em
-│   │                        memória de 10 minutos.
+│   ├── geocoding.py       → Geocoding: Open-Meteo para procurar
+│   │                        pelo nome e BigDataCloud para o
+│   │                        caminho contrário (coordenadas do
+│   │                        browser → nome da terra). Traz as
+│   │                        terras que a lista local não tem —
+│   │                        as duas somam-se, não se
+│   │                        substituem. Sem chave de API, com
+│   │                        cache em memória de 10 minutos.
 │   │
-│   └── __init__.py        → A porta de entrada do módulo
-│                            procurar() e reverter(). A lista
-│                            local é tentada primeiro; a rede só
-│                            é tocada quando ela não encontra nada.
+│   └── __init__.py        → A porta de entrada do módulo:
+│                            procurar_na_lista(), procurar_mais()
+│                            e reverter(). A lista local responde
+│                            primeiro e sem rede; a rede
+│                            acrescenta as terras com aquele nome
+│                            que ela não tem.
 │
 ├── py/astronomia/         → Cálculo e rede
 │   │                        O que pensa (o sky_engine.py) e os
@@ -399,7 +403,12 @@ Rotas da API de conta (Precisa de sessão, marcadas com ✱):
                        com as coordenadas e o fuso horário já
                        resolvidos. É o que alimenta a lista do
                        seletor de cidades — ninguém escreve
-                       coordenadas à mão.
+                       coordenadas à mão. São duas fontes e dois
+                       pedidos: sem mais nada responde a lista
+                       local (instantânea, e sem rede), e
+                       &fonte=rede responde o serviço de
+                       geocoding com as terras daquele nome que
+                       a lista não tem (ver LOCALIZAÇÃO PESSOAL).
   /api/localidades/reversa ✱ → O caminho contrário: POST com
                        latitude e longitude e devolve o NOME da
                        terra onde elas caem. É o que permite ao
@@ -439,13 +448,27 @@ O que a conta acrescenta é o que só faz sentido para uma pessoa:
      errado. Agora escreve-se "Madrid" e as coordenadas, a
      elevação e o fuso vêm com a terra escolhida.
 
-     A procura vive no py/localizacao/: primeiro procura-se na
-     lista de ~150 cidades (instantâneo, e funciona sem rede), e só
-     se ela não encontrar nada é que se pergunta ao serviço de
-     geocoding. A lista ignora acentos e pontuação — "Lisboa,
-     Portugal" e "lIsBoA" dão a mesma terra — e conhece os nomes
-     portugueses ao lado dos originais, por isso "Londres" e
-     "London" também.
+     A procura vive no py/localizacao/, e tem duas fontes que se
+     pedem em separado. A primeira é a lista de ~150 cidades:
+     instantânea e sem rede, é ela que responde quase sempre. A
+     segunda é o serviço público de geocoding (Open-Meteo), que
+     traz as terras com aquele nome que a lista não tem. A lista
+     ignora acentos e pontuação — "Lisboa, Portugal" e "lIsBoA"
+     dão a mesma terra — e conhece os nomes portugueses ao lado
+     dos originais, por isso "Londres" e "London" também.
+
+     As duas somam-se, não se substituem: a lista é uma amostra,
+     e uma amostra não pode responder sozinha a um nome que
+     existe em vários países. Escrever "Granada" devolvia a
+     espanhola e mais nada, quando há mais quatro no mundo. Os
+     resultados da lista aparecem primeiro e os do serviço logo
+     abaixo, debaixo de um separador ("Outros sítios com este
+     nome"), e o que a lista já deu não se repete — a mesma
+     Granada não aparece duas vezes por vir de duas fontes.
+     Estão em pedidos separados por uma razão prática: juntá-los
+     num só obrigava toda a procura a esperar pela internet para
+     mostrar o que já estava em memória, e "Porto" não tem nada
+     que esperar.
 
      Há três caminhos na página de perfil:
        · escrever o nome da cidade — a lista de resultados aparece
@@ -453,8 +476,12 @@ O que a conta acrescenta é o que só faz sentido para uma pessoa:
          mostra a região e as coordenadas, que é o que distingue as
          terras com o mesmo nome. Basta UMA letra: quem escreve "S"
          vê as terras que começam por S e escolhe de lá, em vez de
-         ter de saber o nome todo de cor. Escrever o nome do país
-         também serve ("Espanha" dá as terras de Espanha) — mas
+         ter de saber o nome todo de cor. A partir de três letras a
+         lista é completada com o que o serviço de geocoding
+         conhece com aquele nome — chega debaixo de um separador
+         um instante depois, e é assim que "Granada" mostra as
+         outras quatro que existem no mundo. Escrever o nome do
+         país também serve ("Espanha" dá as terras de Espanha) — mas
          quando há terras que se chamam mesmo o que se escreveu,
          as que só coincidiram por causa da região saem da lista,
          porque "port" a devolver o Porto e, atrás dele, Beja e
@@ -783,8 +810,14 @@ Geocoding
   a pedir a quem está a usar.
   Aqui é feito em duas camadas: a lista local de
   py/localizacao/cidades.py (instantânea, e funciona sem
-  rede) e, só quando ela não encontra nada, os serviços
-  públicos Open-Meteo e BigDataCloud — ambos sem chave de API.
+  rede) e os serviços públicos Open-Meteo e BigDataCloud —
+  ambos sem chave de API. As duas camadas somam-se em vez de
+  se substituírem: a lista responde primeiro e sem rede, e o
+  Open-Meteo acrescenta as terras com aquele nome que ela não
+  tem — é uma amostra, e "Granada" existe em cinco países.
+  O BigDataCloud é o caminho contrário, das coordenadas para
+  o nome da terra (ver "usar a localização deste
+  dispositivo").
 
 Fuso horário IANA
   Os fusos são identificados pelo nome da região

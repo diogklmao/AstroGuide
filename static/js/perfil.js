@@ -78,6 +78,12 @@
   // pergunta que se faça a um serviço externo — é uma navegação pela lista.)
   const MINIMO_DA_PROCURA = 1;
 
+  // A partir de quantas letras se pergunta também ao serviço de geocoding. É o
+  // mesmo número do _MINIMO_PARA_A_REDE, no py/localizacao/__init__.py: abaixo
+  // disto o servidor recusa-se a ir à rede, e pedir-lhe que fosse era um
+  // pedido para receber uma lista vazia de volta.
+  const MINIMO_PARA_A_REDE = 3;
+
   // O fuso horário do dispositivo. O browser já sabe em que fuso está, por
   // isso não é preciso ir a nenhum serviço externo nem perguntar ao
   // utilizador. O "Europe/Lisbon" é só a rede de segurança: browsers antigos
@@ -138,88 +144,157 @@
     if (campo) campo.setAttribute("aria-expanded", "false");
   }
 
-  function mostrarResultados(cidades) {
+  // Uma linha da lista. Vive à parte porque as duas fontes a usam: o que vem
+  // da lista local e o que vem do serviço de geocoding mostram-se da mesma
+  // maneira, e o que muda é só onde ficam.
+  function itemResultado(cidade) {
+    const item = document.createElement("li");
+
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "perfil-resultado";
+
+    // O que vem do servidor fica em data-*, e não dentro do onclick: assim o
+    // JavaScript lê-o do próprio elemento e nada do que veio da rede chega a
+    // ser interpretado como código. (É o mesmo cuidado dos favoritos, no
+    // perfil.html.)
+    botao.dataset.cidade    = cidade.cidade;
+    botao.dataset.pais      = cidade.pais;
+    botao.dataset.regiao    = cidade.regiao || "";
+    botao.dataset.latitude  = cidade.latitude;
+    botao.dataset.longitude = cidade.longitude;
+    botao.dataset.elevacao  = cidade.elevacao;
+    botao.dataset.timezone  = cidade.timezone;
+    botao.onclick = function () { escolherLocalidade(botao); };
+
+    // A região vai no texto porque é o que distingue as terras com o mesmo
+    // nome — há mais do que uma "Vila Nova", e sem ela a lista dava duas
+    // linhas iguais e a pessoa escolhia ao calhas.
+    const nome = document.createElement("span");
+    nome.className = "perfil-resultado-nome";
+    nome.textContent = cidade.pais ? `${cidade.cidade}, ${cidade.pais}` : cidade.cidade;
+
+    const detalhe = document.createElement("span");
+    detalhe.className = "perfil-resultado-detalhe";
+    detalhe.textContent = [
+      cidade.regiao,
+      coordenadasLegiveis(cidade.latitude, cidade.longitude),
+    ].filter(Boolean).join(" · ");
+
+    botao.appendChild(nome);
+    botao.appendChild(detalhe);
+    item.appendChild(botao);
+    return item;
+  }
+
+  // Mostra a lista, substituindo o que lá estiver.
+  //
+  // "mostrarVazio" diz o que significa uma lista vazia: uma resposta ("não
+  // encontrámos essa terra") ou apenas uma pergunta que ainda não acabou. A
+  // primeira fase devolve vazio sempre que a lista local não conhece o nome —
+  // e nesse instante ainda se está à espera do serviço de geocoding, que pode
+  // conhecê-lo. Anunciar "não existe" aí era uma mensagem a aparecer e a
+  // desaparecer sozinha meio segundo depois.
+  function mostrarResultados(cidades, mostrarVazio = true) {
     const lista = document.getElementById("local-resultados");
     const campo = document.getElementById("local-procura");
     if (!lista || !campo) return;
 
+    lista.innerHTML = "";
+
     if (!cidades.length) {
-      lista.innerHTML =
-        '<li class="perfil-resultado-vazio">Não encontrámos essa terra. ' +
-        'Tenta escrever de outra maneira, ou usa a localização deste dispositivo.</li>';
-      lista.hidden = false;
-      campo.setAttribute("aria-expanded", "true");
+      if (mostrarVazio) {
+        lista.innerHTML =
+          '<li class="perfil-resultado-vazio">Não encontrámos essa terra. ' +
+          'Tenta escrever de outra maneira, ou usa a localização deste dispositivo.</li>';
+        lista.hidden = false;
+        campo.setAttribute("aria-expanded", "true");
+      } else {
+        lista.hidden = true;
+        campo.setAttribute("aria-expanded", "false");
+      }
       return;
     }
 
-    lista.innerHTML = "";
     cidades.forEach(function (cidade) {
-      const item = document.createElement("li");
-
-      const botao = document.createElement("button");
-      botao.type = "button";
-      botao.className = "perfil-resultado";
-
-      // O que vem do servidor fica em data-*, e não dentro do onclick: assim o
-      // JavaScript lê-o do próprio elemento e nada do que veio da rede chega a
-      // ser interpretado como código. (É o mesmo cuidado dos favoritos, no
-      // perfil.html.)
-      botao.dataset.cidade    = cidade.cidade;
-      botao.dataset.pais      = cidade.pais;
-      botao.dataset.regiao    = cidade.regiao || "";
-      botao.dataset.latitude  = cidade.latitude;
-      botao.dataset.longitude = cidade.longitude;
-      botao.dataset.elevacao  = cidade.elevacao;
-      botao.dataset.timezone  = cidade.timezone;
-      botao.onclick = function () { escolherLocalidade(botao); };
-
-      // A região vai no texto porque é o que distingue as terras com o mesmo
-      // nome — há mais do que uma "Vila Nova", e sem ela a lista dava duas
-      // linhas iguais e a pessoa escolhia ao calhas.
-      const nome = document.createElement("span");
-      nome.className = "perfil-resultado-nome";
-      nome.textContent = cidade.pais ? `${cidade.cidade}, ${cidade.pais}` : cidade.cidade;
-
-      const detalhe = document.createElement("span");
-      detalhe.className = "perfil-resultado-detalhe";
-      detalhe.textContent = [
-        cidade.regiao,
-        coordenadasLegiveis(cidade.latitude, cidade.longitude),
-      ].filter(Boolean).join(" · ");
-
-      botao.appendChild(nome);
-      botao.appendChild(detalhe);
-      item.appendChild(botao);
-      lista.appendChild(item);
+      lista.appendChild(itemResultado(cidade));
     });
 
     lista.hidden = false;
     campo.setAttribute("aria-expanded", "true");
   }
 
+  // Junta o que veio do serviço de geocoding POR BAIXO do que já está
+  // desenhado, debaixo de um separador. Não substitui nem reordena nada: as
+  // terras da lista local continuam onde estavam e continuam a ser as
+  // primeiras, porque são as que a aplicação conhece melhor.
+  function acrescentarResultados(cidades) {
+    const lista = document.getElementById("local-resultados");
+    const campo = document.getElementById("local-procura");
+    if (!lista || !campo || !cidades.length) return;
+
+    const separador = document.createElement("li");
+    separador.className = "perfil-resultados-separador";
+    separador.setAttribute("role", "presentation");
+    separador.textContent = "Outros sítios com este nome";
+    lista.appendChild(separador);
+
+    cidades.forEach(function (cidade) {
+      lista.appendChild(itemResultado(cidade));
+    });
+
+    lista.hidden = false;
+    campo.setAttribute("aria-expanded", "true");
+  }
+
+  // Pede uma das duas fontes. Devolve a lista, ou null quando o pedido falhou
+  // (rede em baixo, sessão caída) — que é diferente de uma lista vazia, e é o
+  // que deixa quem chama distinguir "não há" de "não se conseguiu perguntar".
+  async function pedirFonte(termo, fonte) {
+    const url = "/api/localidades?q=" + encodeURIComponent(termo) +
+                (fonte ? "&fonte=" + fonte : "");
+    try {
+      const resposta = await fetch(url);
+      if (!resposta.ok) return null;
+      const dados = await resposta.json().catch(function () { return {}; });
+      return dados.resultados || [];
+    } catch (erro) {
+      return null;
+    }
+  }
+
   async function pedirCidades(termo) {
     const meuPedido = ++pedidoAtual;
 
-    let resposta;
-    try {
-      resposta = await fetch("/api/localidades?q=" + encodeURIComponent(termo));
-    } catch (erro) {
-      mostrarResultados([]);
-      return;
-    }
+    // Fase 1 — a lista local. Não sai do computador, por isso é quase sempre
+    // ela que chega primeiro, e é ela que faz a lista aparecer no instante em
+    // que se para de escrever.
+    const locais = await pedirFonte(termo, "");
     // Chegou tarde: entretanto já se pediu outra coisa, e o que está escrito
     // no campo não é o que esta resposta responde. Deita-se fora.
     if (meuPedido !== pedidoAtual) return;
 
-    if (!resposta.ok) {
-      mostrarResultados([]);
+    const pedirRede = termo.trim().length >= MINIMO_PARA_A_REDE;
+
+    // Uma lista local vazia só é "não encontrámos" quando não há uma segunda
+    // resposta a caminho.
+    mostrarResultados(locais || [], !pedirRede);
+    if (!pedirRede) return;
+
+    // Fase 2 — o resto do mundo: as terras com este nome que a lista local não
+    // tem. É isto que faz "Granada" mostrar as outras quatro, e não só a
+    // espanhola.
+    const outros = await pedirFonte(termo, "rede");
+    if (meuPedido !== pedidoAtual) return;
+
+    // Se a lista local não tinha nada, o que veio da rede não é um complemento
+    // — é a resposta toda, e é só agora que se sabe se existe alguma.
+    if (!locais || !locais.length) {
+      mostrarResultados(outros || []);
       return;
     }
 
-    const dados = await resposta.json().catch(function () { return {}; });
-    if (meuPedido !== pedidoAtual) return;
-
-    mostrarResultados(dados.resultados || []);
+    if (outros && outros.length) acrescentarResultados(outros);
   }
 
   window.procurarCidade = function procurarCidade() {
@@ -228,6 +303,12 @@
 
     const termo = campo.value.trim();
     clearTimeout(temporizadorProcura);
+
+    // O campo mudou, e o que ainda esteja em voo (a segunda fase da procura
+    // anterior) deixou de responder ao que está escrito. Sem isto, essa resposta
+    // tardia chegava depois de a lista ter sido fechada — por a pessoa ter
+    // limpado o campo, ou por ter escolhido uma terra — e reabria-a por cima.
+    pedidoAtual++;
 
     // Escolher outra cidade tira a que estava à espera de confirmação: deixá-la
     // lá era guardar uma terra e estar a ver outra.
@@ -255,6 +336,10 @@
   // gravá-la é igual nos dois, e é isso que vive aqui.
   function mostrarEscolha(local) {
     localEscolhida = local;
+
+    // A escolha está feita: a segunda fase da procura, se ainda estiver a
+    // caminho, já não pode reabrir a lista por cima do cartão da escolha.
+    pedidoAtual++;
 
     document.getElementById("escolha-nome").textContent =
       local.pais ? `${local.cidade}, ${local.pais}` : local.cidade;

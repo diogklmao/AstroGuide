@@ -213,7 +213,7 @@ _BRUTO = (
 )
 
 
-def _sem_acentos(texto):
+def sem_acentos(texto):
     # "São Paulo" -> "sao paulo". É o que faz a procura funcionar sem a pessoa
     # ter de acertar nos acentos nem na caixa — ninguém escreve "SÃO PAULO"
     # para procurar São Paulo, e quem escreve "santarem" tem de encontrar
@@ -221,6 +221,11 @@ def _sem_acentos(texto):
     #
     # O NFD separa cada letra do acento que leva (o "é" vira "e" + acento) e o
     # filtro deita fora o que for marcação de acento. Fica uma letra só.
+    #
+    # É pública, e não um "_sem_acentos" só desta lista, porque é a maneira
+    # como o pacote compara dois nomes de terras — quem junta as cidades daqui
+    # com as do serviço de geocoding precisa dela para reconhecer a mesma terra
+    # escrita pelas duas (ver o _identidade, no __init__.py).
     decomposto = unicodedata.normalize("NFD", texto)
     return "".join(c for c in decomposto if unicodedata.category(c) != "Mn").lower()
 
@@ -243,16 +248,16 @@ def _preparar(entrada):
     # procurar: "_texto" (tudo o que se pode escrever para a encontrar) e
     # "_palavras" (as palavras do nome, para reconhecer um começo de palavra).
     cidade = dict(zip(_CAMPOS, entrada))
-    cidade["_texto"] = _sem_acentos(" ".join(
+    cidade["_texto"] = sem_acentos(" ".join(
         (cidade["cidade"], cidade["pais"], cidade["regiao"], cidade["alias"])
     ))
     cidade["_palavras"] = [
-        _sem_acentos(p) for p in (cidade["cidade"] + " " + cidade["alias"]).split() if p
+        sem_acentos(p) for p in (cidade["cidade"] + " " + cidade["alias"]).split() if p
     ]
     # O nome da cidade sozinho, já sem acentos, para a comparação exata do
     # _pontuar ("lisboa" tal e qual vale mais do que "lisboa" no meio de outra
     # coisa). Fica calculado aqui, uma vez por cidade, e não a cada procura.
-    cidade["_nome_limpo"] = _sem_acentos(cidade["cidade"])
+    cidade["_nome_limpo"] = sem_acentos(cidade["cidade"])
     return cidade
 
 
@@ -309,7 +314,7 @@ def procurar(termo, limite=8):
     # As cidades que correspondem ao que se escreveu, da mais provável para a
     # menos. Uma procura vazia não devolve a lista toda: quem ainda não
     # escreveu nada não quer 150 resultados.
-    alvo = _sem_acentos(_sem_pontuacao(termo or ""))
+    alvo = sem_acentos(_sem_pontuacao(termo or ""))
     if not alvo:
         return []
 
