@@ -481,22 +481,17 @@ function toggleNightMode(forcarEstado) {
     }
 
     const body = document.body;
-    const btnCanvas = document.getElementById("btn-night-mode");
     const chkControlo = document.getElementById("chk-night-mode");
 
+    // A caixa dos Controlos é o único interruptor que existe (o botão que
+    // havia no mapa saiu): quem a carrega passa o estado novo, e é ele que
+    // manda. Isto escreve-lhe o mesmo estado de volta para o caso de a função
+    // ser chamada sem argumento — é o que a deixa continuar a servir sozinha.
     if (modoNightModeAtivo) {
         body.classList.add("red-velvet-mode");
-        if (btnCanvas) {
-            btnCanvas.classList.add("ativo");
-            btnCanvas.title = "Desativar Modo Noturno (Red Velvet)";
-        }
         if (chkControlo) chkControlo.checked = true;
     } else {
         body.classList.remove("red-velvet-mode");
-        if (btnCanvas) {
-            btnCanvas.classList.remove("ativo");
-            btnCanvas.title = "Ativar Modo Noturno (Red Velvet) para preservar a visão noturna";
-        }
         if (chkControlo) chkControlo.checked = false;
     }
 

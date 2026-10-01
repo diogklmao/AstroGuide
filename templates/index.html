@@ -140,7 +140,7 @@
                              no index.js). -->
                         <div class="config-linha-check">
                             <input type="checkbox" id="chk-ceu-profundo" checked onchange="desenharObservatorio()">
-                            <label for="chk-ceu-profundo">🔭 Objetos de Céu Profundo</label>
+                            <label for="chk-ceu-profundo">Objetos de Céu Profundo</label>
                         </div>
                         <!-- Tira o chão e mostra o que está debaixo do horizonte.
                              O que escondia esses objetos não era o chão, era o
@@ -152,7 +152,7 @@
                              não há lá sítio para o desenhar. -->
                         <div class="config-linha-check">
                             <input type="checkbox" id="chk-ver-abaixo" onchange="desenharObservatorio()">
-                            <label for="chk-ver-abaixo">🌍 Ver abaixo do horizonte</label>
+                            <label for="chk-ver-abaixo">Ver abaixo do horizonte</label>
                         </div>
                         <!-- O par da caixa de cima: a caixa é o que existe para
                              desenhar, este botão é para onde a câmara olha. Sem
@@ -187,12 +187,21 @@
                 </div>
                 <!-- Mapa Celeste -->
                 <div class="observatorio-mapa-wrapper glass-panel">
-                    <button id="btn-night-mode" onclick="toggleNightMode()" class="btn-night-mode"
-                        title="Modo Noturno (Red Velvet) para preservar a visão noturna">🔴 Night Mode (Red
-                        Velvet)</button>
-                    <button id="btn-entrar-vr" onclick="mudarEcra('vr')" title="Abrir Observatório VR">🥽 VR</button>
-                    <button id="btn-iss" onclick="mostrarDetalhesISS()"
-                        title="Estação Espacial Internacional: ver onde ela está agora">🛰 ISS</button>
+                    <!-- O Night Mode (Red Velvet) governa-se no painel dos
+                         Controlos, com a caixa que lá está (ver o
+                         chk-night-mode). Aqui no mapa havia um segundo botão
+                         para a mesma coisa, a ocupar a esquina do céu — e era
+                         no mapa que o espaço faz falta. -->
+                    <!-- Os dois botões do mapa, numa linha só. Vivem juntos
+                         num contentor que se encosta ao canto (ver o
+                         .observatorio-botoes, no index.css): o 🥽 VR fica na
+                         ponta, que é o canto que sempre foi dele, e o 🛰 ISS
+                         à esquerda, na linha de cima em vez da segunda. -->
+                    <div class="observatorio-botoes">
+                        <button id="btn-iss" onclick="mostrarDetalhesISS()"
+                            title="Estação Espacial Internacional: ver onde ela está agora">🛰 ISS</button>
+                        <button id="btn-entrar-vr" onclick="mudarEcra('vr')" title="Abrir Observatório VR">🥽 VR</button>
+                    </div>
                     <canvas id="observatorio-canvas" width="800" height="800"></canvas>
                 </div>
             </div>

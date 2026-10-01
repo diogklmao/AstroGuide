@@ -1324,23 +1324,39 @@ body.observatorio-ativo #btn-toggle-painel {
     font-size: 0.85rem;
 }
 
-/* Botão flutuante "🥽 VR" no canto do Observatório 2D, para entrar no modo VR */
-#btn-entrar-vr {
+/* ── Os botões do canto do mapa: 🛰 ISS e 🥽 VR ────────────────────────────
+   Vivem lado a lado dentro de um contentor que se encosta ao canto, em vez de
+   cada um com o seu "right" contado à mão. A largura destes botões depende da
+   fonte e do emoji, e uma conta dessas acertaria por sorte: encostava-os um ao
+   outro num computador e deixava um vão no meio noutro. O contentor encosta-se
+   e eles arrumam-se lá dentro, pela ordem em que estão no HTML — o 🥽 VR na
+   ponta, que é o canto que sempre foi dele, e o 🛰 ISS à esquerda. */
+.observatorio-botoes {
     position: absolute;
     top: 14px;
     right: 14px;
     z-index: 5;
-    background: rgba(206, 147, 216, 0.15);
-    border: 1px solid rgba(206, 147, 216, 0.4);
-    color: #ce93d8;
-    font-size: 0.85rem;
-    font-weight: 700;
+    display: flex;
+    gap: 8px;
+}
+
+/* A forma que os dois partilham — o que os distingue é a cor. */
+.observatorio-botoes button {
     padding: 8px 14px;
     border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
     cursor: pointer;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     transition: all 0.25s ease;
+}
+
+/* Botão flutuante "🥽 VR", à entrada do modo VR do Observatório. */
+#btn-entrar-vr {
+    background: rgba(206, 147, 216, 0.15);
+    border: 1px solid rgba(206, 147, 216, 0.4);
+    color: #ce93d8;
 }
 
 #btn-entrar-vr:hover {
@@ -1350,28 +1366,12 @@ body.observatorio-ativo #btn-toggle-painel {
 
 /* Botão flutuante "🛰 ISS". Abre o painel da ISS a qualquer momento — e é
    preciso: ela só está acima do horizonte cerca de 10% do tempo, por isso sem
-   este botão o painel dela ficaria quase sempre inalcançável. Fica na segunda
-   linha do canto superior direito, alinhado com o "🥽 VR" por baixo (top: 56px
-   = 14 do topo + ~34 de altura do botão de cima + 8 de folga). Não vai para a
-   primeira linha porque a largura do "🔴 Night Mode" muda com a fonte, e um
-   right fixo lá acertaria por sorte; e o canto inferior direito é do botão ⚙️
-   das configurações (shared-ui-controls.css). */
+   este botão o painel dela ficaria quase sempre inalcançável. (O canto inferior
+   direito do ecrã é do botão ⚙️ das configurações, shared-ui-controls.css.) */
 #btn-iss {
-    position: absolute;
-    top: 56px;
-    right: 14px;
-    z-index: 5;
     background: rgba(110, 184, 255, 0.15);
     border: 1px solid rgba(110, 184, 255, 0.4);
     color: #9ed4ff;
-    font-size: 0.85rem;
-    font-weight: 700;
-    padding: 8px 14px;
-    border-radius: 10px;
-    cursor: pointer;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transition: all 0.25s ease;
 }
 
 #btn-iss:hover {
@@ -1618,54 +1618,6 @@ body.vr-sessao #btn-sair-vr {
     }
 }
 
-/* ── Botão flutuante "🔴 Night Mode (Red Velvet)" no Observatório ── */
-#btn-night-mode {
-    position: absolute;
-    top: 14px;
-    right: 85px;
-    z-index: 5;
-    background: rgba(30, 4, 8, 0.7);
-    border: 1px solid rgba(255, 60, 80, 0.45);
-    color: #ff7085;
-    font-size: 0.82rem;
-    font-weight: 700;
-    padding: 8px 14px;
-    border-radius: 10px;
-    cursor: pointer;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transition: all 0.25s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    user-select: none;
-}
-
-#btn-night-mode:hover {
-    background: rgba(255, 40, 60, 0.25);
-    border-color: rgba(255, 80, 100, 0.8);
-    color: #ffa8b5;
-    box-shadow: 0 0 16px rgba(255, 40, 60, 0.4);
-}
-
-#btn-night-mode.ativo,
-body.red-velvet-mode #btn-night-mode {
-    background: rgba(210, 15, 45, 0.4);
-    border-color: #ff2a4d;
-    color: #ffffff;
-    box-shadow: 0 0 20px rgba(255, 30, 60, 0.65), inset 0 0 10px rgba(255, 30, 60, 0.35);
-    animation: pulseRedVelvet 2s infinite ease-in-out;
-}
-
-@keyframes pulseRedVelvet {
-    0%, 100% {
-        box-shadow: 0 0 14px rgba(255, 30, 60, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 24px rgba(255, 40, 70, 0.8);
-    }
-}
-
 /* ── Modo Noturno: Red Velvet (Astronomia) ────────────────────────── */
 body.red-velvet-mode #observatorio-canvas,
 body.red-velvet-mode #vr-canvas {
@@ -1679,7 +1631,7 @@ body.red-velvet-mode .observatorio-mapa-wrapper {
 
 /* O botão da ISS, que é azul, seria a única coisa dessa cor a sobrar no modo
    noturno — e é exatamente o azul que ele existe para não haver. Aqui herda o
-   vermelho como o "🔴 Night Mode" ao lado. */
+   vermelho, como o resto do modo. */
 body.red-velvet-mode #btn-iss {
     background: rgba(30, 4, 8, 0.7);
     border-color: rgba(255, 60, 80, 0.45);
@@ -1856,17 +1808,9 @@ body.red-velvet-mode #obs-hora-label {
 }
 
 @media (max-width: 600px) {
-    #btn-night-mode {
-        top: 10px;
-        right: 75px;
-        padding: 6px 10px;
-        font-size: 0.75rem;
-    }
-
-    /* O botão de cima fica mais baixo neste tamanho, e este acompanha — senão
-       encostavam um ao outro. */
-    #btn-iss {
-        top: 52px;
+    /* Num ecrã pequeno os dois botões do canto encolhem juntos: formam um par,
+       e um par com dois tamanhos diferentes lê-se como um engano. */
+    .observatorio-botoes button {
         padding: 6px 10px;
         font-size: 0.75rem;
     }

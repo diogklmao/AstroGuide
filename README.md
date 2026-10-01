@@ -884,8 +884,10 @@ Fuso horário IANA
       pelo nome, com a lista de resultados a aparecer enquanto
       se escreve (e navegável pelo teclado)
   [x] Night Mode (Red Velvet) — o mapa todo em tons de
-      vermelho, para não estragar a visão noturna. Botão no
-      mapa e caixa nas configurações
+      vermelho, para não estragar a visão noturna. Caixa no
+      painel dos Controlos, com as outras camadas — no mapa
+      era um segundo botão para o que já tinha um, a ocupar a
+      esquina do céu
   [x] "Ver abaixo do horizonte" — tira o chão e mostra as
       estrelas, constelações e planetas que estão debaixo do
       horizonte, desenhados mais apagados para se perceber

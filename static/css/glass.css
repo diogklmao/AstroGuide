@@ -171,10 +171,4 @@
     .card-imagem {
         animation: none;
     }
-
-    /* Botão do Night Mode aceso */
-    #btn-night-mode.ativo,
-    body.red-velvet-mode #btn-night-mode {
-        animation: none;
-    }
 }
