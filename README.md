@@ -917,6 +917,15 @@ Fuso horário IANA
       (immersive-vr) com tracking real da cabeça num Meta
       Quest 3, mantendo o arrasto do rato no PC
   [x] Observatório VR — Sol, Lua e planetas na cena 3D
+  [x] Observatório VR — céu sob os pés, sempre ligado: aqui o
+      "Ver abaixo do horizonte" não é uma caixa, porque não há
+      chão nenhum a tapar o céu. As estrelas, as constelações e
+      os planetas debaixo do horizonte aparecem sempre, e
+      desenhados a 0,6 (o mesmo ALFA_ABAIXO do Observatório 2D)
+      para se continuar a ver que não estão observáveis. Uma
+      linha de constelação que atravesse o horizonte conta como
+      céu de cima e leva o neon todo — a divisão é a mesma do
+      2D, para os dois observatórios mostrarem o mesmo céu
   [x] Página /perfil — a localização de observação, os
       favoritos e o caderno de observações de uma conta, numa
       página só (as iniciais do nome como avatar)

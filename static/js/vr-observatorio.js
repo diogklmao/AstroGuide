@@ -44,6 +44,20 @@ let vrStartYaw = 0, vrStartPitch = 0;
 
 const RAIO_CEU_VR = 500; // distância da "cúpula celeste" ao observador
 
+// ── Céu sob os pés, sempre ligado ───────────────────────────────────────────
+// No Observatório 2D o céu debaixo do horizonte só aparece com a caixa "Ver
+// abaixo do horizonte" ligada (ver verAbaixoDoHorizonte, no index.js) — sem
+// ela, cada camada salta os objetos de baixo com um "if (!visivel)".
+// Aqui não há caixa nenhuma: no VR o observador está DENTRO da cúpula, sem
+// chão a tapar nada, e metade da graça do modo imersivo é poder baixar os olhos
+// e ver o céu todo à volta. Por isso a opção está sempre ligada.
+// O que se copia do 2D é a OPACIDADE: o que está debaixo do horizonte desenha-
+// se apagado, para continuar a ler-se como "não observável neste instante" e
+// não se confundir com o que está acima. O valor é o mesmo ALFA_ABAIXO do
+// index.js (0,6) — o nome leva sufixo _VR só para não colidir com o de lá,
+// já que as duas constantes vivem no mesmo âmbito global.
+const ALFA_ABAIXO_VR = 0.6;
+
 // ── Iniciar a cena ──────────────────────────────────────────────────────────
 function iniciarCenaVR() {
     const canvas = document.getElementById("vr-canvas");
@@ -243,30 +257,49 @@ async function carregarDadosVR() {
 }
 
 // ── Estrelas ────────────────────────────────────────────────────────────────
+// As estrelas vêm todas na resposta da API, com um "visivel" que diz se estão
+// acima do horizonte. Aqui desenham-se as duas metades do céu (ver
+// ALFA_ABAIXO_VR), mas em duas nuvens de pontos separadas: o PointsMaterial não
+// tem opacidade por ponto, e é a opacidade que distingue as de baixo. Duas
+// nuvens custam uma draw call a mais e resolvem-no sem shaders à medida.
 function desenharEstrelasVR(dados) {
     const grupo = new THREE.Group();
-    const posicoes = [];
-    const cores = [];
+    const acima = { posicoes: [], cores: [] };
+    const abaixo = { posicoes: [], cores: [] };
     for (const id in dados.estrelas) {
         const est = dados.estrelas[id];
         const p = altAzParaXYZ(est.altitude, est.azimute, RAIO_CEU_VR);
-        posicoes.push(p.x, p.y, p.z);
         // Estrelas mais brilhantes (mag menor) ligeiramente mais azuladas
         const mag = est.magnitude || 2;
         const brilho = Math.max(0.4, 1 - (mag + 1.5) / 7);
-        cores.push(0.75 + 0.25 * brilho, 0.80 + 0.20 * brilho, brilho);
+        const destino = est.visivel ? acima : abaixo;
+        destino.posicoes.push(p.x, p.y, p.z);
+        destino.cores.push(0.75 + 0.25 * brilho, 0.80 + 0.20 * brilho, brilho);
     }
 
+    grupo.add(criarNuvemDeEstrelas(acima, 0.95));
+    grupo.add(criarNuvemDeEstrelas(abaixo, ALFA_ABAIXO_VR));
+    return grupo;
+}
+
+// Uma nuvem de pontos a partir das posições/cores já reunidas. Uma metade sem
+// estrelas nenhumas (céu todo de um lado, conforme a latitude) devolve um grupo
+// vazio, e não uma malha sem vértices — assim quem chama pode somar os dois sem
+// ter de saber se algum deles ficou vazio.
+function criarNuvemDeEstrelas(nuvem, opacidade) {
+    const grupo = new THREE.Group();
+    if (nuvem.posicoes.length === 0) return grupo;
+
     const geometria = new THREE.BufferGeometry();
-    geometria.setAttribute("position", new THREE.Float32BufferAttribute(posicoes, 3));
-    geometria.setAttribute("color", new THREE.Float32BufferAttribute(cores, 3));
+    geometria.setAttribute("position", new THREE.Float32BufferAttribute(nuvem.posicoes, 3));
+    geometria.setAttribute("color", new THREE.Float32BufferAttribute(nuvem.cores, 3));
 
     const material = new THREE.PointsMaterial({
         vertexColors: true,
         size: 2.5,
         sizeAttenuation: false,
         transparent: true,
-        opacity: 0.95
+        opacity: opacidade
     });
 
     grupo.add(new THREE.Points(geometria, material));
@@ -348,6 +381,11 @@ function desenharConstelacoesVR(dados) {
     const geometriasGlowExterior = [];
     const geometriasGlowInterior = [];
     const geometriasNucleo = [];
+    // As mesmas três camadas, mas para as linhas inteiramente debaixo do
+    // horizonte (ver ALFA_ABAIXO_VR).
+    const geometriasGlowExteriorAbaixo = [];
+    const geometriasGlowInteriorAbaixo = [];
+    const geometriasNucleoAbaixo = [];
     const etiquetas = [];
 
     for (const id in dados.constelacoes) {
@@ -361,27 +399,35 @@ function desenharConstelacoesVR(dados) {
             estrelasUnicas.add(linha[0]);
             estrelasUnicas.add(linha[1]);
 
-            // Tal como no Observatório 2D: só desenha a linha se pelo menos uma
-            // das estrelas estiver acima do horizonte.
-            if (!(a.visivel || b.visivel)) return;
-
             const pa = altAzParaXYZ(a.altitude, a.azimute, RAIO_CEU_VR);
             const pb = altAzParaXYZ(b.altitude, b.azimute, RAIO_CEU_VR);
             if (pa.distanceTo(pb) < 0.5) return; // evita tubos de comprimento nulo
 
+            // A divisão é a mesma do Observatório 2D (ver o "linhasAbaixo" em
+            // desenharObservatorio, no index.js): basta UMA estrela acima do
+            // horizonte para a linha inteira ser céu observável e levar o neon
+            // todo — mesmo a metade dela que mergulha. Só quando as duas pontas
+            // estão debaixo do horizonte é que a linha é "céu sob os pés".
+            const camadas = (a.visivel || b.visivel)
+                ? [geometriasGlowExterior, geometriasGlowInterior, geometriasNucleo]
+                : [geometriasGlowExteriorAbaixo, geometriasGlowInteriorAbaixo, geometriasNucleoAbaixo];
+
             // Três camadas do efeito neon: halo exterior largo, halo interior e núcleo
-            geometriasGlowExterior.push(tuboDeLinha(pa, pb, 2.6));
-            geometriasGlowInterior.push(tuboDeLinha(pa, pb, 1.5));
-            geometriasNucleo.push(tuboDeLinha(pa, pb, 0.55));
+            camadas[0].push(tuboDeLinha(pa, pb, 2.6));
+            camadas[1].push(tuboDeLinha(pa, pb, 1.5));
+            camadas[2].push(tuboDeLinha(pa, pb, 0.55));
         });
 
-        // Nome da constelação no centroide das estrelas visíveis (como no 2D).
-        // Usa só estrelas acima do horizonte; se nenhuma estiver, omitir o nome.
+        // Nome da constelação no centroide das estrelas (como no 2D, onde o
+        // centróide conta as de baixo quando "Ver abaixo do horizonte" está
+        // ligado — e aqui está sempre). Sem o filtro do "visivel", uma
+        // constelação toda debaixo dos pés continua a ter nome, que é o que
+        // permite reconhecê-la quando se olha para baixo.
         const centroide = new THREE.Vector3(0, 0, 0);
         let count = 0;
         estrelasUnicas.forEach(idEstrela => {
             const est = estrelas[idEstrela];
-            if (est && est.visivel) {
+            if (est) {
                 centroide.add(altAzParaXYZ(est.altitude, est.azimute, 1));
                 count++;
             }
@@ -392,13 +438,16 @@ function desenharConstelacoesVR(dados) {
         }
     }
 
-    // Camada "neon": material aditivo com brilho azul suave
-    const adicionarCamada = (geometrias, cor, opacidade, aditivo, renderOrder) => {
+    // Camada "neon": material aditivo com brilho azul suave.
+    // O último argumento é o fator de opacidade: 1 para o céu de cima, e
+    // ALFA_ABAIXO_VR para as camadas do céu sob os pés — assim as duas usam
+    // exatamente a mesma cor e o mesmo traço, só a intensidade difere.
+    const adicionarCamada = (geometrias, cor, opacidade, aditivo, renderOrder, fator = 1) => {
         if (geometrias.length === 0) return;
         const material = new THREE.MeshBasicMaterial({
             color: cor,
             transparent: true,
-            opacity: opacidade,
+            opacity: opacidade * fator,
             depthWrite: false,
             blending: aditivo ? THREE.AdditiveBlending : THREE.NormalBlending
         });
@@ -410,6 +459,11 @@ function desenharConstelacoesVR(dados) {
     adicionarCamada(geometriasGlowExterior, 0x3f9cff, 0.10, true, -3);
     adicionarCamada(geometriasGlowInterior, 0x6ec8ff, 0.26, true, -2);
     adicionarCamada(geometriasNucleo, 0xaedcff, 0.92, false, -1);
+
+    // Céu sob os pés: as mesmas três camadas, apagadas.
+    adicionarCamada(geometriasGlowExteriorAbaixo, 0x3f9cff, 0.10, true, -3, ALFA_ABAIXO_VR);
+    adicionarCamada(geometriasGlowInteriorAbaixo, 0x6ec8ff, 0.26, true, -2, ALFA_ABAIXO_VR);
+    adicionarCamada(geometriasNucleoAbaixo, 0xaedcff, 0.92, false, -1, ALFA_ABAIXO_VR);
 
     etiquetas.forEach(e => grupo.add(e));
     return grupo;
@@ -536,8 +590,10 @@ function reconstruirAstrosVR() {
     vrGrupoAstros = grupo;
 
     dadosVRAtuais.astros.forEach(astro => {
-        if (!astro.visivel) return; // astros abaixo do horizonte não aparecem
-
+        // O Sol, a Lua e os planetas debaixo do horizonte TAMBÉM se desenham
+        // (céu sob os pés, sempre ligado — ver ALFA_ABAIXO_VR). Como no 2D com
+        // a caixa ligada, ficam apagados: vê-se que estão lá sem se confundirem
+        // com os que estão observáveis.
         const cfg = astroCfg(astro.nome);
         if (!cfg) return;
 
@@ -557,10 +613,15 @@ function reconstruirAstrosVR() {
             depthWrite: false,
             depthTest: true
         });
+        // Opacidade do astro: cheia acima do horizonte, ALFA_ABAIXO_VR abaixo.
+        // O Sol leva um extra de brilho (é o único com blending aditivo), e é
+        // sobre esse 0,95 que o fator se aplica — senão, abaixo do horizonte,
+        // o Sol ficaria com a opacidade toda das estrelas de baixo.
+        const opacidadeBase = (astro.tipo === "sol") ? 0.95 : 1;
+        material.opacity = astro.visivel ? opacidadeBase : opacidadeBase * ALFA_ABAIXO_VR;
         if (astro.tipo === "sol") {
             // Sol com brilho forte — mistura aditiva
             material.blending = THREE.AdditiveBlending;
-            material.opacity = 0.95;
         }
 
         const sprite = new THREE.Sprite(material);
