@@ -91,7 +91,7 @@ astroguide/
 │   │                        "Lisboa" e as coordenadas aparecem.
 │   │
 │   ├── cidades.py         → Lista de cidades, fora da rede
-│   │                        ~150 terras com coordenadas, elevação
+│   │                        ~160 terras com coordenadas, elevação
 │   │                        e fuso horário. A procura ignora
 │   │                        acentos e pontuação e conhece os
 │   │                        nomes portugueses ("Londres" e
@@ -168,10 +168,11 @@ astroguide/
 │
 ├── _teste_contas.py       → Testes das contas, do perfil e da
 │                            localização
-│                            217 verificações automáticas
-│                            (213 se não houver rede — a parte
-│                            da ISS salta 2 e a da localização do
-│                            dispositivo salta 2, e dizem que
+│                            224 verificações automáticas
+│                            (216 se não houver rede — a segunda
+│                            fonte de cidades salta 4, a
+│                            localização do dispositivo salta 2 e
+│                            a ISS salta 2, e dizem que
 │                            saltaram).
 │                            Correr com: py _teste_contas.py
 │                            Não arranca servidor nem abre browser.
@@ -292,7 +293,7 @@ astroguide/
     │                        os dados de /api/observatorio
     │                        (zero duplicação da lógica
     │                        astronómica). Estrelas, constelações,
-    │                        Sol, Lua e planetas posicionados por
+    │                        Sol, Lua, planetas e a ISS posicionados por
     │                        altitude/azimute reais à volta do
     │                        observador. Navegação por arrasto do
     │                        rato no PC, e sessão WebXR imersiva
@@ -315,8 +316,8 @@ astroguide/
     │   ├── moon_render.png, sun.png → Imagens da Lua e Sol.
     │   │
     │   ├── iss.png        → Fotografia da Estação Espacial
-    │   │                  Internacional (ISS), desenhada no
-    │   │                  Observatório sem o recorte circular
+    │   │                  Internacional (ISS), desenhada nos
+    │   │                  Observatórios 2D e VR sem o recorte circular
     │   │                  dos planetas — é um objeto largo, e o
     │   │                  círculo cortava-lhe as pontas.
     │   │
@@ -450,7 +451,7 @@ O que a conta acrescenta é o que só faz sentido para uma pessoa:
      elevação e o fuso vêm com a terra escolhida.
 
      A procura vive no py/localizacao/, e tem duas fontes que se
-     pedem em separado. A primeira é a lista de ~150 cidades:
+     pedem em separado. A primeira é a lista de ~160 cidades:
      instantânea e sem rede, é ela que responde quase sempre. A
      segunda é o serviço público de geocoding (Open-Meteo), que
      traz as terras com aquele nome que a lista não tem. A lista
@@ -916,7 +917,12 @@ Fuso horário IANA
   [x] Observatório VR — Fase 2: sessão WebXR imersiva
       (immersive-vr) com tracking real da cabeça num Meta
       Quest 3, mantendo o arrasto do rato no PC
-  [x] Observatório VR — Sol, Lua e planetas na cena 3D
+  [x] Observatório VR — Sol, Lua, planetas e a ISS na cena 3D,
+      cada um com a sua imagem real. A ISS leva o mesmo
+      tratamento que no 2D: desenhada inteira, na proporção 3:2
+      da fotografia, em vez do recorte circular dos planetas —
+      o círculo espremia-a e cortava as pontas dos painéis
+      solares
   [x] Observatório VR — céu sob os pés, sempre ligado: aqui o
       "Ver abaixo do horizonte" não é uma caixa, porque não há
       chão nenhum a tapar o céu. As estrelas, as constelações e
@@ -931,7 +937,7 @@ Fuso horário IANA
       página só (as iniciais do nome como avatar)
   [x] Localização escolhida pelo NOME — um seletor de cidade e
       país que resolve as coordenadas e o fuso horário sozinho,
-      a partir de uma lista local de ~150 cidades com o serviço
+      a partir de uma lista local de ~160 cidades com o serviço
       de geocoding por trás dela. Escrever latitude e longitude
       à mão deixou de ser preciso, e deixou de ser possível
   [x] Papel de administrador, atribuído a partir do terminal
