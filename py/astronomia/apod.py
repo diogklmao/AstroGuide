@@ -6,7 +6,7 @@ import requests
 import datetime
 
 APOD_URL = "https://api.nasa.gov/planetary/apod"
-API_KEY = "DEMO_KEY"  # chave pública de demonstração da NASA (~30 pedidos/hora)
+API_KEY = "AnsFw60qh8k6TMITDyaX1ZnwmmWP6DJY1bu1a5g1"  
 
 # Cache simples em memória: guarda a última resposta e a data em que foi obtida
 _cache = {"data": None, "resultado": None}

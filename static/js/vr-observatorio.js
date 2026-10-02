@@ -485,7 +485,10 @@ const IMAGENS_ASTROS_VR = {
     "Júpiter": { src: "/static/images/jupiter.png", size: 37 },
     "Saturno": { src: "/static/images/saturn.png", size: 34 },
     "Úrano": { src: "/static/images/uranus.png", size: 25 },
-    "Neptuno": { src: "/static/images/neptune.png", size: 24 }
+    "Neptuno": { src: "/static/images/neptune.png", size: 24 },
+    // A ISS, tal como no 2D: imagem própria e um "size" que NÃO é o raio do
+    // disco — ver o ramo dela no desenho, onde é ele que manda na largura.
+    "ISS": { src: "/static/images/iss.png", size: 20 }
 };
 
 // Resolução dos canvas gerados (px por unidade de "size" do 2D) — só afeta a
@@ -568,6 +571,22 @@ function texturaAstroCompleta(img, size2d) {
     return finalizarTexturaVR(new THREE.CanvasTexture(canvas));
 }
 
+// ISS: a fotografia é 3:2 e os painéis solares estendem-se para os lados, por
+// isso — tal como no 2D — desenha-se inteira num retângulo com a proporção
+// dela. O recorte circular dos planetas pressupõe uma imagem quadrada com o
+// astro ao centro: aqui espremia-a 33% e cortava as pontas dos painéis.
+function texturaAstroISS(img, size2d) {
+    const largura = Math.max(32, Math.round(size2d * 3 * RES_IMAGEM_VR));
+    const altura = Math.round(largura / 1.5);   // 3:2, igual ao 2D (size*3 x size*2)
+    const canvas = document.createElement("canvas");
+    canvas.width = largura;
+    canvas.height = altura;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, largura, altura);
+
+    return finalizarTexturaVR(new THREE.CanvasTexture(canvas));
+}
+
 function desenharAstrosVR(dados) {
     dadosVRAtuais = dados;         // guarda para reconstruir quando as imagens chegarem
     reconstruirAstrosVR();
@@ -603,9 +622,12 @@ function reconstruirAstrosVR() {
         if (!img) return;
 
         const ehSaturno = astroCfg(astro.nome) === IMAGENS_ASTROS_VR["Saturno"];
+        const ehISS = astroCfg(astro.nome) === IMAGENS_ASTROS_VR["ISS"];
         const textura = ehSaturno
             ? texturaAstroCompleta(img, cfg.size)
-            : texturaAstroCircular(img, cfg.size);
+            : ehISS
+                ? texturaAstroISS(img, cfg.size)
+                : texturaAstroCircular(img, cfg.size);
 
         const material = new THREE.SpriteMaterial({
             map: textura,
@@ -628,11 +650,15 @@ function reconstruirAstrosVR() {
         sprite.position.copy(altAzParaXYZ(astro.altitude, astro.azimute, RAIO_CEU_VR));
 
         // Largura do sprite = diâmetro do disco no mundo. Saturno conta com
-        // os anéis (size*2.2, tal como no 2D).
+        // os anéis (size*2.2, tal como no 2D); a ISS é larga e baixa, 3:2
+        // (size*3 x size*2, igual ao 2D), e por isso não é quadrada.
         const largura = ehSaturno
             ? cfg.size * 2.2 * FATOR_ESCALA_VR
-            : cfg.size * 2 * FATOR_ESCALA_VR;
-        sprite.scale.set(largura, largura, 1);
+            : ehISS
+                ? cfg.size * 3 * FATOR_ESCALA_VR
+                : cfg.size * 2 * FATOR_ESCALA_VR;
+        const altura = ehISS ? largura / 1.5 : largura;
+        sprite.scale.set(largura, altura, 1);
         grupo.add(sprite);
     });
 
