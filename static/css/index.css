@@ -1844,3 +1844,228 @@ body.red-velvet-mode #obs-hora-label {
         font-size: 0.75rem;
     }
 }
+
+/* ── Painel Flutuante da Imagem da Constelação ("ao lado") ──────────────── */
+.painel-constelacao-lateral {
+    position: absolute;
+    top: 60px;
+    right: 18px;
+    width: 290px;
+    max-width: calc(100% - 36px);
+    background: rgba(8, 14, 28, 0.90);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(110, 184, 255, 0.35);
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(110, 184, 255, 0.18);
+    z-index: 20;
+    transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.painel-constelacao-lateral.oculto {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-12px) scale(0.95);
+    display: none !important;
+}
+
+.painel-constelacao-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.painel-constelacao-titulos {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.painel-constelacao-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: #ffd54f;
+    text-transform: uppercase;
+}
+
+#painel-constelacao-nome {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0;
+    text-shadow: 0 0 12px rgba(110, 184, 255, 0.6);
+}
+
+.painel-constelacao-btn-fechar {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.75);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.painel-constelacao-btn-fechar:hover {
+    background: rgba(255, 90, 90, 0.25);
+    border-color: rgba(255, 90, 90, 0.5);
+    color: #ff8585;
+    transform: rotate(90deg);
+}
+
+.painel-constelacao-preview {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #020408;
+    aspect-ratio: 1 / 1;
+    border: 1px solid rgba(110, 184, 255, 0.2);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+#img-constelacao-lateral {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease;
+}
+
+.painel-constelacao-preview:hover #img-constelacao-lateral {
+    transform: scale(1.05);
+}
+
+.painel-constelacao-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
+    padding: 10px;
+    text-align: center;
+    font-size: 0.75rem;
+    color: rgba(220, 235, 255, 0.9);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.painel-constelacao-preview:hover .painel-constelacao-overlay {
+    opacity: 1;
+}
+
+/* Modal ampliado */
+.modal-constelacao {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(1, 3, 8, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeInModal 0.25s ease;
+}
+
+.modal-constelacao.oculto {
+    display: none !important;
+}
+
+.modal-constelacao-conteudo {
+    position: relative;
+    max-width: 680px;
+    width: 100%;
+    background: rgba(10, 18, 36, 0.96);
+    border: 1px solid rgba(110, 184, 255, 0.35);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(110, 184, 255, 0.25);
+}
+
+.modal-constelacao-fechar {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.modal-constelacao-fechar:hover {
+    background: rgba(255, 70, 70, 0.35);
+    color: #ff9999;
+    transform: rotate(90deg);
+}
+
+.modal-constelacao-header {
+    margin-bottom: 16px;
+}
+
+.modal-constelacao-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #6eb8ff;
+    display: block;
+    margin-bottom: 4px;
+}
+
+#modal-constelacao-nome {
+    font-size: 1.4rem;
+    color: #ffffff;
+    margin: 0;
+    text-shadow: 0 0 15px rgba(110, 184, 255, 0.6);
+}
+
+#modal-constelacao-img {
+    width: 100%;
+    height: auto;
+    max-height: 70vh;
+    object-fit: contain;
+    border-radius: 14px;
+    border: 1px solid rgba(110, 184, 255, 0.2);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+    display: block;
+    margin: 0 auto;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 900px) {
+    .painel-constelacao-lateral {
+        top: 55px;
+        right: 10px;
+        width: 250px;
+    }
+}

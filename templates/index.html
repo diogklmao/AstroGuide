@@ -202,12 +202,40 @@
                             title="Estação Espacial Internacional: ver onde ela está agora">🛰 ISS</button>
                         <button id="btn-entrar-vr" onclick="mudarEcra('vr')" title="Abrir Observatório VR">🥽 VR</button>
                     </div>
+                                        <!-- Painel Flutuante da Constelação ("ao lado do canvas") -->
+                    <div id="painel-constelacao-lateral" class="painel-constelacao-lateral oculto">
+                        <div class="painel-constelacao-header">
+                            <div class="painel-constelacao-titulos">
+                                <span class="painel-constelacao-badge" id="painel-constelacao-badge">✦ CONSTELAÇÃO</span>
+                                <h4 id="painel-constelacao-nome">Constelação</h4>
+                            </div>
+                            <button type="button" id="btn-fechar-painel-constelacao" class="painel-constelacao-btn-fechar" onclick="esconderImagemConstelacao()" title="Fechar imagem">✕</button>
+                        </div>
+                        <div class="painel-constelacao-preview" onclick="abrirModalConstelacao()" title="Clique para ampliar">
+                            <img id="img-constelacao-lateral" src="" alt="Ilustração da Constelação" />
+                            <div class="painel-constelacao-overlay">
+                                <span>🔍 Clique para ampliar</span>
+                            </div>
+                        </div>
+                    </div>
                     <canvas id="observatorio-canvas" width="800" height="800"></canvas>
                 </div>
             </div>
             <!-- Barra do tour guiado. Vive dentro do ecrã do Observatório, por
                  isso desaparece sozinha ao mudar de ecrã — a paragem do tour no
                  código é a rede de segurança, não a única defesa. -->
+                        <!-- Modal de Imagem Ampliada da Constelação -->
+            <div id="modal-constelacao" class="modal-constelacao oculto" onclick="fecharModalConstelacao(event)">
+                <div class="modal-constelacao-conteudo" onclick="event.stopPropagation()">
+                    <button type="button" class="modal-constelacao-fechar" onclick="fecharModalConstelacao()" title="Fechar">✕</button>
+                    <div class="modal-constelacao-header">
+                        <span class="modal-constelacao-badge" id="modal-constelacao-badge">✦ ILUSTRAÇÃO CELESTE</span>
+                        <h3 id="modal-constelacao-nome">Constelação</h3>
+                    </div>
+                    <img id="modal-constelacao-img" src="" alt="Constelação Ampliada" />
+                </div>
+            </div>
+
             <div id="tour-barra" class="glass-panel">
                 <button type="button" class="tour-btn" id="btn-tour-anterior" onclick="paragemAnterior()"
                     title="Paragem anterior">‹</button>

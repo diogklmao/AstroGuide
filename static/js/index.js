@@ -150,6 +150,7 @@ function mudarEcra(nome) {
         setTimeout(redimensionarCanvasVR, 50);
     } else {
         document.body.classList.remove("observatorio-ativo", "vr-ativo");
+        if (typeof esconderImagemConstelacao === "function") esconderImagemConstelacao();
         if (typeof sairSessaoVR === "function") sairSessaoVR();
     }
 
@@ -2280,6 +2281,7 @@ function tratarCliqueCanvas(e) {
         desenharObservatorio();
     } else {
         objetoSelecionado = null;
+        esconderImagemConstelacao();
         painel.innerHTML = `
             <div class="detalhe-titulo">ℹ️ Detalhes</div>
             <p style="color:#778899;font-size:0.85rem;margin-top:12px;text-align:center;line-height:1.4;">Clique num astro, estrela, constelação ou objeto de céu profundo no mapa celeste para ver os seus detalhes astronómicos.</p>
@@ -2457,15 +2459,10 @@ function mostrarDetalhesDe(item, aviso) {
     if (item.tipo === "constelacao") {
         // ── Detalhes de Constelação ──
         const curiosidade = CURIOSIDADES_CONSTELACOES[item.const_id] || "Uma constelação fascinante do céu noturno.";
-        const imagemConst = IMAGENS_CONSTELACOES[item.const_id];
-        const imagemHTML = imagemConst
-            ? `<img class="constelacao-img" src="${imagemConst}" alt="${item.nome}" onerror="this.style.display='none'">`
-            : "";
         painel.innerHTML = `
             <div class="detalhe-titulo">⭐ ${item.nome}</div>
             ${avisoHTML}
             ${blocoFavorito(item)}
-            ${imagemHTML}
             <div class="detalhe-linha"><span class="detalhe-icon">🏷️</span><span class="detalhe-label">Tipo</span><span class="detalhe-valor" style="color:#6eb8ff">CONSTELAÇÃO</span></div>
             <div class="detalhe-linha"><span class="detalhe-icon">🔤</span><span class="detalhe-label">Abreviatura</span><span class="detalhe-valor" style="font-family:monospace;color:#ce93d8">${item.const_id}</span></div>
             <div class="detalhe-linha"><span class="detalhe-icon">✨</span><span class="detalhe-label">Estrelas</span><span class="detalhe-valor" style="font-family:monospace">${item.numEstrelas}</span></div>
@@ -2474,6 +2471,8 @@ function mostrarDetalhesDe(item, aviso) {
                 <p style="color:rgba(220,227,240,0.85);font-size:0.82rem;line-height:1.5;margin:0;">${curiosidade}</p>
             </div>
         `;
+        // Mostrar imagem ao lado do canvas (painel flutuante)
+        mostrarImagemConstelacao(item.const_id, item.nome);
     } else if (item.tipo === "iss") {
         // ── Detalhes da Estação Espacial ──
         // Quem desenha o painel vai buscar a posição ao céu em
@@ -2492,6 +2491,7 @@ function mostrarDetalhesDe(item, aviso) {
             ? `${(item.dimensao / 60).toFixed(1)}°`
             : `${item.dimensao}′`;
 
+        esconderImagemConstelacao();
         painel.innerHTML = `
             <div class="detalhe-titulo">🌌 ${item.nome}</div>
             ${avisoHTML}
@@ -2521,6 +2521,11 @@ function mostrarDetalhesDe(item, aviso) {
             `;
         }
 
+        if (item.tipo === "planeta" || item.tipo === "sol" || item.tipo === "lua") {
+            mostrarImagemAstro(item);
+        } else {
+            esconderImagemConstelacao();
+        }
         const corTipo = item.tipo === "sol" ? "#ff8f00" : (item.tipo === "lua" ? "#b0bec5" : (item.tipo === "estrela" ? "#4fc3f7" : "#ffd54f"));
         const labelTipo = item.tipo.toUpperCase();
 
@@ -2536,6 +2541,133 @@ function mostrarDetalhesDe(item, aviso) {
         `;
     }
 }
+
+
+// ── Painel Flutuante de Imagem ("ao lado") ──────────────────────────────────
+// Abre a ilustração da constelação ou o retrato do planeta / Sol / Lua / ISS
+// ao lado do mapa celeste quando o utilizador clica num desses objetos.
+// Fecha automaticamente ao clicar noutro astro (ex: estrela isolada) ou espaço vazio.
+
+const IMAGENS_ASTROS_CARTOES = {
+    "sol": "/static/images/astros/sol.png",
+    "lua": "/static/images/astros/lua.png",
+    "mercurio": "/static/images/astros/mercurio.png",
+    "venus": "/static/images/astros/venus.png",
+    "marte": "/static/images/astros/marte.png",
+    "jupiter": "/static/images/astros/jupiter.png",
+    "saturno": "/static/images/astros/saturno.png",
+    "urano": "/static/images/astros/urano.png",
+    "neptuno": "/static/images/astros/neptuno.png",
+    "iss": "/static/images/astros/iss.png"
+};
+
+function normalizarIdAstro(idOuNome) {
+    if (!idOuNome) return "";
+    return idOuNome.toLowerCase()
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/\s+/g, "");
+}
+
+function mostrarImagemAstro(item) {
+    if (!item) return;
+    const painel = document.getElementById("painel-constelacao-lateral");
+    const imgElem = document.getElementById("img-constelacao-lateral");
+    const nomeElem = document.getElementById("painel-constelacao-nome");
+    const badgeElem = document.getElementById("painel-constelacao-badge");
+    if (!painel) return;
+
+    const idNorm = normalizarIdAstro(item.id || item.nome);
+    let badgeText = "✦ PLANETA DO SISTEMA SOLAR";
+    let nomeFormatado = item.nome || idNorm;
+
+    if (item.tipo === "sol" || idNorm === "sol") {
+        badgeText = "✦ ESTRELA CENTRAL • SOL";
+        nomeFormatado = "Sol";
+    } else if (item.tipo === "lua" || idNorm === "lua") {
+        badgeText = item.fase_nome ? `✦ LUA • ${item.fase_nome.toUpperCase()}` : "✦ SATÉLITE NATURAL • LUA";
+        nomeFormatado = "Lua";
+    } else if (item.tipo === "iss" || idNorm === "iss") {
+        badgeText = "✦ ESTAÇÃO ESPACIAL INTERNACIONAL";
+        nomeFormatado = "ISS";
+    } else if (item.tipo === "planeta") {
+        badgeText = "✦ PLANETA DO SISTEMA SOLAR";
+    }
+
+    if (badgeElem) badgeElem.textContent = badgeText;
+    if (nomeElem) nomeElem.textContent = nomeFormatado;
+
+    // Buscar imagem do astro nos retratos estilizados
+    const src = IMAGENS_ASTROS_CARTOES[idNorm] || `/static/images/astros/${idNorm}.png`;
+
+    if (imgElem) {
+        imgElem.src = src;
+        imgElem.alt = `Retrato de ${nomeFormatado}`;
+    }
+
+    painel.classList.remove("oculto");
+    painel.style.display = "block";
+}
+
+function mostrarImagemConstelacao(const_id, nome) {
+    const painel = document.getElementById("painel-constelacao-lateral");
+    const imgElem = document.getElementById("img-constelacao-lateral");
+    const nomeElem = document.getElementById("painel-constelacao-nome");
+    const badgeElem = document.getElementById("painel-constelacao-badge");
+    if (!painel) return;
+
+    if (badgeElem) badgeElem.textContent = "✦ CONSTELAÇÃO";
+    if (nomeElem) nomeElem.textContent = nome || const_id;
+
+    // Obter imagem mapeada
+    const src = IMAGENS_CONSTELACOES[const_id] || `/static/images/constelacoes/${const_id.toLowerCase()}.png`;
+
+    if (imgElem) {
+        imgElem.src = src;
+        imgElem.alt = `Ilustração da Constelação de ${nome || const_id}`;
+    }
+
+    painel.classList.remove("oculto");
+    painel.style.display = "block";
+}
+
+function esconderImagemConstelacao() {
+    const painel = document.getElementById("painel-constelacao-lateral");
+    if (painel) {
+        painel.classList.add("oculto");
+        painel.style.display = "none";
+    }
+    fecharModalConstelacao();
+}
+
+function abrirModalConstelacao() {
+    const imgLateral = document.getElementById("img-constelacao-lateral");
+    const nomeLateral = document.getElementById("painel-constelacao-nome");
+    const badgeLateral = document.getElementById("painel-constelacao-badge");
+    const modal = document.getElementById("modal-constelacao");
+    const modalImg = document.getElementById("modal-constelacao-img");
+    const modalNome = document.getElementById("modal-constelacao-nome");
+    const modalBadge = document.getElementById("modal-constelacao-badge");
+
+    if (!modal || !imgLateral || !imgLateral.src) return;
+
+    if (modalImg) modalImg.src = imgLateral.src;
+    if (modalNome && nomeLateral) modalNome.textContent = nomeLateral.textContent;
+    if (modalBadge && badgeLateral) modalBadge.textContent = badgeLateral.textContent;
+
+    modal.classList.remove("oculto");
+}
+
+function fecharModalConstelacao(e) {
+    const modal = document.getElementById("modal-constelacao");
+    if (modal) modal.classList.add("oculto");
+}
+
+// Fechar com a tecla ESC
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+        esconderImagemConstelacao();
+    }
+});
 
 // ── Estação Espacial Internacional (ISS) ─────────────────────────────────────
 // A ISS chega do servidor dentro de observatorioDados.astros, com tipo "iss", e
@@ -2562,6 +2694,7 @@ function astroISS() {
 function mostrarDetalhesISS() {
     objetoSelecionado = { id: "iss", tipo: "iss", nome: "ISS" };
     painelISS();
+    mostrarImagemAstro(objetoSelecionado);
     agendarDesenhoObservatorio();   // desenhar o destaque à volta da ISS
 }
 
