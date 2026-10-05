@@ -1,0 +1,965 @@
+/* ── AstroGuide — a AstroGuide AI ────────────────────────────────────────
+   O botão flutuante e o painel de conversa.
+
+   Vive num ficheiro próprio, como o conta.css, porque é uma peça que se
+   acrescenta à moldura da aplicação e não uma parte de um ecrã — o botão
+   está por cima de tudo, em qualquer dos cinco ecrãs, e não pertence a
+   nenhum deles.
+
+   Onde se põe: em baixo à ESQUERDA. As outras quatro esquinas já têm dono
+   (o menu em cima à esquerda, a conta em cima à direita, as configurações
+   em baixo à direita), e nos ecrãs da aplicação ainda há o cabeçalho e as
+   abas. A esquina de baixo à esquerda é a única livre em todos eles.
+
+   O AR: vidro escuro sobre o céu, bordas finas, cantos arredondados e um
+   halo azul-violeta tão fraco que só se nota à procura dele. Uma conversa
+   lê-se durante minutos, e por isso o que aqui manda é a legibilidade e o
+   espaço — bolhas translúcidas com ar à volta, entrelinha larga, texto
+   claro sobre fundo fechado — e não o brilho. Os tokens são os do
+   glass.css; o resto são as medidas desta peça.
+
+   UMA MENSAGEM É UMA LINHA, NÃO UMA BOLHA. A bolha é o que se lê; a linha
+   é o que se encosta a um lado, e é ela que leva o avatar ao lado. São dois
+   avatares, um por voz: a estrela da IA e a pessoa de quem pergunta. Sem
+   eles, os dois lados da conversa eram duas bolhas parecidas viradas uma
+   para cada lado, e quem abrisse o painel a meio não sabia quem tinha dito
+   o quê — que é exactamente o que eles vêm resolver. */
+
+
+/* ── O botão ─────────────────────────────────────────────────────────── */
+
+#btn-ia {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    /* Acima dos painéis do observatório, ao nível do botão de conta. */
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 18px;
+    border: 1px solid var(--glass-border);
+    border-top-color: var(--glass-border-top);
+    border-radius: 999px;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(var(--glass-blur));
+    /* O último brilho é o da estrela a sair do botão: sem ele, o botão fica
+       apagado ao lado dos outros controlos flutuantes, que têm todos um halo
+       do acento quando o rato lhes passa por cima. */
+    box-shadow:
+        0 8px 28px rgba(0, 0, 0, 0.4),
+        0 0 18px rgba(110, 184, 255, 0.1);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+#btn-ia:hover {
+    color: #fff;
+    border-color: var(--accent);
+    box-shadow:
+        0 8px 28px rgba(0, 0, 0, 0.4),
+        0 0 24px var(--accent-glow);
+}
+
+#btn-ia:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+/* A estrela do rótulo. O ✦ já é um símbolo, mas com o brilho do acento fica
+   a ser a única coisa azul num botão de texto branco — é o que faz o olho
+   ir para lá primeiro. É a mesma estrela que assina as respostas lá dentro
+   (ver o .ia-avatar). */
+#btn-ia .ia-estrela {
+    color: var(--accent);
+    font-size: 1rem;
+    line-height: 1;
+    text-shadow: 0 0 10px var(--accent-glow);
+}
+
+#btn-ia:hover .ia-estrela {
+    color: inherit;
+    text-shadow: none;
+}
+
+
+/* ── O painel ────────────────────────────────────────────────────────── */
+
+#painel-ia {
+    position: fixed;
+    /* Por cima do botão, com a folga de um dedo — o botão fica sempre
+       clicável por baixo dele, para se poder fechar no mesmo sítio onde se
+       abriu. */
+    bottom: 82px;
+    left: 24px;
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    /* 420 px na largura: espaço para uma linha de resposta sem partir
+       palavras a meio, e pouco o suficiente para não ser uma segunda página
+       ao lado da aplicação. Num ecrã estreito encolhe com ele. */
+    width: min(420px, calc(100vw - 48px));
+    /* Alto, mas nunca a tapar o céu todo: numa janela baixa encolhe, e o que
+       encolhe é a lista de mensagens, que tem scroll próprio. */
+    max-height: min(600px, calc(100vh - 140px));
+    padding: 0;
+    /* Por cima do glass-panel: um azul-noite mais fechado, para o texto ter
+       o contrário que precisa, e o halo azul-violeta do fundo — tão suave
+       que é uma impressão, não um efeito. */
+    background: rgba(9, 13, 30, 0.68);
+    border-color: rgba(140, 175, 255, 0.16);
+    border-top-color: rgba(160, 195, 255, 0.24);
+    border-radius: 20px;
+    -webkit-backdrop-filter: blur(26px);
+    backdrop-filter: blur(26px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 24px 60px rgba(0, 0, 0, 0.5),
+        0 0 44px rgba(110, 140, 255, 0.1);
+    transition: width 0.25s ease, max-height 0.25s ease;
+}
+
+/* O ⛶ do cabeçalho: quase full-screen, para as conversas que crescem. É a
+   mesma largura do ecrã de telefone, mais larga — o texto da resposta
+   agradece, e o painel continua a não ser a página inteira. */
+#painel-ia.maximizado {
+    width: min(760px, calc(100vw - 48px));
+    max-height: calc(100vh - 140px);
+}
+
+#painel-ia.aberto {
+    display: flex;
+    /* Abre a crescer a partir do canto de baixo, onde está o botão: parece
+       sair de lá em vez de aparecer já feito no sítio. É uma animação de
+       entrada — corre uma vez e acaba —, e o "menos movimento" do fim do
+       ficheiro desliga-a. */
+    transform-origin: bottom left;
+    animation: ia-abrir 0.25s ease-out;
+}
+
+@keyframes ia-abrir {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+
+/* ── Os modos imersivos: sem botão nem painel ──────────────────────── */
+/* Só o VR: lá o ecrã é todo céu, e um botão flutuante por cima dele é uma
+   coisa a mais (a mesma razão do botão de conta e da configuração). Os dois
+   seletores vão juntos porque em VR a classe "observatorio-ativo" sai do
+   body (ver mudarEcra, no index.js).
+   No Observatório 2D, ao contrário, o botão e o painel ficam — é um ecrã com
+   painéis e botões à volta, e o painel da IA é mais um deles (ver a secção
+   "No Observatório" logo abaixo, onde ele se afasta do painel lateral). */
+body.vr-ativo #btn-ia,
+body.vr-ativo #painel-ia {
+    display: none;
+}
+
+
+/* ── No Observatório, ao lado do painel lateral ──────────────────────── */
+/* No Observatório 2D o painel lateral ocupa a esquerda toda (position:
+   fixed, 310 px, de 20 px aos 330 px — ver index.css), e o botão em baixo à
+   esquerda encostava por cima dele. Por isso, neste ecrã, o botão e o painel
+   deslocam-se para a direita do painel lateral. Quando ele se recolhe (o ◀
+   do seu canto), o canto fica livre e eles voltam para lá — é o :has() que
+   diz que está recolhido; num browser que não o suporte, ficam onde estão,
+   que é sempre um sítio por onde se passa o rato.
+
+   Abaixo de 901 px não há que deslocar: o painel lateral do Observatório já
+   tapa quase o ecrã todo, e os 12 px da regra dos telemóveis é o que há. */
+@media (min-width: 901px) {
+    body.observatorio-ativo #btn-ia,
+    body.observatorio-ativo #painel-ia {
+        left: 346px;
+    }
+
+    body.observatorio-ativo:has(.observatorio-painel-lateral.recolhido) #btn-ia,
+    body.observatorio-ativo:has(.observatorio-painel-lateral.recolhido) #painel-ia {
+        left: 24px;
+    }
+}
+
+
+/* ── O cabeçalho ─────────────────────────────────────────────────────── */
+
+.ia-cabecalho {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 15px 16px 10px;
+    flex-shrink: 0;
+    /* Um véu de azul muito fraco, mais denso em cima. Dá ao título o ar de
+       estar debaixo de uma luz, sem uma linha dura a atravessar o painel —
+       o divisor entre o cabeçalho e a conversa é o da linha de estado,
+       abaixo (ver o .ia-estado::after). */
+    background: linear-gradient(180deg, rgba(110, 184, 255, 0.07), transparent);
+}
+
+.ia-titulo {
+    min-width: 0;
+    color: var(--accent);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.18rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 18px rgba(110, 184, 255, 0.35);
+}
+
+/* Os botões do cabeçalho. Redondos e discretos: são controlos secundários,
+   e o painel tem pouca largura para gastar.
+
+   São quatro, e de dois grupos diferentes — o ↺ é da conversa e os outros
+   três são do painel, uma mini-janela em regra: — para minimizar, ⛶ para
+   maximizar, ✕ para fechar. Por isso o ↺ encosta ao título (é o
+   margin-right: auto que abre o vão) e os três ficam juntos à direita, como
+   em qualquer janela. */
+.ia-btn-cabecalho {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: rgba(180, 200, 230, 0.7);
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.ia-btn-nova {
+    margin-right: auto;
+}
+
+.ia-btn-cabecalho:hover {
+    color: #fff;
+    border-color: var(--glass-border);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.ia-btn-cabecalho:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+
+/* ── A linha de estado ───────────────────────────────────────────────── */
+/* "Online • Pronto para explorar o universo", por baixo do cabeçalho. É o
+   que diz, antes de qualquer pergunta, que há alguém do outro lado.
+
+   O ponto verde é desenhado aqui e não um emoji 🟢: um emoji muda de
+   máquina para máquina — o verde do Windows, o gradiente da Apple — e esta
+   linha tem de ser a mesma em todas. */
+
+.ia-estado {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px 12px;
+    flex-shrink: 0;
+    color: rgba(165, 195, 230, 0.72);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+}
+
+.ia-estado-ponto {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #35d97e;
+    box-shadow: 0 0 8px rgba(53, 217, 126, 0.6);
+}
+
+/* O divisor entre o cabeçalho e o conteúdo: um gradiente que nasce e morre
+   nas pontas em vez de uma linha a acabar a direito contra o canto
+   arredondado — num painel de vidro, uma linha com um fim brusco lê-se como
+   um risco. */
+.ia-estado::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.14) 20%,
+            rgba(255, 255, 255, 0.14) 80%,
+            transparent);
+    pointer-events: none;
+}
+
+
+/* ── A conversa ──────────────────────────────────────────────────────── */
+
+.ia-mensagens {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    /* Bastante ar entre mensagens: um chat apertado lê-se como uma
+       transcrição, e isto é uma conversa. */
+    gap: 16px;
+    /* Por cima do ::before do glass-panel. Aquele gradiente decorativo do
+       painel é pintado por cima de tudo o que não estiver posicionado — nos
+       outros painéis dá-lhe um brilho de vidro, mas aqui passava por cima das
+       bolhas e esbatia o texto das primeiras mensagens. Levantando esta
+       camada, as bolhas ficam com a cor que lhes é devida. */
+    position: relative;
+    /* Sem isto, uma mensagem longa sem espaços (um URL, uma palavra enorme)
+       estica a bolha e com ela o painel todo. */
+    overflow-wrap: anywhere;
+    /* A barra de scroll ocupa sempre o seu espaço, mesmo quando não há nada
+       para rolar. Sem isto, a primeira resposta a chegar — que é quando a
+       barra aparece — encolhia o painel e empurrava tudo para o lado. */
+    scrollbar-gutter: stable;
+    /* Afinada e escura, com o thumb no acento: a barra do sistema, num painel
+       escuro, é uma faixa clara que corta o vidro ao meio. As duas primeiras
+       propriedades são as do Firefox, que ignora os ::-webkit-* — e o Chrome
+       faz o contrário —, daí estarem ambas. */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(122, 150, 255, 0.3) transparent;
+}
+
+.ia-mensagens::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ia-mensagens::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ia-mensagens::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(122, 150, 255, 0.3);
+}
+
+.ia-mensagens::-webkit-scrollbar-thumb:hover {
+    background: rgba(122, 150, 255, 0.5);
+}
+
+
+/* ── As linhas e as bolhas ───────────────────────────────────────────── */
+
+/* A linha: o que se encosta a um lado, e o que leva o avatar. A largura
+   máxima está aqui e não na bolha porque é a linha que não pode encher o
+   painel todo — a bolha, dentro dela, fica com a largura do que diz. */
+.ia-linha {
+    display: flex;
+    /* Alinhado em baixo, e não em cima: põe a estrela à altura do canto que
+       fica em bico na bolha (o border-bottom-left-radius, mais abaixo), que
+       é o canto que aponta para quem falou. */
+    align-items: flex-end;
+    gap: 8px;
+    max-width: 92%;
+}
+
+/* A pergunta: à direita, com o avatar do lado de fora. */
+.ia-linha.utilizador {
+    align-self: flex-end;
+    max-width: 86%;
+}
+
+/* A resposta: à esquerda. */
+.ia-linha.ia {
+    align-self: flex-start;
+}
+
+/* A falha: também à esquerda, e sem avatar nenhum. Uma falha não foi dita pelo
+   modelo, e dar-lhe a mesma cara que às respostas era fazer passar por dele
+   uma coisa que ele nunca disse. */
+.ia-linha.erro {
+    align-self: flex-start;
+}
+
+/* O avatar. São dois — a estrela da IA e a pessoa de quem pergunta —, com a
+   mesma roda e a mesma medida, porque são as duas vozes da mesma conversa.
+
+   Eles existem porque sem eles não se sabia quem tinha dito o quê. Eram duas
+   bolhas parecidas, uma à esquerda e outra à direita, e o lado era a única
+   pista: quem abrisse o painel a meio, com a conversa já a rolar, tinha de
+   seguir cada bolha até ao princípio para saber de quem era. Com uma cara de
+   cada lado, lê-se de relance. */
+.ia-avatar {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid rgba(124, 168, 255, 0.42);
+    /* Dois azuis em vez de um: a roda da IA tem o acento e um pouco de
+       violeta, que é o segundo tom do painel — o mesmo do botão de enviar. */
+    background: linear-gradient(150deg, rgba(110, 184, 255, 0.3), rgba(124, 108, 255, 0.2));
+    box-shadow: 0 0 16px rgba(110, 150, 255, 0.22);
+    color: var(--accent);
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+/* O avatar de quem pergunta: a mesma roda, e nada mais igual. O cinza não é
+   falta de ideias — o azul é a marca da AstroGuide AI em todo o painel, e um
+   segundo círculo azul do outro lado punha as duas vozes a parecer a mesma.
+   Quem fala aqui é a pessoa, e a pessoa não tem cor nenhuma nesta aplicação. */
+.ia-avatar.utilizador {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: none;
+    color: rgba(200, 215, 235, 0.62);
+}
+
+/* A silhueta da pessoa, desenhada com os dois pseudo-elementos — uma cabeça
+   redonda e os ombros — em vez de um carácter como "👤".
+
+   Um emoji traria a paleta do sistema para dentro de um painel que é todo azul
+   e vidro — o amarelo no Windows, o azul na Apple — e mudava de feitio de
+   máquina para máquina. Duas formas com border-radius não mudam em lado
+   nenhum, e ficam da cor que o .utilizador lhes der. */
+.ia-avatar.utilizador::before,
+.ia-avatar.utilizador::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    background: currentColor;
+}
+
+/* A cabeça. */
+.ia-avatar.utilizador::before {
+    top: 5px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+/* Os ombros: meia-lua com o lado de baixo a direito, que é o que faz isto ler
+   como uma pessoa e não como dois círculos soltos. */
+.ia-avatar.utilizador::after {
+    top: 13px;
+    width: 13px;
+    height: 7px;
+    border-radius: 999px 999px 0 0;
+}
+
+.ia-mensagem {
+    min-width: 0;
+    padding: 11px 15px;
+    border-radius: 16px;
+    font-size: 0.885rem;
+    /* Entrelinha larga: é texto para ler, não uma etiqueta. */
+    line-height: 1.62;
+    /* Um relevo curto por baixo: assenta a bolha no vidro em vez de a deixar
+       colada a ele. É o mesmo truque dos glass-panel, em ponto pequeno. */
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+    /* O texto vem do modelo e escreve-se como se escreve num chat: os
+       parágrafos que ele separa com linhas em branco ficam separados. */
+    white-space: pre-wrap;
+    /* Entra a aparecer, para a resposta não saltar para o ecrã de repente.
+       É uma animação de uma vez só, não um brilho em ciclo — e o
+       prefers-reduced-motion do fim do ficheiro desliga-a. */
+    animation: ia-entrar 0.25s ease-out;
+}
+
+@keyframes ia-entrar {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* O bico. O canto de baixo do lado de quem falou fica quase a direito em vez
+   de arredondado, e é isso que diz para que lado a bolha aponta sem uma seta
+   desenhada. */
+.ia-mensagem.utilizador {
+    border-bottom-right-radius: 5px;
+    /* A pergunta: mais compacta que a resposta (menos recuo e letra um
+       pouco menor) e com um fundo ligeiramente azulado — do lado direito do
+       chat vê-se que é outra voz sem se ler uma palavra sequer. */
+    padding: 8px 14px;
+    font-size: 0.86rem;
+    background: rgba(64, 104, 190, 0.3);
+    border: 1px solid rgba(110, 184, 255, 0.32);
+    color: #eaf4ff;
+}
+
+/* A resposta: um cartão escuro translúcido, com o acento azul-violeta a
+   entrar pela borda — fina, para não desenhar uma moldura à volta de cada
+   frase. */
+.ia-mensagem.ia {
+    border-bottom-left-radius: 5px;
+    background: rgba(17, 24, 48, 0.66);
+    border: 1px solid rgba(128, 168, 255, 0.16);
+    color: rgba(226, 236, 252, 0.96);
+}
+
+/* Uma falha, não uma resposta: lê-se como aviso, e não se confunde com o
+   que a IA disse. Nada do que está aqui foi dito pelo modelo. */
+.ia-mensagem.erro {
+    border-bottom-left-radius: 5px;
+    background: rgba(255, 112, 133, 0.12);
+    border: 1px solid rgba(255, 112, 133, 0.35);
+    color: #ffc2cc;
+}
+
+/* A contagem da quota diária, dentro da bolha do erro. Fica por baixo da
+   frase, separada por uma linha tracejada, para se ler como um relógio e não
+   como mais uma frase do aviso — é a única coisa da conversa que muda sozinha.
+   Os algarismos tabulares são para o número não dançar a cada bateria. */
+.ia-contagem {
+    display: block;
+    margin-top: 9px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(255, 112, 133, 0.35);
+    color: #ffb9c3;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A IA a pensar. Veste as mesmas roupas das respostas — estrela e bolha —
+   porque o que está a acontecer é uma resposta a chegar: se o "a pensar"
+   aparecesse noutro sítio, a resposta final parecia mudar de lugar. */
+#ia-a-pensar .ia-mensagem {
+    display: flex;
+    align-items: center;
+}
+
+
+/* ── O indicador de resposta a chegar ────────────────────────────────── */
+/* Três pontos que se acendem por turnos, e nada mais. Substituem a roda que
+   havia — que era do index.css, um ficheiro que só a aplicação carrega e que
+   deixava um quadrado invisível nas outras páginas —, e ficam sozinhos na
+   bolha: pontos em movimento já dizem "algo está a chegar", com um texto
+   ao lado só diriam a mesma coisa duas vezes.
+
+   O que anunciam fica numa classe que só os leitores de ecrã leem (ver o
+   .ia-sr): eles não veem pontos a mexer-se. */
+
+.ia-pontos {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 0;
+}
+
+.ia-pontos span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: ia-ponto 1.2s ease-in-out infinite;
+}
+
+.ia-pontos span:nth-child(2) {
+    animation-delay: 0.18s;
+}
+
+.ia-pontos span:nth-child(3) {
+    animation-delay: 0.36s;
+}
+
+@keyframes ia-ponto {
+
+    0%,
+    60%,
+    100% {
+        opacity: 0.35;
+        transform: none;
+    }
+
+    30% {
+        opacity: 1;
+        transform: translateY(-3px);
+    }
+}
+
+/* Só para os leitores de ecrã: presente no layout, invisível à vista. O
+   clip é o padrão de sempre — sem ele, um span vazio de 1 px podia ganhar
+   scroll a mais em cima. */
+.ia-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+
+/* ── O estado vazio ──────────────────────────────────────────────────── */
+
+/* Sem conversa, o painel não pode ser um cursor a piscar à espera. Fica a
+   apresentação — a saudação pelo nome de quem chegou, o que a IA faz e, mais
+   importante, o que não faz — e por baixo quatro perguntas para começar.
+
+   Os atalhos não são decoração: são a única coisa no painel que diz o que
+   se lhe pode pedir. Sem eles, quem abre isto pela primeira vez escreve
+   "olá", recebe um "olá" de volta, e não descobre nem metade do que ali
+   está. E, sendo a regra da casa que a IA não calcula nada, uma pergunta
+   de partida é a maneira mais rápida de mostrar o que ela faz bem. */
+.ia-boas-vindas {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    /* Centrado no espaço que sobra, em vez de encostado ao cabeçalho: é uma
+       apresentação, e o meio do painel é onde ela se lê. Com uma janela
+       baixa, o espaço livre desaparece e o "auto" com ele — e o conteúdo
+       rola, em vez de ser cortado. */
+    margin: auto 0;
+}
+
+.ia-boas-vindas .ia-linha {
+    max-width: 100%;
+}
+
+.ia-sugestoes {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    /* Encostado ao texto das respostas, e não à estrela: é com o que a IA
+       diz que estas perguntas se alinham. */
+    padding-left: 34px;
+}
+
+/* Os atalhos de partida são cards horizontais: ícone à esquerda, a pergunta
+   ao meio, a seta à direita. A seta não informa de nada — ela é a promessa
+   de que tocar aqui segue para algum lado —, e o ícone põe cada pergunta a
+   distinguir-se das vizinhas antes de se ler o texto. */
+.ia-sugestao {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.045);
+    color: rgba(214, 228, 248, 0.9);
+    font-family: inherit;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.ia-sugestao:hover {
+    color: #fff;
+    border-color: rgba(110, 184, 255, 0.5);
+    background: rgba(110, 184, 255, 0.1);
+}
+
+.ia-sugestao:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.ia-sugestao-icone {
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+.ia-sugestao-texto {
+    flex: 1;
+    min-width: 0;
+}
+
+/* A seta. Com o rato por cima, acompanha o hover do card com um passo para
+   a direita — o movimento mínimo que diz "isto vai". */
+.ia-sugestao-seta {
+    flex-shrink: 0;
+    color: rgba(160, 190, 225, 0.55);
+    font-size: 1.05rem;
+    line-height: 1;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.ia-sugestao:hover .ia-sugestao-seta {
+    color: var(--accent);
+    transform: translateX(3px);
+}
+
+/* O aviso de que não há IA configurada neste servidor. Ocupa a largura toda
+   e centra-se: não é uma mensagem da conversa, é um estado do painel. */
+.ia-aviso {
+    margin: auto;
+    padding: 20px;
+    color: rgba(180, 200, 230, 0.75);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    text-align: center;
+    white-space: pre-wrap;
+}
+
+/* A porta de saída do aviso: quando falta é a conta e não a chave, o aviso
+   remete para /entrar — e remeter num texto que não se pode clicar é mandar
+   a pessoa procurar sozinha a barra de endereço. É um <a> e não um botão,
+   pelo mesmo motivo do #btn-conta (ver conta.css): funciona antes de o
+   JavaScript responder e com o teclado. */
+.ia-aviso-accao {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 9px 18px;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ia-aviso-accao:hover {
+    color: #fff;
+    box-shadow: 0 0 18px var(--accent-glow);
+}
+
+.ia-aviso-accao:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+
+/* ── Escrever ────────────────────────────────────────────────────────── */
+
+.ia-formulario {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 12px 14px 6px;
+    flex-shrink: 0;
+}
+
+.ia-formulario::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.14) 20%,
+            rgba(255, 255, 255, 0.14) 80%,
+            transparent);
+    pointer-events: none;
+}
+
+#ia-entrada {
+    flex: 1;
+    min-width: 0;
+    /* Grande o suficiente para a pergunta caber à vontade, e com o canto bem
+       arredondado — é a caixa de escrita de uma conversa, não um campo de
+       formulário. Duas linhas chegam para o tamanho das perguntas que aqui
+       se fazem; o resto rola por dentro. */
+    min-height: 44px;
+    max-height: 96px;
+    padding: 11px 15px;
+    border: 1px solid rgba(140, 175, 255, 0.18);
+    border-radius: 16px;
+    background: rgba(10, 16, 36, 0.6);
+    /* Um sulco por dentro: a caixa de escrita não é uma bolha da conversa,
+       é um sítio onde se escreve — e um sulco diz isso melhor do que uma
+       cor mais escura sozinha. */
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+    color: #eaf4ff;
+    font-family: inherit;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    resize: none;
+    overflow-y: auto;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#ia-entrada::placeholder {
+    color: rgba(180, 200, 230, 0.4);
+}
+
+/* O foco acende a caixa sem a transformar: borda no acento, um anel macio
+   e o mesmo halo azul-violeta do painel. */
+#ia-entrada:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow:
+        inset 0 1px 3px rgba(0, 0, 0, 0.25),
+        0 0 0 3px rgba(110, 184, 255, 0.14),
+        0 0 20px rgba(110, 140, 255, 0.18);
+}
+
+#ia-entrada:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* O enviar: um círculo com o acento a virar violeta, à direita da caixa.
+   É o único elemento do painel com cor cheia — por isso é para lá que o olho
+   vai quando a pergunta está pronta. */
+#ia-enviar {
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 50%;
+    background: linear-gradient(140deg, #6eb8ff, #7b6cff);
+    box-shadow: 0 6px 18px rgba(90, 120, 255, 0.32);
+    color: #fff;
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+/* O hover e o foco dão-lhe o glow — suave, e só aqui e na caixa de escrita:
+   são os dois controlos onde a conversa acontece. */
+#ia-enviar:hover:not(:disabled) {
+    filter: brightness(1.08);
+    box-shadow:
+        0 6px 22px rgba(90, 120, 255, 0.42),
+        0 0 22px rgba(110, 150, 255, 0.35);
+}
+
+#ia-enviar:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+#ia-enviar:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+
+/* ── O rodapé ────────────────────────────────────────────────────────── */
+/* A nota de baixo, pequena e ao centro: as respostas saem dos dados reais
+   do AstroGuide e não de memória. Diz-se uma vez, discretamente, como se diz
+   a fonte de uma citação — não é um rodapé de publicidade. */
+
+.ia-rodape {
+    flex-shrink: 0;
+    padding: 2px 16px 12px;
+    color: rgba(160, 190, 225, 0.5);
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    text-align: center;
+}
+
+
+/* ── Ecrãs estreitos ─────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+
+    /* O painel ocupa a largura toda, com uma margem de dedo de cada lado, e
+       sobe até quase ao topo: num telefone um painel de 420px encostado à
+       esquerda deixava uma tira de céu inútil à direita, e uma conversa
+       precisa de altura mais do que de outra coisa. O que encolhe é a lista
+       de mensagens, com o seu scroll — o cabeçalho e a caixa de escrita
+       ficam sempre à vista. */
+    #painel-ia {
+        left: 10px;
+        right: 10px;
+        width: auto;
+        max-height: calc(100vh - 110px);
+    }
+
+    /* No telefone o painel já é quase full-screen: o ⛶ não tem o que
+       aumentar, e a classe dele não pode travar o width:auto de cima — a
+       regra .maximizado tem mais especificidade e ganhava a esta. */
+    #painel-ia.maximizado {
+        width: auto;
+        max-height: calc(100vh - 110px);
+    }
+
+    /* O botão encolhe para o rótulo: "✦ AstroGuide AI" num telefone tapa
+       meia barra de navegação, e a estrela sozinha já se identifica. */
+    #btn-ia {
+        bottom: 16px;
+        left: 16px;
+        padding: 10px 14px;
+        font-size: 0.8rem;
+    }
+
+    /* Num telefone a bolha pode ir quase de ponta a ponta: os 8% que sobram
+       de margem são uma faixa de vidro a menos e uma linha de texto a mais. */
+    .ia-linha {
+        max-width: 96%;
+    }
+
+    .ia-linha.utilizador {
+        max-width: 90%;
+    }
+}
+
+
+/* ── Menos movimento ─────────────────────────────────────────────────── */
+/* As animações daqui são todas de entrada — a mensagem a aparecer, o painel
+   a abrir —, e são decorativas: sem elas tudo funciona igual e tudo aparece
+   no sítio. Quem tem o sistema configurado para menos movimento recebe as
+   mensagens já colocadas e o painel já aberto.
+
+   Os três pontos do "a pensar" NÃO desaparecem, de propósito: não são
+   movimento decorativo, são a indicação de que algo está a acontecer, e um
+   indicador parado parece um ecrã bloqueado. O que se lhes tira é o SALTO —
+   o mesmo truque do glass.css com as estrelas —, e fica o esbatimento. */
+@media (prefers-reduced-motion: reduce) {
+
+    .ia-mensagem {
+        animation: none;
+    }
+
+    #painel-ia.aberto {
+        animation: none;
+    }
+
+    #painel-ia {
+        transition: none;
+    }
+
+    .ia-pontos span {
+        animation-name: ia-ponto-calmo;
+    }
+
+    @keyframes ia-ponto-calmo {
+
+        0%,
+        60%,
+        100% {
+            opacity: 0.3;
+        }
+
+        30% {
+            opacity: 1;
+        }
+    }
+}

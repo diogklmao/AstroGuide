@@ -21,6 +21,7 @@
          alteração feita num dos lados. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/menu.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ia.css') }}">
 </head>
 
 <body class="page-menu page-admin" data-bg-theme="menu">
@@ -128,8 +129,73 @@
         {% endif %}
     </div>
 
+    <!-- ── AstroGuide AI ────────────────────────────────────────────────
+         O mesmo botão e o mesmo painel das outras páginas do AstroGuide: a
+         IA é peça da moldura e não de uma página. Fica no fim do body, e é o
+         ia.css que lhe dá o canto de baixo à esquerda — o único que o botão
+         de voltar (em cima à esquerda) deixam livre, nesta página que não tem
+         o botão de conta.
+
+         Sem sessão iniciada o /api/ia/estado responde "sem_conta", e o painel
+         abre a dizer-o com a porta de saída para o /entrar. A chave da IA não
+         está aqui, nem em nenhum sítio que o browser veja: este painel fala
+         com o /api/ia/chat do próprio AstroGuide, e é o servidor que fala com
+         o serviço de IA (ver o py/ia/ai_engine.py). -->
+    <button id="btn-ia" type="button" onclick="toggleIA()" aria-label="AstroGuide AI"
+        aria-controls="painel-ia" aria-expanded="false" title="Falar com a AstroGuide AI">
+        <span class="ia-estrela" aria-hidden="true">✦</span> AstroGuide AI
+    </button>
+
+    <!-- role="region" e não "dialog": este painel não bloqueia a página —
+         a tabela continua por baixo dele —, e um diálogo prometia ao leitor
+         de ecrã uma modalidade que não existe. -->
+    <div id="painel-ia" class="glass-panel" role="region" aria-label="AstroGuide AI">
+        <div class="ia-cabecalho">
+            <div class="ia-titulo">✦ AstroGuide AI</div>
+            <button type="button" class="ia-btn-cabecalho ia-btn-nova" onclick="novaConversaIA()"
+                title="Começar uma conversa nova" aria-label="Começar uma conversa nova">↺</button>
+            <button type="button" class="ia-btn-cabecalho" onclick="fecharIA()" title="Minimizar"
+                aria-label="Minimizar o painel da AstroGuide AI">—</button>
+            <button type="button" class="ia-btn-cabecalho ia-btn-maximizar" onclick="maximizarIA()"
+                title="Maximizar" aria-label="Maximizar o painel da AstroGuide AI"
+                aria-pressed="false">⛶</button>
+            <button type="button" class="ia-btn-cabecalho" onclick="fecharIA()" title="Fechar"
+                aria-label="Fechar o painel da AstroGuide AI">✕</button>
+        </div>
+
+        <!-- O estado do assistente, por baixo do cabeçalho: a linha verde que
+             diz que a AstroGuide AI está online. O ponto é desenhado em CSS
+             (ver o .ia-estado-ponto no ia.css) e não um emoji — um emoji muda
+             de máquina para máquina, e esta linha tem de ser a mesma em
+             todas. O divisor subtil fica em baixo dela, entre o cabeçalho e a
+             conversa. -->
+        <div class="ia-estado"><span class="ia-estado-ponto" aria-hidden="true"></span>Online
+            • Pronto para explorar o universo</div>
+
+        <!-- O aria-live faz com que a resposta seja lida em voz alta a quem
+             usa um leitor de ecrã — sem isto, a resposta aparecia em silêncio
+             e a pessoa não sabia que já tinha chegado. -->
+        <div id="ia-mensagens" class="ia-mensagens" aria-live="polite"></div>
+
+        <!-- Um <form> para o Enter funcionar sem depender do JavaScript, e o
+             onsubmit a travar o envio normal: quem trata disto é o
+             enviarMensagemIA, que não recarrega a página. -->
+        <form class="ia-formulario" onsubmit="event.preventDefault(); enviarMensagemIA();">
+            <textarea id="ia-entrada" rows="1" autocomplete="off"
+                placeholder="Pergunta sobre o universo..."
+                aria-label="Escrever uma pergunta para a AstroGuide AI"></textarea>
+            <button type="submit" id="ia-enviar" title="Enviar" aria-label="Enviar a pergunta">➤</button>
+        </form>
+
+        <!-- O rodapé, discreto: as respostas saem dos dados reais do
+             AstroGuide e não de memória — é o que distingue este assistente
+             de um que responde "de cor". -->
+        <div class="ia-rodape">ⓘ A IA utiliza os dados reais do AstroGuide</div>
+    </div>
+
     <script src="/static/js/shared-ui-controls.js"></script>
     <script src="/static/js/admin.js"></script>
+    <script src="/static/js/ia.js"></script>
 </body>
 
 </html>

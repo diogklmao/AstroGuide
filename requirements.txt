@@ -15,3 +15,9 @@ tzdata==2025.2
 
 # Pedidos HTTP – usado para ir buscar a Imagem Astronómica do Dia (APOD) à NASA
 requests==2.32.3
+
+# AstroGuide AI – o SDK do Google Gemini, usado pelo py/ia/ai_engine.py
+# É o único pacote do projeto que serve uma funcionalidade opcional: sem a
+# chave configurada a aplicação corre igual, só o painel da IA fica a dizer
+# que não está disponível.
+google-genai==2.28.0

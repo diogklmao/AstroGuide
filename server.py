@@ -26,6 +26,7 @@ from flask import request                                          # para ler qu
 from py.database.db import criar_esquema, fechar_ligacao           # base de dados (contas, favoritos, observações)
 from py.database.auth import auth_bp, localizacao_do_utilizador    # rotas de conta e localização pessoal
 from py.database.admin import admin_bp                             # página de administração (/admin)
+from py.ia.rotas import ia_bp                                      # AstroGuide AI (/api/ia/estado, /api/ia/chat)
 
 app = Flask(__name__)                               # cria a aplicação Flask
                                                     # __name__ diz ao Flask onde está a pasta do projeto
@@ -77,6 +78,7 @@ criar_esquema()                                     # cria as tabelas que ainda 
 
 app.register_blueprint(auth_bp)                     # junta as rotas de conta (/entrar, /api/entrar, ...)
 app.register_blueprint(admin_bp)                    # junta a página de administração (/admin)
+app.register_blueprint(ia_bp)                       # junta a AstroGuide AI (a chave da IA nunca sai daqui)
 
 @app.teardown_appcontext
 def _fechar_bd(excecao=None):

@@ -57,5 +57,12 @@ desktop.ini
 # o repositório — é gerada automaticamente na primeira execução.
 .secret_key
 
+# Chave da AstroGuide AI (ver _chave em py/ia/ai_engine.py).
+# É uma chave paga ao pedido: quem a tiver gasta o dinheiro de quem a criou,
+# e uma chave publicada num repositório é encontrada por robôs em minutos.
+# Pode estar neste ficheiro ou na variável de ambiente GEMINI_API_KEY — em
+# qualquer dos casos, nunca no Git.
+.ai_key
+
 # ── Claude ───────────────────────────────────────────────
 .claude/
