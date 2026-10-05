@@ -38,10 +38,13 @@
     align-items: center;
     gap: 8px;
     padding: 11px 18px;
-    border: 1px solid var(--glass-border);
+    /* Borda fina fria e o vidro com um toque de violeta: é o botão do
+       painel da AstroGuide AI, e o painel tem o mesmo halo azul-violeta. */
+    border: 1px solid rgba(140, 175, 255, 0.22);
     border-top-color: var(--glass-border-top);
     border-radius: 999px;
-    background: var(--glass-bg);
+    background: linear-gradient(160deg, rgba(110, 184, 255, 0.12), rgba(124, 108, 255, 0.09)),
+        var(--glass-bg);
     -webkit-backdrop-filter: blur(var(--glass-blur));
     backdrop-filter: blur(var(--glass-blur));
     /* O último brilho é o da estrela a sair do botão: sem ele, o botão fica
@@ -50,7 +53,9 @@
     box-shadow:
         0 8px 28px rgba(0, 0, 0, 0.4),
         0 0 18px rgba(110, 184, 255, 0.1);
-    color: var(--accent);
+    /* Rótulo claro e estrela azul, como na referência: o texto é que se lê,
+       e o acento fica só no símbolo. */
+    color: rgba(235, 242, 252, 0.95);
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 600;
@@ -84,8 +89,10 @@
 }
 
 #btn-ia:hover .ia-estrela {
-    color: inherit;
-    text-shadow: none;
+    /* A estrela não desbota no hover: é ela que assina o botão, e o branco
+       é do texto. */
+    color: var(--accent);
+    text-shadow: 0 0 12px var(--accent-glow);
 }
 
 

@@ -1,4 +1,4 @@
-/* ── Menu — foto do buraco negro + os cards por cima ─────────────── */
+/* ── Menu — os anéis de Saturno + os cards por cima ──────────────── */
 body.page-menu {
     overflow: hidden;
     display: flex;
@@ -26,22 +26,40 @@ body.page-menu {
     min-height: 100%;
     object-fit: cover;
     transform: translate(-50%, -50%);
-    filter: blur(3px) saturate(2);
+    filter: blur(1.5px) saturate(1.4);
 }
 
-/* Escurece ligeiramente para os cards glass destacarem mais */
+/* O tratamento da luz. Três coisas ao mesmo tempo, e todas subtis: o centro
+   escuro, para o título e os cards lerem sem esforço; os anéis escurecidos o
+   suficiente para não competirem com eles; e uma tonalidade azul-violeta a
+   cair sobre os anéis, para o fundo falar a mesma língua do painel da
+   AstroGuide AI. */
 .page-menu .bg-foto::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(4, 6, 20, 0.35);
+    background:
+        radial-gradient(ellipse 85% 75% at 50% 40%, rgba(4, 7, 22, 0.52) 0%, rgba(4, 7, 22, 0.3) 55%, rgba(4, 7, 22, 0.1) 100%),
+        radial-gradient(ellipse 55% 45% at 12% 90%, rgba(90, 100, 220, 0.16), transparent 70%),
+        rgba(4, 6, 20, 0.2);
     pointer-events: none;
 }
 
-/* Vinheta mais leve no menu para a foto respirar */
+/* Vinheta mais leve no menu para a foto respirar. Em cima dela, a nebulosa:
+   dois véus de cor tão ténues que se leem como profundidade e não como cor,
+   um no canto de cima à direita e outro no de baixo à esquerda — as
+   extremidades, que é onde a foto está mais negra. O centro fica escuro e
+   sem cor nenhuma: é ali que vive o texto. */
 .page-menu .bg-vignette {
     z-index: 1;
     background:
+        /* A nebulosa da referência, em dois véus sobrepostos — um roxo no
+           canto de cima à direita e outro mais violeta a descer pela margem.
+           São duas em vez de uma porque é a sobreposição que dá a forma de
+           nuvem; um véu só lê-se como mancha. */
+        radial-gradient(ellipse 45% 38% at 94% 8%, rgba(112, 78, 208, 0.16), transparent 65%),
+        radial-gradient(ellipse 34% 46% at 99% 30%, rgba(138, 84, 196, 0.12), transparent 68%),
+        radial-gradient(ellipse 50% 42% at 5% 94%, rgba(64, 96, 200, 0.1), transparent 62%),
         radial-gradient(ellipse 85% 70% at 50% 45%, transparent 0%, rgba(3, 5, 18, 0.35) 65%, rgba(2, 3, 12, 0.75) 100%),
         linear-gradient(180deg, rgba(8, 12, 40, 0.08) 0%, transparent 40%, rgba(2, 4, 16, 0.35) 100%);
 }
@@ -60,56 +78,186 @@ body.page-menu {
 
 
 /* ── Título principal da aplicação ───────────────────────────────── */
+/* A hierarquia da página é logo → localização → cards, e são os vãos que
+   a dizem: pouco ar entre o título e a localização (são uma só coisa, o
+   "onde"), e mais ar antes dos cards (aí muda-se de assunto). */
 .titulo {
     text-align: center;
-    margin-bottom: 60px;
+    /* ~25px na janela de 1500 (o vão da referência), a crescer com ela. */
+    margin-bottom: clamp(24px, 1.7vw, 40px);
 }
 
-/* Título — glass definido em glass.css (.glass-panel) */
+/* Título — glass definido em glass.css (.glass-panel).
+   Sem as animações em ciclo que havia (o cartão a flutuar e o brilho da
+   borda a acender-se e apagar-se): eram movimento constante, e esta página
+   pede que nada se mexa sozinho. O que fica é o brilho parado — borda fina
+   azulada e um halo suave por fora —, para o cartão parecer vidro
+   iluminado e não um retângulo a fazer festa. */
 .frosted-card {
     display: inline-block;
-    padding: 1.5rem 2.5rem;
+    /* As medidas da referência, EM ESCALA: o cartão é ~35% da largura da
+       janela em qualquer tamanho — 525px na janela de 1500 da foto, 675 numa
+       de 1920. O recuo interno acompanha: 56/24 é o da foto no mínimo. */
+    padding: clamp(24px, 1.6vw, 34px) clamp(56px, 3.73vw, 96px);
     border-radius: 22px;
-    animation: floatSoft 6s ease-in-out infinite, borderGlow 4s ease-in-out infinite;
+    /* Vidro mais fechado que o do resto da moldura (0.66 e não 0.52): na
+       referência o cartão lê-se como vidro escuro, e não como um véu. */
+    background: rgba(9, 13, 30, 0.66);
+    border-color: rgba(150, 185, 255, 0.24);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 20px 45px rgba(0, 0, 0, 0.45),
+        0 0 30px rgba(110, 140, 255, 0.08);
 }
 
 /* Título principal dentro do cartão */
 .frosted-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(3.5rem, 8vw, 6rem);
+    /* O título da referência: ~70px na janela de 1500 (4.67vw), ~90 numa
+       de 1920, até 118 numa de 2560 — é ele que dá a largura ao cartão
+       inteiro, e por isso a foto fica igual em qualquer ecrã. */
+    font-size: clamp(3.6rem, 4.67vw, 7.4rem);
     font-weight: 300;
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(255, 255, 255, 0.95);
     letter-spacing: 0.15em;
     text-shadow:
         0 1px 0 rgba(255, 255, 255, 0.3),
         0 0 20px rgba(160, 210, 255, 0.6);
     line-height: 1;
-    margin-bottom: 0.3em;
+    /* O vão para o divisor do subtítulo, que é o que os separa. */
+    margin-bottom: 0.12em;
 }
 
-/* Subtítulo decorativo */
+/* Subtítulo decorativo. Por cima dele, o divisor: uma linha fina que nasce
+   e morre nas pontas, atravessada ao meio por um losango — a mesma estrela
+   de quatro pontas que assina o botão da AstroGuide AI, em ponto pequeno.
+   É o que amarra o nome ao que ele é, e cabe tudo em dois pseudo-elementos:
+   mais um elemento no HTML para um traço seria caro. */
 .frosted-sub {
+    position: relative;
+    padding-top: clamp(18px, 1.2vw, 26px);
     font-family: 'Raleway', sans-serif;
-    font-size: 0.65rem;
+    font-size: clamp(0.7rem, 0.75vw, 1.05rem);
     font-weight: 300;
     letter-spacing: 0.5em;
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.5);
     text-transform: uppercase;
 }
 
-/* Label com a localização do utilizador */
+/* O divisor: uma linha com um vão ao meio, onde assenta o símbolo. O vão
+   faz-se com o gradiente (transparente a meio) e não com mais um elemento —
+   é a linha que abre a porta ao ✦, e não dois traços soltos. */
+.frosted-sub::before {
+    content: "";
+    position: absolute;
+    top: clamp(6px, 0.4vw, 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: clamp(150px, 10vw, 256px);
+    height: 1px;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(140, 180, 255, 0.45) 30%,
+            rgba(140, 180, 255, 0.45) 42%,
+            transparent 42%,
+            transparent 58%,
+            rgba(140, 180, 255, 0.45) 58%,
+            rgba(140, 180, 255, 0.45) 70%,
+            transparent);
+}
+
+/* O pequeno símbolo central: a mesma estrela ✦ da identidade, em azul do
+   acento e com brilho — a mesma que assina o botão da AstroGuide AI. */
+.frosted-sub::after {
+    content: "✦";
+    position: absolute;
+    top: clamp(1px, 0.07vw, 3px);
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--accent);
+    font-size: clamp(10px, 0.67vw, 17px);
+    line-height: 1;
+    text-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* A localização do utilizador, em pill: vidro escuro, borda fina, o pino da
+   localização em azul do acento e o nome ao lado. É o elemento do meio da
+   hierarquia — abaixo do logo, acima dos cards — e por isso é pequeno e
+   centralizado: chama-se a atenção por estar sozinho, não por ser grande. */
 #lbl-localizacao {
-    color: rgba(200, 220, 255, 0.55);
-    letter-spacing: 1px;
-    margin-top: 0;
-    margin-bottom: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(88vw, 420px);
+    padding: 8px 16px;
+    /* ~22px na janela da referência: ali o pill está perto dos cards. */
+    margin-bottom: clamp(22px, 1.5vw, 36px);
+    border: 1px solid rgba(140, 175, 255, 0.2);
+    border-radius: 999px;
+    background: rgba(10, 16, 36, 0.55);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    color: rgba(222, 234, 252, 0.88);
+    font-size: 0.82rem;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.25s ease, border-color 0.25s ease,
+        background 0.25s ease, box-shadow 0.25s ease;
     animation: entrar 0.7s 0.2s ease backwards;
 }
 
+#lbl-localizacao:hover {
+    color: #fff;
+    border-color: rgba(110, 184, 255, 0.5);
+    background: rgba(110, 184, 255, 0.12);
+    box-shadow: 0 0 18px rgba(110, 150, 255, 0.18);
+}
+
+#lbl-localizacao:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+/* O pino. Azul do acento, e não o emoji 📍: um emoji muda de máquina para
+   máquina e traz a paleta do sistema para dentro de um pill que é todo azul
+   e vidro. */
+.localizacao-icone {
+    flex-shrink: 0;
+    color: var(--accent);
+}
+
+/* O nome da terra. Corta com reticências em vez de esticar o pill: uma
+   localização comprida não pode empurrar a página toda para a direita. */
+.localizacao-nome {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A seta — um chevron feito de duas bordas, como o do botão de conta. Diz
+   que tocar aqui segue para algum lado (o perfil, onde se muda a
+   localização) sem gastar um carácter de fonte, que mudava de máquina para
+   máquina. */
+.localizacao-seta {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    margin-left: 2px;
+    border-right: 1.5px solid rgba(180, 205, 240, 0.7);
+    border-bottom: 1.5px solid rgba(180, 205, 240, 0.7);
+    transform: translateY(-2px) rotate(45deg);
+}
+
 /* ── Grelha de cards de navegação ────────────────────────────────── */
+/* As medidas da referência, EM ESCALA: cada card ocupa ~16,4% da largura da
+   janela e cada vão ~1,1% — na janela de 1500 da foto isso dá 247×337 com
+   vãos de 17px; numa de 1920, 315×428. Os quatro são iguais entre si, e o
+   formato da foto mantém-se em qualquer largura. */
 .cards {
     display: flex;
-    gap: 28px;
+    /* ~17px na janela de 1500, a crescer com ela. */
+    gap: clamp(16px, 1.13vw, 26px);
     justify-content: center;
     align-items: center;
     flex-wrap: wrap;
@@ -117,24 +265,35 @@ body.page-menu {
 
 /* Card de navegação — moldura glass + imagem interior */
 .card.glass-card {
-    width: 280px;
-    height: 480px;
-    border-radius: 22px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(8, 12, 28, 0.35);
+    width: clamp(260px, 16.4vw, 440px);
+    /* A altura vem da proporção da foto (247:337 ≈ 25:34) e não de um
+       número fechado: é isso que mantém o formato da referência em qualquer
+       largura de janela. O max-height é rede de segurança para janelas
+       baixas — esta página não tem scroll, e cortava os cards: só prende em
+       janelas com menos de ~860px de altura. */
+    height: auto;
+    aspect-ratio: 25 / 34;
+    max-height: calc(100vh - 400px);
+    /* O arredondado da referência: 16px na janela de 1500, a crescer. */
+    border-radius: clamp(16px, 1.07vw, 27px);
+    /* Borda fina e fria, mais azul que branca: é o mesmo vidro do painel da
+       AstroGuide AI, e uma borda branca a toda a volta pesava mais do que o
+       que está lá dentro. */
+    border: 1px solid rgba(155, 185, 255, 0.18);
+    background: rgba(9, 13, 30, 0.4);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     cursor: pointer;
     position: relative;
     overflow: hidden;
     text-decoration: none;
-    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-        box-shadow 0.45s ease,
-        border-color 0.35s ease;
+    transition: transform 0.35s ease,
+        box-shadow 0.35s ease,
+        border-color 0.3s ease;
     animation: entrar 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.1),
-        0 16px 48px rgba(0, 0, 0, 0.45);
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 14px 40px rgba(0, 0, 0, 0.42);
 }
 
 .card:nth-child(1) {
@@ -165,37 +324,42 @@ body.page-menu {
     }
 }
 
+/* O hover: sobe 4 px e a borda aparece um pouco mais. Só isso — o card é a
+   janela para uma fotografia, e um card a saltar 14 px e a crescer 3%
+   tapava-lhe a fotografia. */
 .card.glass-card:hover {
-    transform: translateY(-14px) scale(1.03);
-    border-color: rgba(255, 255, 255, 0.28);
+    transform: translateY(-4px);
+    border-color: rgba(160, 190, 255, 0.32);
 }
 
+/* O halo da cor de cada card no hover. Metade do que era: a cor continua a
+   dizer qual é qual, mas sem desenhar um retângulo luminoso no ecrã. */
 .card-ceu:hover {
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.15),
-        0 24px 56px rgba(0, 0, 0, 0.5),
-        0 0 40px rgba(255, 100, 120, 0.2);
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 18px 44px rgba(0, 0, 0, 0.5),
+        0 0 28px rgba(255, 100, 120, 0.14);
 }
 
 .card-calendario:hover {
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.15),
-        0 24px 56px rgba(0, 0, 0, 0.5),
-        0 0 40px rgba(180, 120, 255, 0.25);
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 18px 44px rgba(0, 0, 0, 0.5),
+        0 0 28px rgba(180, 120, 255, 0.16);
 }
 
 .card-observatorio:hover {
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.15),
-        0 24px 56px rgba(0, 0, 0, 0.5),
-        0 0 40px rgba(80, 120, 255, 0.3);
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 18px 44px rgba(0, 0, 0, 0.5),
+        0 0 28px rgba(80, 120, 255, 0.18);
 }
 
 .card-apod:hover {
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.15),
-        0 24px 56px rgba(0, 0, 0, 0.5),
-        0 0 40px rgba(255, 153, 85, 0.28);
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 18px 44px rgba(0, 0, 0, 0.5),
+        0 0 28px rgba(255, 153, 85, 0.16);
 }
 
 /* ── Barra colorida no topo de cada card ─────────────────────────── */
@@ -206,14 +370,14 @@ body.page-menu {
     top: 0;
     left: 0;
     width: 100%;
-    height: 3px;
+    height: 2px;
     z-index: 10;
     transition: height 0.3s ease;
 }
 
 /* A barra fica mais alta ao hover */
 .card:hover::before {
-    height: 5px;
+    height: 3px;
 }
 
 /* Cor da barra por tipo de card */
@@ -252,7 +416,9 @@ body.page-menu {
     bottom: 0;
     left: 0;
     width: 100%;
-    padding: 20px;
+    /* O recuo da referência — o ícone alinha a ~20px da borda esquerda e o
+       último texto deixa ~16px até ao fundo —, a crescer com o card. */
+    padding: clamp(18px, 1.2vw, 27px) clamp(18px, 1.2vw, 27px) clamp(16px, 1.07vw, 27px);
     z-index: 3;
     /* fica por cima do overlay e do canvas */
 }
@@ -262,14 +428,16 @@ body.page-menu {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    /* 48px é o da foto na janela de 1500; cresce com o card até 58px — mais
+       que isso e o desenho de 36 píxeis lá dentro começa a notar-se. */
+    width: clamp(48px, 3.2vw, 58px);
+    height: clamp(48px, 3.2vw, 58px);
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(12, 18, 38, 0.55);
+    border: 1px solid rgba(165, 200, 255, 0.35);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    margin-bottom: 10px;
+    margin-bottom: clamp(10px, 0.7vw, 15px);
     box-shadow: 0 0 20px rgba(140, 180, 255, 0.2);
     transition: box-shadow 0.35s ease, transform 0.35s ease;
 }
@@ -280,16 +448,36 @@ body.page-menu {
 }
 
 .card-titulo {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 6px;
+    /* A mesma serif do título grande — o card deixa de ser um rótulo de
+       interface a passar por fotografia e passa a ser um letreiro da casa.
+       O Cormorant tem caixa-alta e caixa-baixa miúdas, e por isso pede mais
+       corpo do que o Segoe UI: é isto que dá o ~24px de agora. */
+    font-family: 'Cormorant Garamond', serif;
+    /* 1.4vw é o máximo em que o título mais comprido ("NASA - Imagem do
+       Dia") continua numa linha em qualquer largura — medido ao Range no
+       browser: a 1.45 já o empurrava para duas a 1920. */
+    font-size: clamp(1.4rem, 1.4vw, 2rem);
+    font-weight: 600;
+    line-height: 1.08;
+    /* Um degradê quase imperceptível do branco para o azul-gelo: branco
+       puro sobre foto é um cartaz, e este assenta. A sombra continua — mas
+       como drop-shadow, porque com o texto transparente a text-shadow
+       apareceria acesa por dentro do próprio texto. */
+    background: linear-gradient(180deg, #ffffff 20%, #c9dcff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 1px 8px rgba(0, 0, 0, 0.55));
+    margin-bottom: clamp(8px, 0.55vw, 13px);
 }
 
 .card-desc {
-    font-size: 0.78rem;
+    font-size: clamp(0.78rem, 0.83vw, 1.05rem);
     color: rgba(255, 255, 255, 0.6);
     line-height: 1.5;
+    /* Um traço de sombra por baixo: o texto assenta sobre fotografias, e é
+       também o que a referência faz — o título continua branco sobre a lua. */
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Imagem de fundo dos cards ────────────────────────────────────── */
@@ -310,20 +498,15 @@ body.page-menu {
     /* escala a imagem cobrindo tudo sem distorcer */
     z-index: 1;
     /* abaixo do overlay (z:2) e do texto (z:3) */
-    animation: respirar 8s ease-in-out infinite;
+    /* O zoom não é mais em ciclo — ver o .card:hover .card-imagem abaixo. */
     transform-origin: center center;
+    transition: transform 0.6s ease;
 }
 
-@keyframes respirar {
-    0% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.05);
-    }
-
-    100% {
-        transform: scale(1);
-    }
+/* O zoom é do HOVER e não em ciclo: antes a imagem "respirava" sozinha, a
+   crescer e a encolher para sempre — quatro cards a mexerem-se ao mesmo
+   tempo, o dia todo. Agora cresce 2% quando o rato passa por cima, e é só
+   isso. */
+.card:hover .card-imagem {
+    transform: scale(1.02);
 }

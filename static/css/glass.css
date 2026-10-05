@@ -162,13 +162,8 @@
         }
     }
 
-    /* Cartão do título do menu: flutuação e brilho da borda */
-    .frosted-card {
-        animation: none;
-    }
-
-    /* Fotografias de fundo dos cartões do menu: zoom lento de 8s */
-    .card-imagem {
-        animation: none;
-    }
+    /* O cartão do título do menu e as fotografias dos cards já não têm
+       animação nenhuma em ciclo: as de movimento constante saíram todas do
+       menu.css. O que lá ficou — a entrada e o hover — não é para desligar:
+       não se mexe sozinho. */
 }

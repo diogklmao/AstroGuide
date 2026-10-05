@@ -122,17 +122,36 @@
   window.criarEstrelas = function criarEstrelas() {
     const container = document.getElementById("stars");
     if (!container) return;   // páginas sem campo de estrelas não fazem nada
-    for (let i = 0; i < 180; i++) {
+    // 130 estrelas, e não 180: um céu real tem muito preto entre elas, e
+    // encher o ecrã de pontos punha o fundo a competir com o conteúdo.
+    for (let i = 0; i < 130; i++) {
       const star = document.createElement("div");    // cria um div por estrela
-      star.className = "star";                       // aplica o estilo .star do CSS
-      const size = Math.random() * 2.5 + 0.5;       // tamanho aleatório entre 0.5px e 3px
+      // Uma em cada onze é de destaque: um pouco maior, com halo e
+      // cintilação mais lenta. É o que dá alturas e baixas ao céu — um campo
+      // em que todas as estrelas têm o mesmo brilho parece papel de parede.
+      const destaque = i % 11 === 0;
+      star.className = destaque ? "star star-destaque" : "star";
+      const size = destaque
+        ? Math.random() * 1 + 1.6                  // de 1.6px a 2.6px
+        : Math.random() * 1.5 + 0.5;               // de 0.5px a 2px
       star.style.cssText = `
           width:${size}px; height:${size}px;
           left:${Math.random() * 100}%; top:${Math.random() * 100}%;
-          --dur:${Math.random() * 4 + 2}s;
+          --dur:${destaque ? Math.random() * 5 + 6 : Math.random() * 4 + 3}s;
           animation-delay:${Math.random() * 4}s;
       `;
       container.appendChild(star);    // adiciona a estrela ao contentor
+    }
+
+    // A estrela grande com cruz — a que a referência tem à direita do título.
+    // Só no menu, porque é a composição daquela página que a pede num sítio
+    // concreto, e uma só: um céu com meia dúzia de cruzes acesas é um céu de
+    // festa, e não o que esta aplicação é. Os raios são do CSS (.star-flare).
+    if (document.body.className === "page-menu") {
+      const cruz = document.createElement("div");
+      cruz.className = "star star-flare";
+      cruz.style.cssText = "left:76.5%; top:28%; --dur:7s; animation-delay:1.5s;";
+      container.appendChild(cruz);
     }
   };
 

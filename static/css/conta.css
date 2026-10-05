@@ -23,14 +23,20 @@
     align-items: center;
     gap: 8px;
     max-width: 200px;
-    padding: 10px 16px;
-    border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.14));
+    padding: 10px 18px;
+    /* Pill, como o da localização no menu: o mesmo vidro, a mesma borda fina
+       fria, e cantos a fechar de todo. Um toque de violeta no fundo liga-o
+       ao painel da AstroGuide AI, que é do mesmo material. */
+    border: 1px solid rgba(140, 175, 255, 0.2);
     border-top-color: var(--glass-border-top, rgba(255, 255, 255, 0.28));
-    border-radius: 12px;
+    border-radius: 999px;
+    /* Vidro escuro liso, como na referência: sem tinta de cor no fundo — a
+       cor que este botão tem é a do nome e do pino, e ela vem do hover. */
     background: var(--glass-bg, rgba(10, 14, 32, 0.52));
     -webkit-backdrop-filter: blur(var(--glass-blur, 22px));
     backdrop-filter: blur(var(--glass-blur, 22px));
-    color: var(--accent, #6eb8ff);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    color: rgba(233, 240, 252, 0.95);
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 600;
@@ -42,7 +48,24 @@
 #btn-conta:hover {
     color: #fff;
     border-color: var(--accent, #6eb8ff);
-    box-shadow: 0 0 18px rgba(110, 184, 255, 0.22);
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.3),
+        0 0 18px rgba(110, 184, 255, 0.22);
+}
+
+/* O chevron depois do nome — o mesmo truque de duas bordas do pill da
+   localização. Diz que o botão leva a algum lado sem gastar um carácter de
+   fonte, que mudava de máquina para máquina. */
+#btn-conta::after {
+    content: "";
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    margin-left: 2px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    opacity: 0.7;
+    transform: translateY(-2px) rotate(45deg);
 }
 
 #btn-conta:focus-visible {

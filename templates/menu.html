@@ -31,7 +31,9 @@
 
     <div class="conteudo">
         <div class="titulo">
-            <div class="frosted-card glass-panel glass-shimmer">
+            <!-- Sem o glass-shimmer: o brilho a passar de lado em lado era
+                 movimento constante, e esta página pede calma. -->
+            <div class="frosted-card glass-panel">
                 <div class="frosted-title">AstroGuide</div>
                 <div class="frosted-sub">Observatório Digital</div>
             </div>
@@ -41,8 +43,22 @@
              Antes isto vinha de uma pergunta ao browser, e o que aparecia aqui
              era o sítio onde o computador estava — que não tem de ser o sítio
              para onde o céu está a ser calculado (quem escolheu observar da
-             serra continua a ter o portátil em casa). -->
-        <div id="lbl-localizacao">📍 {{ localizacao.nome }}</div>
+             serra continua a ter o portátil em casa).
+
+             É um link para o /perfil e não um rótulo: a localização
+             escolhe-se lá, e um pill que diz onde se observa sem dizer como
+             se muda é uma porta sem maçaneta. -->
+        <a id="lbl-localizacao" class="localizacao-pill" href="/perfil"
+            title="Alterar a localização de observação">
+            <svg class="localizacao-icone" viewBox="0 0 24 24" width="13" height="13" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                aria-hidden="true">
+                <path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11z"></path>
+                <circle cx="12" cy="10" r="2.5"></circle>
+            </svg>
+            <span class="localizacao-nome">{{ localizacao.nome }}</span>
+            <span class="localizacao-seta" aria-hidden="true"></span>
+        </a>
 
         <div class="cards">
             <a class="card card-ceu glass-card" href="/ceu">

@@ -41,7 +41,53 @@ body {
        do glass.css, junto com as restantes animações infinitas. */
 }
 
-/* Animação de brilho das estrelas */
+/* As estrelas de destaque: as que brilham um pouco mais. O halo é parado —
+   é a cintilação (ver o .star) que se mexe, e mesmo essa devagar. */
+.star-destaque {
+    box-shadow:
+        0 0 6px rgba(255, 255, 255, 0.85),
+        0 0 16px rgba(150, 190, 255, 0.5);
+}
+
+/* A estrela grande da referência — a que brilha à direita do título. Além
+   do halo, tem dois raios finos que se cruzam no meio: o efeito de difração
+   que uma estrela verdadeira deixa numa lente. Só existe uma, e só no menu
+   (o JS é quem a põe). Os raios esbatem nas pontas para não serem dois
+   traços a mexer-se — a cintilação é do conjunto, como nas outras. */
+.star-flare {
+    width: 5px;
+    height: 5px;
+    background: #fff;
+    box-shadow:
+        0 0 10px rgba(255, 255, 255, 0.9),
+        0 0 26px rgba(160, 200, 255, 0.6);
+}
+
+.star-flare::before,
+.star-flare::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+}
+
+.star-flare::before {
+    width: 56px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(210, 228, 255, 0.85), transparent);
+    transform: translate(-50%, -50%);
+}
+
+.star-flare::after {
+    width: 1px;
+    height: 44px;
+    background: linear-gradient(180deg, transparent, rgba(210, 228, 255, 0.85), transparent);
+    transform: translate(-50%, -50%);
+}
+
+/* Animação de brilho das estrelas. O scale é curto de propósito: a
+   cintilação é uma alteração de brilho, e uma estrela que cresce 40%
+   parece um ponto a piscar e não uma estrela. */
 @keyframes twinkle {
     0%, 100% {
         opacity: 0.2;           /* quase invisível no início e fim */
@@ -49,7 +95,7 @@ body {
     }
     50% {
         opacity: 1;             /* totalmente visível a meio da animação */
-        transform: scale(1.4);  /* ligeiramente maior a meio */
+        transform: scale(1.15); /* ligeiramente maior a meio */
     }
 }
 
