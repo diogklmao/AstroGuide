@@ -7,7 +7,11 @@
    O botão continua presente no menu e na aplicação (é carregado pelas três),
    e continua a fazer canto com o botão de voltar (em cima à esquerda) e com o
    de configurações (em baixo à direita), para não tapar nada. Usa os tokens do
-   glass.css para ser do mesmo material que o resto da UI. */
+   glass.css para ser do mesmo material que o resto da UI.
+
+   Esconde-se onde já não há para onde ir: no Observatório, no VR (os dois
+   modos imersivos) e no próprio perfil — quem está na conta não precisa do
+   botão que leva à conta. */
 
 /* O que este botão é agora: uma porta. Não abre nada por cima da página —
    leva ao /perfil, e quem não tem sessão é a página de entrada que o recebe
@@ -94,5 +98,17 @@
    esconder só um deles fazia o botão reaparecer ao entrar no VR. */
 body.observatorio-ativo #btn-conta,
 body.vr-ativo #btn-conta {
+    display: none;
+}
+
+
+/* ── Perfil: dentro da conta, sem botão de conta ──────────────────────── */
+/* Quem está no /perfil já está dentro da conta — o botão do canto dizia "A tua
+   conta" para levar a onde o utilizador já se encontrava, e ainda por cima
+   ficava a tapar o canto do próprio perfil. É a mesma regra dos dois modos
+   imersivos logo acima: já não há para onde ir, por isso o botão some-se.
+   A saída continua a ser o "◀ Menu" (e o link de voltar) do perfil.
+   A classe é a do <body> do perfil.html — página que carrega o conta.css. */
+body.page-perfil #btn-conta {
     display: none;
 }
