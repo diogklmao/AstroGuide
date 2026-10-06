@@ -164,6 +164,16 @@
     // Anuncia o novo estado a leitores de ecrã — o botão controla o painel.
     const botao = document.getElementById("btn-config");
     if (botao) botao.setAttribute("aria-expanded", aberto ? "true" : "false");
+
+    // No Observatório o painel da AstroGuide AI vive no mesmo canto (o ⚙️ é
+    // logo ao lado do botão dela, ver o ia.css), e os dois abertos ficariam um
+    // sobre o outro. Quem abre este fecha aquele. O fecharIA vem do ia.js, que
+    // carrega ao lado deste na página onde o ⚙️ existe — o typeof deixa a
+    // guarda de pé em qualquer página que inclua só este ficheiro.
+    const ia = document.getElementById("painel-ia");
+    if (aberto && ia && ia.classList.contains("aberto") && typeof window.fecharIA === "function") {
+      window.fecharIA();
+    }
   };
 
   // ── Controlo de volume ───────────────────────────────────────────

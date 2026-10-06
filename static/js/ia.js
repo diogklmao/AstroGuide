@@ -100,6 +100,17 @@
     const b = botao();
     if (b) b.setAttribute("aria-expanded", "true");
 
+    // No Observatório o painel das configurações vive no mesmo canto — é o ⚙️
+    // logo ao lado deste botão (ver o ia.css), e o painel dele é maior do que
+    // o vão. Com os dois abertos ficavam um em cima do outro, por isso quem
+    // abre este fecha aquele. Nas outras abas isto não faz nada: lá o ⚙️ nem
+    // existe. O toggleConfig é de outra página (shared-ui-controls.js), daí o
+    // typeof — aqui ele existe sempre, mas a guarda documenta a ligação.
+    const config = document.getElementById("painel-config");
+    if (config && config.classList.contains("visivel") && typeof window.toggleConfig === "function") {
+      window.toggleConfig();
+    }
+
     // O foco vai para a caixa de escrita: quem abriu o painel é para escrever,
     // e obrigá-lo a clicar outra vez era um passo a mais.
     const campo = entrada();

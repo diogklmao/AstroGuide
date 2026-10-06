@@ -98,10 +98,35 @@
                         <!-- Seletor de Data e Hora -->
                         <div class="obs-tempo-bloco">
                             <div class="obs-tempo-titulo">🕐 Simular Data/Hora</div>
-                            <input type="date" id="obs-data" class="obs-input"
-                                onchange="atualizarObservatorioComHora()">
-                            <input type="time" id="obs-hora" class="obs-input"
-                                onchange="atualizarObservatorioComHora()">
+                            <!-- Nem a data nem a hora são um <input type="date">
+                                 e um <input type="time">: o calendário e a lista
+                                 que o browser abre por cima deles são brancos e
+                                 não se conseguem vestir — quem os desenha é o
+                                 browser, e não lhes chega CSS nenhum. Cada campo
+                                 é um botão, e os painéis são nossos (ver o
+                                 construirSeletorData e o construirSeletorHora,
+                                 no index.js).
+                                 Os valores continuam no #obs-data e no
+                                 #obs-hora, agora escondidos: são eles que o
+                                 inicializarSeletorHora e o
+                                 atualizarObservatorioComHora lêem e escrevem,
+                                 como faziam com os campos nativos. -->
+                            <button type="button" id="obs-data-campo" class="obs-input obs-data-campo"
+                                onclick="alternarSeletorData()" aria-haspopup="dialog"
+                                aria-expanded="false" aria-controls="obs-data-picker"
+                                title="Escolher a data">
+                                <span id="obs-data-texto"></span>
+                                <span class="obs-data-seta" aria-hidden="true">▾</span>
+                            </button>
+                            <input type="hidden" id="obs-data">
+                            <button type="button" id="obs-hora-campo" class="obs-input obs-hora-campo"
+                                onclick="alternarSeletorHora()" aria-haspopup="listbox"
+                                aria-expanded="false" aria-controls="obs-hora-picker"
+                                title="Escolher a hora">
+                                <span id="obs-hora-texto">00:00</span>
+                                <span class="obs-hora-seta" aria-hidden="true">▾</span>
+                            </button>
+                            <input type="hidden" id="obs-hora">
                             <button id="btn-obs-agora" class="obs-btn-agora" onclick="repoeHoraAtual()">
                                 ↺ Tempo Real
                             </button>
@@ -288,8 +313,9 @@
          configurações, e não dentro do .app: são uma peça da moldura da
          aplicação, por cima de qualquer um dos cinco ecrãs, e não pertencem a
          nenhum deles. Por isso é que ficam no fim do body, e é o ia.css que
-         lhes dá o canto de baixo à esquerda — o único que os outros quatro
-         botões (menu, conta, configurações) e o cabeçalho deixam livre.
+         lhes dá o canto de baixo à esquerda. A exceção é o Observatório, onde
+         o botão se encosta ao ⚙️ que abre o painel do volume — os dois lado a
+         lado no canto da direita (ver a secção "No Observatório", no ia.css).
 
          A chave da IA não está aqui, nem em nenhum sítio que o browser veja:
          este painel fala com o /api/ia/chat do próprio AstroGuide, e é o

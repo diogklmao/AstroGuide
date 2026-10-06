@@ -137,6 +137,11 @@ function mudarEcra(nome) {
     const btn = document.getElementById("btn-" + nome);
     if (btn) btn.classList.add("ativo");
 
+    // Os seletores da data e da hora são painéis "fixed" presos aos campos que
+    // os abriram: fora do Observatório esses campos não estão à vista, e os
+    // painéis ficavam a flutuar sozinhos por cima do ecrã novo.
+    fecharSeletoresTempo();
+
     // Gerir modo ecrã inteiro para o observatório e para o VR
     if (nome === "observatorio") {
         document.body.classList.add("observatorio-ativo");
@@ -462,6 +467,10 @@ function togglePainelLateral() {
     if (painel) {
         painel.classList.toggle("recolhido");
     }
+    // Os seletores da data e da hora estão presos aos campos que os abriram, e
+    // esses campos vão deslizar para fora do ecrã com o painel: sem isto
+    // ficavam a flutuar sozinhos, sem nada a que pertencer.
+    fecharSeletoresTempo();
 }
 
 // Ouvinte de redimensionamento da janela
@@ -976,6 +985,11 @@ function inicializarSeletorHora() {
         inputHora.value = agora.hora;
     }
 
+    // Os campos da data e da hora são botões, e os valores acabaram de ser
+    // escritos nos inputs escondidos: é isto que os leva até ao texto que se
+    // lê.
+    sincronizarCampoHora();
+    sincronizarCampoData();
     atualizarLabelTempoSimulado();
 }
 
@@ -1036,6 +1050,661 @@ function repoeHoraAtual() {
     tempoSimuladoObs = null;      // céu em tempo real, no 2D e no VR
     inicializarSeletorHora();     // repõe os campos e limpa o rótulo
     carregarObservatorio(true);   // voltar ao tempo real também é uma viagem
+}
+
+// ── Painéis presos a um campo ───────────────────────────────────────────────
+// O seletor da hora e o da data são a mesma peça por baixo: um painel que
+// abre ao lado do campo que o abriu e se fecha com um clique fora ou com o
+// Esc. O que muda entre eles é só o que vai lá dentro.
+//
+// Os dois vivem no <body> e são "fixed", e não dentro do painel lateral: o
+// .observatorio-controlos tem overflow próprio e o .glass-panel tem
+// backdrop-filter, que prende os filhos "fixed" ao painel — lá dentro ficavam
+// presos e cortados a meio. É a mesma razão por que o painel da IA vive fora
+// do .app.
+
+// Põe o painel ao lado do campo. No Observatório o painel lateral está
+// encostado à esquerda, e é à direita dele que há espaço — mas num telefone
+// não há, e o painel desce para baixo do campo (ou sobe, se também não
+// couber). Em qualquer dos casos acaba encaixado dentro do ecrã.
+function posicionarPopup(painel, campo) {
+    if (!painel || !campo || !painel.classList.contains("aberto")) return;
+
+    const caixa = campo.getBoundingClientRect();
+    const largura = painel.offsetWidth;
+    const altura = painel.offsetHeight;
+    const folga = 10;
+    let esquerda = caixa.right + folga;
+    let topo = caixa.top;
+
+    if (esquerda + largura > window.innerWidth - 8) {
+        esquerda = caixa.left;
+        topo = caixa.bottom + folga;
+        if (topo + altura > window.innerHeight - 8) topo = caixa.top - folga - altura;
+    }
+
+    esquerda = Math.max(8, Math.min(esquerda, window.innerWidth - largura - 8));
+    topo = Math.max(8, Math.min(topo, window.innerHeight - altura - 8));
+
+    painel.style.left = Math.round(esquerda) + "px";
+    painel.style.top = Math.round(topo) + "px";
+}
+
+// Arma os fechos comuns: um clique fora ou o Esc fecham o painel, e o que faz
+// o campo andar (a roda do rato no painel lateral, a janela a mudar de
+// tamanho) obriga a apontar outra vez para ele — o painel é "fixed" e não anda
+// com o campo. O scroll ouve-se na captura: os eventos de scroll não sobem do
+// elemento para a janela, mas na captura passam por lá.
+//
+// O `fechar` que chega de fora decide o resto — e recebe o mesmo booleano que
+// os dois caminhos abaixo lhe passam: true quando quem fechou foi o próprio
+// utilizador (Esc), e é aí que faz sentido devolver-lhe o foco ao campo; false
+// quando foi um clique noutro sítio, que não deve tirar o foco a quem o pôs lá.
+//
+// Devolve a função que desliga tudo. Quem abre guarda-a e chama-a ao fechar:
+// sem isso, cada abertura deixava mais um par de ouvintes agarrado ao
+// documento.
+function ligarFechosDoPopup(painel, campo, fechar) {
+    function tratarCliqueFora(e) {
+        if (painel.contains(e.target) || campo.contains(e.target)) return;
+        fechar(false);
+    }
+
+    function tratarTecla(e) {
+        if (e.key !== "Escape") return;
+        e.preventDefault();
+        fechar(true);
+    }
+
+    function reposicionar() {
+        posicionarPopup(painel, campo);
+    }
+
+    document.addEventListener("pointerdown", tratarCliqueFora, true);
+    document.addEventListener("keydown", tratarTecla, true);
+    window.addEventListener("scroll", reposicionar, true);
+    window.addEventListener("resize", reposicionar);
+
+    return function desligar() {
+        document.removeEventListener("pointerdown", tratarCliqueFora, true);
+        document.removeEventListener("keydown", tratarTecla, true);
+        window.removeEventListener("scroll", reposicionar, true);
+        window.removeEventListener("resize", reposicionar);
+    };
+}
+
+// ── O seletor de hora (Horas + Minutos) ─────────────────────────────────────
+// O campo da hora era um <input type="time">, e o browser abria-lhe uma lista
+// branca que não se consegue vestir: quem a desenha é o próprio browser, e não
+// lhe chega CSS nenhum. Aqui o campo é um botão e o painel é nosso — duas
+// colunas, das horas e dos minutos, no lilás do bloco "Simular Data/Hora".
+//
+// O valor continua a viver no #obs-hora, agora escondido: é ele que o
+// inicializarSeletorHora e o atualizarObservatorioComHora lêem e escrevem, tal
+// como faziam antes, e nenhum deles precisou de saber que o campo mudou de
+// desenho. O que é novo é o sincronizarCampoHora, que leva o valor do input
+// escondido até ao texto do botão.
+
+const HORAS_DO_DIA = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTOS_DA_HORA = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+
+// O painel é construído à primeira abertura e fica para as seguintes; as duas
+// listas ficam guardadas porque é por elas que se marca a escolha, se anda com
+// as setas e se traz a opção à vista.
+let painelHora = null;
+// O desligar dos fechos (clique fora, Esc, scroll, resize) enquanto o painel
+// está aberto — ver o ligarFechosDoPopup. Fora disso é null.
+let desligarFechosHora = null;
+const listasHora = { hora: null, minuto: null };
+
+// A opção debaixo do cursor de teclado, por coluna. É coisa diferente da
+// escolhida: andar com as setas move esta sem mexer na hora, e é o Enter (ou o
+// clique) que muda a hora.
+const ativoHora = { hora: null, minuto: null };
+
+// O valor que está no campo, partido ao meio: "14:35" -> {hora:"14", minuto:"35"}.
+function valorDaParteHora(parte) {
+    const input = document.getElementById("obs-hora");
+    const [hora, minuto] = (input && input.value ? input.value : "00:00").split(":");
+    return parte === "hora" ? hora : minuto;
+}
+
+// Leva o valor do input escondido até ao texto do botão. Nos sítios onde o
+// valor é escrito por fora deste ficheiro — o inicializarSeletorHora, quando
+// repõe a hora real ou a simulada — é isto que põe o botão a dizer o mesmo.
+function sincronizarCampoHora() {
+    const texto = document.getElementById("obs-hora-texto");
+    if (!texto) return;
+    const valor = valorDaParteHora("hora") + ":" + valorDaParteHora("minuto");
+    texto.textContent = valor;
+}
+
+function construirSeletorHora() {
+    const painel = document.createElement("div");
+    painel.className = "obs-hora-picker";
+    painel.id = "obs-hora-picker";
+    painel.setAttribute("role", "group");
+    painel.setAttribute("aria-label", "Escolher a hora");
+
+    painel.appendChild(criarColunaHora("hora", "Hora", HORAS_DO_DIA));
+    painel.appendChild(criarColunaHora("minuto", "Minutos", MINUTOS_DA_HORA));
+
+    // No <body>, e não dentro do painel lateral: o .observatorio-controlos tem
+    // overflow próprio e o .glass-panel tem backdrop-filter, que prende os
+    // filhos "fixed" ao painel — e um painel preso ali dentro, com 186px de
+    // lista, ficava cortado a meio. É a mesma razão por que o painel da IA
+    // vive fora do .app.
+    document.body.appendChild(painel);
+    return painel;
+}
+
+// Uma coluna (Hora ou Minutos) com as suas opções. A coluna é uma listbox: só
+// ela leva foco (tabindex 0), e é por ela que se anda com as setas — as 84
+// opções todas no caminho do Tab seriam 84 paragens para sair do seletor.
+function criarColunaHora(parte, titulo, valores) {
+    const coluna = document.createElement("div");
+    coluna.className = "obs-hora-coluna";
+
+    const cabecalho = document.createElement("div");
+    cabecalho.className = "obs-hora-coluna-titulo";
+    cabecalho.id = "obs-hora-titulo-" + parte;
+    cabecalho.textContent = titulo;
+
+    const lista = document.createElement("div");
+    lista.className = "obs-hora-lista";
+    lista.id = "obs-hora-lista-" + parte;
+    lista.tabIndex = 0;
+    lista.setAttribute("role", "listbox");
+    lista.setAttribute("aria-labelledby", cabecalho.id);
+    lista.addEventListener("keydown", function (e) {
+        tratarTeclaListaHora(e, parte, lista);
+    });
+
+    valores.forEach(function (valor) {
+        const opcao = document.createElement("button");
+        opcao.type = "button";
+        opcao.id = "obs-hora-" + parte + "-" + valor;
+        opcao.className = "obs-hora-opcao";
+        opcao.dataset.valor = valor;
+        opcao.tabIndex = -1;
+        opcao.setAttribute("role", "option");
+        opcao.setAttribute("aria-selected", "false");
+        opcao.textContent = valor;
+        // Sem isto o clique punha o foco na opção e tirava-o à listbox, e as
+        // setas deixavam de andar. O clique continua a valer — o que se trava
+        // é só o foco a mudar de sítio.
+        opcao.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        opcao.addEventListener("click", function () {
+            escolherParteHora(parte, valor);
+        });
+        lista.appendChild(opcao);
+    });
+
+    coluna.appendChild(cabecalho);
+    coluna.appendChild(lista);
+    listasHora[parte] = lista;
+    return coluna;
+}
+
+// Pinta uma coluna: a opção escolhida (a que está no campo) e a ativa (a que
+// está debaixo do cursor de teclado). São dois estados, e é por isso que são
+// duas marcas: o aria-selected e a classe .ativo.
+function marcarColunaHora(parte) {
+    const lista = listasHora[parte];
+    if (!lista) return;
+
+    const escolhido = valorDaParteHora(parte);
+    const ativo = ativoHora[parte] || escolhido;
+    Array.from(lista.children).forEach(function (opcao) {
+        opcao.setAttribute("aria-selected", opcao.dataset.valor === escolhido ? "true" : "false");
+        opcao.classList.toggle("ativo", opcao.dataset.valor === ativo);
+    });
+    // É por este id que o leitor de ecrã sabe qual das opções está debaixo do
+    // cursor, já que o foco não anda de opção em opção.
+    lista.setAttribute("aria-activedescendant", "obs-hora-" + parte + "-" + ativo);
+}
+
+// Traz a opção à vista, ao centro da lista. O offsetTop conta a partir da
+// lista (o .obs-hora-lista é position: relative), e não da página.
+function trazerParaVista(parte, valor) {
+    const lista = listasHora[parte];
+    if (!lista) return;
+    const opcao = lista.querySelector('[data-valor="' + valor + '"]');
+    if (!opcao) return;
+    lista.scrollTop = opcao.offsetTop - (lista.clientHeight - opcao.offsetHeight) / 2;
+}
+
+function tratarTeclaListaHora(e, parte, lista) {
+    const opcoes = Array.from(lista.children);
+    const atual = ativoHora[parte] || valorDaParteHora(parte);
+    const i = opcoes.findIndex(function (o) { return o.dataset.valor === atual; });
+    let novo = null;
+
+    if (e.key === "ArrowDown") novo = opcoes[Math.min(i + 1, opcoes.length - 1)];
+    else if (e.key === "ArrowUp") novo = opcoes[Math.max(i - 1, 0)];
+    else if (e.key === "PageDown") novo = opcoes[Math.min(i + 10, opcoes.length - 1)];
+    else if (e.key === "PageUp") novo = opcoes[Math.max(i - 10, 0)];
+    else if (e.key === "Home") novo = opcoes[0];
+    else if (e.key === "End") novo = opcoes[opcoes.length - 1];
+    else if (e.key === "Enter" || e.key === " ") {
+        // Escolhe o que está debaixo do cursor. É o Enter que muda a hora —
+        // andar com as setas só anda.
+        e.preventDefault();
+        escolherParteHora(parte, atual);
+        return;
+    } else {
+        return;
+    }
+
+    // A lista também rola sozinha com as setas; quem manda aqui é o cursor.
+    e.preventDefault();
+    if (!novo) return;
+    ativoHora[parte] = novo.dataset.valor;
+    marcarColunaHora(parte);
+    trazerParaVista(parte, novo.dataset.valor);
+}
+
+function escolherParteHora(parte, valor) {
+    const input = document.getElementById("obs-hora");
+    if (!input || !valor) return;
+
+    const [hora, minuto] = (input.value || "00:00").split(":");
+    input.value = parte === "hora" ? valor + ":" + minuto : hora + ":" + valor;
+
+    ativoHora[parte] = valor;
+    sincronizarCampoHora();
+    marcarColunaHora("hora");
+    marcarColunaHora("minuto");
+
+    // É daqui que o céu viaja até à hora nova — o mesmo caminho do campo
+    // nativo, que só tinha um onchange a chamar isto.
+    atualizarObservatorioComHora();
+
+    // Escolhidos os minutos, o gesto está completo: fecha-se e devolve-se o
+    // foco ao campo. Escolhida a hora, fica aberto — quem escolhe a hora
+    // escolhe os minutos a seguir.
+    if (parte === "minuto") fecharSeletorHora(true);
+}
+
+function alternarSeletorHora() {
+    if (painelHora && painelHora.classList.contains("aberto")) {
+        fecharSeletorHora(true);
+        return;
+    }
+    abrirSeletorHora();
+}
+
+function abrirSeletorHora() {
+    const campo = document.getElementById("obs-hora-campo");
+    if (!campo) return;
+
+    if (!painelHora) painelHora = construirSeletorHora();
+
+    // Abre sempre na escolha: as setas partem do valor que está no campo.
+    ativoHora.hora = valorDaParteHora("hora");
+    ativoHora.minuto = valorDaParteHora("minuto");
+    marcarColunaHora("hora");
+    marcarColunaHora("minuto");
+
+    // Visível primeiro: é preciso medir para o pôr no sítio certo. Como não se
+    // desenha nada entre isto e o posicionar, não se vê o salto.
+    painelHora.classList.add("aberto");
+    posicionarPopup(painelHora, campo);
+    trazerParaVista("hora", ativoHora.hora);
+    trazerParaVista("minuto", ativoHora.minuto);
+    campo.setAttribute("aria-expanded", "true");
+    desligarFechosHora = ligarFechosDoPopup(painelHora, campo, fecharSeletorHora);
+
+    if (listasHora.hora) listasHora.hora.focus();
+}
+
+// Idempotente: quem a chama não precisa de saber se ele estava aberto. O
+// devolverFoco distingue as duas saídas — o Esc e a escolha dos minutos devem
+// pôr o foco de volta no campo; um clique fora não, senão tirava-se o foco a
+// quem o pôs noutro sítio.
+function fecharSeletorHora(devolverFoco) {
+    const estavaAberto = painelHora && painelHora.classList.contains("aberto");
+
+    if (painelHora) painelHora.classList.remove("aberto");
+    const campo = document.getElementById("obs-hora-campo");
+    if (campo) campo.setAttribute("aria-expanded", "false");
+
+    if (desligarFechosHora) {
+        desligarFechosHora();
+        desligarFechosHora = null;
+    }
+
+    if (estavaAberto && devolverFoco && campo) campo.focus();
+}
+
+// ── O seletor da data (o calendário) ────────────────────────────────────────
+// O campo da data também não é um <input type="date">: o calendário que o
+// browser abre por cima dele é branco e não se consegue vestir — quem o
+// desenha é o browser, e não lhe chega CSS nenhum. É a mesma história do campo
+// da hora: um botão no lugar do campo, e o calendário é nosso. O valor
+// continua no #obs-data, agora escondido, para o inicializarSeletorHora e o
+// atualizarObservatorioComHora o lerem e escreverem como faziam.
+//
+// Ao contrário do seletor da hora, que tem duas listas, aqui as casas dos dias
+// são botões independentes e é o foco que diz onde se está: a grelha entra no
+// Tab por uma só casa (a escolhida) e são as setas que andam de dia em dia.
+
+let painelData = null;
+let desligarFechosData = null;
+// O mês que o calendário tem à vista. Não é o mesmo que o valor do campo:
+// quem folheia até Dezembro sem escolher nada mexe nisto e não na data.
+const mesDoSeletorData = { ano: 0, mes: 0 };
+
+// A data do campo em "AAAA-MM-DD", ou "" se ainda não houver nenhuma. É o
+// formato do <input type="date"> e o que o horaEDataNoLocal devolve.
+function valorCampoData() {
+    const input = document.getElementById("obs-data");
+    return input && input.value ? input.value : "";
+}
+
+// Escreve a data no botão à portuguesa (05/10/2026). O valor guardado continua
+// a ser o "AAAA-MM-DD", que é o que o resto do ficheiro espera; isto é só o
+// que se lê.
+function sincronizarCampoData() {
+    const texto = document.getElementById("obs-data-texto");
+    if (!texto) return;
+    const valor = valorCampoData();
+    texto.textContent = /^\d{4}-\d{2}-\d{2}$/.test(valor)
+        ? valor.split("-").reverse().join("/")
+        : valor;
+}
+
+// "AAAA-MM-DD" a partir de um Date local, feito à mão. O toISOString não serve
+// aqui: passa por UTC, e à noite em Portugal o dia que ele dava já era o
+// seguinte.
+function dataParaISO(d) {
+    return d.getFullYear() + "-" +
+        String(d.getMonth() + 1).padStart(2, "0") + "-" +
+        String(d.getDate()).padStart(2, "0");
+}
+
+function construirSeletorData() {
+    const painel = document.createElement("div");
+    painel.className = "obs-data-picker";
+    painel.id = "obs-data-picker";
+    painel.setAttribute("role", "group");
+    painel.setAttribute("aria-label", "Escolher a data");
+
+    // O cabeçalho: ‹ Outubro 2026 ›
+    const cabecalho = document.createElement("div");
+    cabecalho.className = "obs-data-cabecalho";
+
+    const anterior = document.createElement("button");
+    anterior.type = "button";
+    anterior.className = "obs-data-nav";
+    anterior.textContent = "‹";
+    anterior.title = "Mês anterior";
+    anterior.setAttribute("aria-label", "Mês anterior");
+    anterior.addEventListener("click", function () { mudarMesSeletorData(-1); });
+
+    const titulo = document.createElement("div");
+    titulo.className = "obs-data-titulo";
+    titulo.id = "obs-data-titulo";
+    // Muda com as setas: quem não vê a grelha ouve o mês novo.
+    titulo.setAttribute("aria-live", "polite");
+
+    const seguinte = document.createElement("button");
+    seguinte.type = "button";
+    seguinte.className = "obs-data-nav";
+    seguinte.textContent = "›";
+    seguinte.title = "Mês seguinte";
+    seguinte.setAttribute("aria-label", "Mês seguinte");
+    seguinte.addEventListener("click", function () { mudarMesSeletorData(1); });
+
+    cabecalho.appendChild(anterior);
+    cabecalho.appendChild(titulo);
+    cabecalho.appendChild(seguinte);
+
+    // A semana, na mesma ordem do calendário da aplicação: a começar na
+    // segunda. As abreviaturas saem do DIAS_PT, que já é essa lista e está
+    // nessa ordem — não vale a pena manter uma segunda lista só para isto.
+    const semana = document.createElement("div");
+    semana.className = "obs-data-semana";
+    semana.setAttribute("aria-hidden", "true");
+    DIAS_PT.forEach(function (nome) {
+        const abreviado = document.createElement("span");
+        abreviado.textContent = nome.slice(0, 3);
+        semana.appendChild(abreviado);
+    });
+
+    // As casas dos dias. A grelha é sempre de 42 (seis semanas), mesmo nos
+    // meses que só precisam de cinco: assim o painel não cresce e encolhe de
+    // mês para mês, e a caixa fica sempre do mesmo tamanho. As setas ouvem-se
+    // aqui, no contentor, e não em cada casa.
+    const grelha = document.createElement("div");
+    grelha.className = "obs-data-grelha";
+    grelha.id = "obs-data-grelha";
+    grelha.addEventListener("keydown", tratarTeclaGrelhaData);
+
+    painel.appendChild(cabecalho);
+    painel.appendChild(semana);
+    painel.appendChild(grelha);
+
+    // Fora do painel lateral, como o da hora: lá dentro ficava preso e cortado
+    // a meio (ver a nota no posicionarPopup).
+    document.body.appendChild(painel);
+    return painel;
+}
+
+// Desenha o mês que está em mesDoSeletorData, com o dia escolhido e o de hoje
+// marcados.
+function desenharMesSeletorData() {
+    const grelha = document.getElementById("obs-data-grelha");
+    const titulo = document.getElementById("obs-data-titulo");
+    if (!grelha || !titulo) return;
+
+    const ano = mesDoSeletorData.ano;
+    const mes = mesDoSeletorData.mes;
+    titulo.textContent = MESES_PT[mes] + " " + ano;
+
+    // Em que dia da semana cai o dia 1, contado a partir da segunda — o mesmo
+    // cálculo do calendário da aplicação (o getDay devolve 0 no domingo).
+    const primeiroDia = new Date(ano, mes - 1, 1).getDay();
+    const deslocamento = primeiroDia === 0 ? 6 : primeiroDia - 1;
+    const diasDoMes = new Date(ano, mes, 0).getDate();
+
+    const hoje = horaEDataNoLocal().data;
+    const escolhido = valorCampoData();
+
+    grelha.innerHTML = "";
+
+    for (let i = 0; i < 42; i++) {
+        const dia = i - deslocamento + 1;
+
+        // Antes do dia 1 e depois do último as casas ficam vazias: são a
+        // margem da grelha, e não dias de outro mês. É o que o calendário da
+        // aplicação já faz.
+        if (dia < 1 || dia > diasDoMes) {
+            const vazio = document.createElement("span");
+            vazio.className = "obs-data-vazio";
+            grelha.appendChild(vazio);
+            continue;
+        }
+
+        const data = ano + "-" + String(mes).padStart(2, "0") + "-" + String(dia).padStart(2, "0");
+
+        const botao = document.createElement("button");
+        botao.type = "button";
+        botao.className = "obs-data-dia";
+        botao.dataset.data = data;
+        botao.textContent = dia;
+        // Fora do alcance do Tab: a grelha tem uma só porta de entrada, que é
+        // a casa marcada no fim desta função.
+        botao.tabIndex = -1;
+        botao.setAttribute("aria-label", dia + " de " + MESES_PT[mes] + " de " + ano);
+
+        // Escolhido e hoje são estados diferentes e podem calhar no mesmo dia.
+        // O aria-pressed é o que um leitor de ecrã anuncia ("premido") para
+        // uma casa escolhida; o aria-current marca o dia de hoje.
+        if (data === escolhido) {
+            botao.classList.add("escolhido");
+            botao.setAttribute("aria-pressed", "true");
+        }
+        if (data === hoje) {
+            botao.classList.add("hoje");
+            botao.setAttribute("aria-current", "date");
+        }
+
+        botao.addEventListener("click", function () { escolherData(data); });
+        grelha.appendChild(botao);
+    }
+
+    // A casa por onde se entra na grelha: a escolhida, se estiver à vista;
+    // senão a primeira do mês.
+    const entrada = grelha.querySelector(".escolhido") || grelha.querySelector(".obs-data-dia");
+    if (entrada) entrada.tabIndex = 0;
+}
+
+// Vira a página do calendário. O Date normaliza sozinho o que sai do
+// intervalo: o mês 13 vira o Janeiro do ano seguinte, e o mês 0 o Dezembro do
+// anterior.
+function mudarMesSeletorData(delta) {
+    const d = new Date(mesDoSeletorData.ano, mesDoSeletorData.mes - 1 + delta, 1);
+    mesDoSeletorData.ano = d.getFullYear();
+    mesDoSeletorData.mes = d.getMonth() + 1;
+    desenharMesSeletorData();
+    // A grelha é sempre da mesma altura, mas depois de virar o mês o painel
+    // pode ter de se mexer para não sair do ecrã.
+    posicionarPopup(painelData, document.getElementById("obs-data-campo"));
+}
+
+// Leva o foco ao dia do Date que chega, virando o mês se ele cair fora do que
+// está à vista.
+function irParaDiaSeletorData(destino) {
+    const iso = dataParaISO(destino);
+
+    if (destino.getFullYear() !== mesDoSeletorData.ano || destino.getMonth() + 1 !== mesDoSeletorData.mes) {
+        mesDoSeletorData.ano = destino.getFullYear();
+        mesDoSeletorData.mes = destino.getMonth() + 1;
+        desenharMesSeletorData();
+        posicionarPopup(painelData, document.getElementById("obs-data-campo"));
+    }
+
+    const novo = document.getElementById("obs-data-grelha").querySelector('[data-data="' + iso + '"]');
+    if (!novo) return;
+
+    // Fica só uma casa alcançável pelo Tab. O desenhar já pôs uma; esta é a
+    // que passou a ter o foco.
+    Array.from(document.querySelectorAll(".obs-data-dia")).forEach(function (b) { b.tabIndex = -1; });
+    novo.tabIndex = 0;
+    novo.focus();
+}
+
+// As setas andam de dia (esquerda/direita) e de semana (cima/baixo), o Home e
+// o End vão às pontas da semana, e o PageUp/PageDown mudam de mês.
+function tratarTeclaGrelhaData(e) {
+    const alvo = e.target && e.target.classList && e.target.classList.contains("obs-data-dia") ? e.target : null;
+    if (!alvo) return;
+
+    const ano = Number(alvo.dataset.data.slice(0, 4));
+    const mes = Number(alvo.dataset.data.slice(5, 7));
+    const dia = Number(alvo.dataset.data.slice(8, 10));
+    let destino = null;
+
+    if (e.key === "ArrowLeft") destino = new Date(ano, mes - 1, dia - 1);
+    else if (e.key === "ArrowRight") destino = new Date(ano, mes - 1, dia + 1);
+    else if (e.key === "ArrowUp") destino = new Date(ano, mes - 1, dia - 7);
+    else if (e.key === "ArrowDown") destino = new Date(ano, mes - 1, dia + 7);
+    else if (e.key === "PageUp" || e.key === "PageDown") {
+        // Um mês à frente ou atrás, mas no mesmo dia — e com o dia preso ao
+        // fim do mês de destino quando ele não chega lá (31 de Março recua
+        // para 28 ou 29 de Fevereiro, e não para 3 de Março).
+        const indice = (mes - 1) + (e.key === "PageUp" ? -1 : 1);
+        const ultimoDia = new Date(ano, indice + 1, 0).getDate();
+        destino = new Date(ano, indice, Math.min(dia, ultimoDia));
+    } else if (e.key === "Home" || e.key === "End") {
+        // Às pontas da semana: a segunda e o domingo.
+        const diaDaSemana = new Date(ano, mes - 1, dia).getDay();   // 0 = domingo
+        const ateSegunda = diaDaSemana === 0 ? 6 : diaDaSemana - 1;
+        destino = new Date(ano, mes - 1, dia + (e.key === "Home" ? -ateSegunda : 6 - ateSegunda));
+    }
+
+    if (!destino) return;
+    e.preventDefault();
+    irParaDiaSeletorData(destino);
+}
+
+function escolherData(data) {
+    const input = document.getElementById("obs-data");
+    if (!input || !data) return;
+
+    input.value = data;
+    sincronizarCampoData();
+
+    // É daqui que o céu viaja até ao dia novo — o mesmo caminho do campo
+    // nativo, que só tinha um onchange a chamar isto.
+    atualizarObservatorioComHora();
+
+    // Um clique escolhe o dia e o gesto está completo: não há aqui uma segunda
+    // parte como os minutos da hora, por isso fecha-se logo e devolve-se o
+    // foco ao campo.
+    fecharSeletorData(true);
+}
+
+function alternarSeletorData() {
+    if (painelData && painelData.classList.contains("aberto")) {
+        fecharSeletorData(true);
+        return;
+    }
+    abrirSeletorData();
+}
+
+function abrirSeletorData() {
+    const campo = document.getElementById("obs-data-campo");
+    if (!campo) return;
+
+    if (!painelData) painelData = construirSeletorData();
+
+    // Abre no mês da data escolhida. Com o campo vazio, no mês de hoje — e o
+    // hoje que interessa é o do local escolhido na aplicação, que é o que o
+    // horaEDataNoLocal dá, e não o do computador.
+    const escolhido = valorCampoData();
+    const referencia = /^\d{4}-\d{2}-\d{2}$/.test(escolhido) ? escolhido : horaEDataNoLocal().data;
+    mesDoSeletorData.ano = Number(referencia.slice(0, 4));
+    mesDoSeletorData.mes = Number(referencia.slice(5, 7));
+
+    desenharMesSeletorData();
+
+    // Visível primeiro: é preciso medir para o pôr no sítio certo.
+    painelData.classList.add("aberto");
+    posicionarPopup(painelData, campo);
+    campo.setAttribute("aria-expanded", "true");
+    desligarFechosData = ligarFechosDoPopup(painelData, campo, fecharSeletorData);
+
+    const entrada = painelData.querySelector('.obs-data-dia[tabindex="0"]');
+    if (entrada) entrada.focus();
+}
+
+// Idempotente, e pelas mesmas razões do seletor da hora: o devolverFoco separa
+// o Esc e a escolha de um dia (que põem o foco de volta no campo) de um clique
+// fora (que não o deve tirar a quem o pôs noutro sítio).
+function fecharSeletorData(devolverFoco) {
+    const estavaAberto = painelData && painelData.classList.contains("aberto");
+
+    if (painelData) painelData.classList.remove("aberto");
+    const campo = document.getElementById("obs-data-campo");
+    if (campo) campo.setAttribute("aria-expanded", "false");
+
+    if (desligarFechosData) {
+        desligarFechosData();
+        desligarFechosData = null;
+    }
+
+    if (estavaAberto && devolverFoco && campo) campo.focus();
+}
+
+// Fecha os dois seletores do bloco "Simular Data/Hora" de uma vez. Quem sai do
+// Observatório ou fecha o painel lateral não tem de saber quais estavam
+// abertos: os dois fechar são idempotentes, e o que já estava fechado não faz
+// nada.
+function fecharSeletoresTempo() {
+    fecharSeletorHora(false);
+    fecharSeletorData(false);
 }
 
 // ── Controlos de Arrastar e Zoom ──────────────────────────────────

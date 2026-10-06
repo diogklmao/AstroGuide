@@ -30,6 +30,9 @@
 
 #btn-ia {
     position: fixed;
+    /* O canto de baixo à esquerda é o dele em toda a aplicação. O Observatório
+       é a exceção: lá encosta ao ⚙️ das configurações — ver a secção "No
+       Observatório", mais abaixo. */
     bottom: 24px;
     left: 24px;
     /* Acima dos painéis do observatório, ao nível do botão de conta. */
@@ -170,33 +173,42 @@
    body (ver mudarEcra, no index.js).
    No Observatório 2D, ao contrário, o botão e o painel ficam — é um ecrã com
    painéis e botões à volta, e o painel da IA é mais um deles (ver a secção
-   "No Observatório" logo abaixo, onde ele se afasta do painel lateral). */
+   seguinte). */
 body.vr-ativo #btn-ia,
 body.vr-ativo #painel-ia {
     display: none;
 }
 
 
-/* ── No Observatório, ao lado do painel lateral ──────────────────────── */
-/* No Observatório 2D o painel lateral ocupa a esquerda toda (position:
-   fixed, 310 px, de 20 px aos 330 px — ver index.css), e o botão em baixo à
-   esquerda encostava por cima dele. Por isso, neste ecrã, o botão e o painel
-   deslocam-se para a direita do painel lateral. Quando ele se recolhe (o ◀
-   do seu canto), o canto fica livre e eles voltam para lá — é o :has() que
-   diz que está recolhido; num browser que não o suporte, ficam onde estão,
-   que é sempre um sítio por onde se passa o rato.
+/* ── No Observatório, ao lado do ⚙️ ──────────────────────────────────── */
+/* Só neste ecrã o botão e o painel saltam do canto de baixo à esquerda para
+   o de baixo à direita, encostados ao ⚙️ das configurações — que é o botão do
+   volume, e com quem a IA faz par. Nas outras abas ficam onde sempre
+   estiveram: ali o canto da direita é das abas e do resto, e não há ⚙️ para
+   lhes fazer companhia (o painel dele nem existe fora daqui — ver o
+   index.css).
 
-   Abaixo de 901 px não há que deslocar: o painel lateral do Observatório já
-   tapa quase o ecrã todo, e os 12 px da regra dos telemóveis é o que há. */
-@media (min-width: 901px) {
-    body.observatorio-ativo #btn-ia,
-    body.observatorio-ativo #painel-ia {
-        left: 346px;
+   O desvio é só a partir dos 561px: abaixo disso quem manda é o telemóvel,
+   e é o @media lá em baixo que o faz, empilhando o botão por cima do ⚙️ em
+   vez de o pôr ao lado. Guardar isto aqui evita que estas regras, com mais
+   especificidade, ganhassem àquelas num telefone.
+
+   Os 84px da direita são a margem do ⚙️ (24) + a largura dele (48) + o vão
+   de um dedo (12). E os 28px de baixo não são os 24px dele: é o que põe os
+   centros dos dois à mesma altura, já que a pílula (≈40px de alto) não é tão
+   alta como o círculo (48px) — assentes os dois no mesmo chão, a pílula
+   ficava baixa. */
+@media (min-width: 561px) {
+    body.observatorio-ativo #btn-ia {
+        bottom: 28px;
+        right: 84px;
+        left: auto;
     }
 
-    body.observatorio-ativo:has(.observatorio-painel-lateral.recolhido) #btn-ia,
-    body.observatorio-ativo:has(.observatorio-painel-lateral.recolhido) #painel-ia {
-        left: 24px;
+    /* O painel segue o botão: abre por cima dele, encostado à direita. */
+    body.observatorio-ativo #painel-ia {
+        right: 24px;
+        left: auto;
     }
 }
 
@@ -915,6 +927,18 @@ body.vr-ativo #painel-ia {
         left: 16px;
         padding: 10px 14px;
         font-size: 0.8rem;
+    }
+
+    /* No Observatório do telefone o botão sobe para cima do ⚙️ em vez de ficar
+       ao lado dele: a pílula ocupa meia barra, e ao lado roubava à barra do
+       tour guiado os 84px que ela ali precisa (ver o @media do #tour-barra,
+       no index.css). Empilhado poupa esse espaço, e o ⚙️ continua a ser o que
+       fica mais à mão no canto. O painel não precisa de nada: a regra de cima
+       já o põe de ponta a ponta. */
+    body.observatorio-ativo #btn-ia {
+        bottom: 84px;
+        right: 24px;
+        left: auto;
     }
 
     /* Num telefone a bolha pode ir quase de ponta a ponta: os 8% que sobram

@@ -1011,6 +1011,328 @@ nav button:hover:not(.ativo) {
 }
 
 
+/* ── O seletor de hora (Hora + Minutos) ──────────────────────────────────
+   O campo da hora era um <input type="time">, e o browser abria-lhe aquela
+   lista branca que não se consegue vestir: quem a desenha é o browser, e não
+   lhe chega CSS. Aqui o campo é um botão (.obs-input, para o desenho ser o
+   mesmo dos outros) e o painel é nosso, na língua do bloco "Simular
+   Data/Hora" — o lilás que o .obs-tempo-bloco já usa.
+
+   O painel é criado pelo construirSeletorHora (index.js) e posto no <body>,
+   não aqui dentro: o .observatorio-controlos tem overflow próprio e o
+   .glass-panel tem backdrop-filter, que prende os filhos "fixed" ao painel —
+   preso e cortado a meio, não servia. Daí o position: fixed e o left/top que
+   o posicionarPopup lhe escreve. O seletor da data, mais abaixo, é a mesma
+   peça com outra cara. */
+.obs-hora-campo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+}
+
+.obs-hora-seta {
+    color: rgba(206, 147, 216, 0.8);
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.obs-hora-picker {
+    position: fixed;
+    z-index: 9999;
+    display: none;
+    gap: 6px;
+    padding: 12px;
+    background: rgba(9, 13, 30, 0.94);
+    border: 1px solid rgba(206, 147, 216, 0.32);
+    border-radius: 14px;
+    font-family: 'Courier New', monospace;
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 18px 44px rgba(0, 0, 0, 0.55),
+        0 0 28px rgba(206, 147, 216, 0.12);
+}
+
+/* Visível pela classe e não pelo [hidden]: como o .glass-panel, este painel
+   define o seu próprio display, e ele ganharia ao atributo. */
+.obs-hora-picker.aberto {
+    display: flex;
+    animation: obsHoraAbrir 0.16s ease;
+}
+
+@keyframes obsHoraAbrir {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.obs-hora-coluna {
+    display: flex;
+    flex-direction: column;
+}
+
+.obs-hora-coluna-titulo {
+    font-family: inherit;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgba(206, 147, 216, 0.7);
+    text-align: center;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(206, 147, 216, 0.16);
+}
+
+/* As duas listas rolam por si: são 24 horas e 60 minutos, e a coluna fica com
+   a altura da lista mais curta — o painel não cresce com o conteúdo. O
+   position: relative é para o offsetTop das opções ser contado a partir daqui
+   (ver o trazerParaVista, no index.js). */
+.obs-hora-lista {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 62px;
+    max-height: 186px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(206, 147, 216, 0.35) transparent;
+}
+
+.obs-hora-lista:focus-visible {
+    outline: 2px solid rgba(206, 147, 216, 0.7);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+.obs-hora-lista::-webkit-scrollbar {
+    width: 6px;
+}
+
+.obs-hora-lista::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.obs-hora-lista::-webkit-scrollbar-thumb {
+    background: rgba(206, 147, 216, 0.35);
+    border-radius: 3px;
+}
+
+.obs-hora-lista::-webkit-scrollbar-thumb:hover {
+    background: rgba(206, 147, 216, 0.55);
+}
+
+.obs-hora-opcao {
+    /* Sem encolher: numa coluna flex com overflow os filhos encolhem por
+       omissão, e as 60 opções espremiam-se umas nas outras em vez de rolar. */
+    flex: 0 0 auto;
+    padding: 5px 0;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: rgba(232, 213, 240, 0.72);
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.obs-hora-opcao:hover {
+    background: rgba(206, 147, 216, 0.14);
+    color: #fff;
+}
+
+/* A escolhida — o valor que está no campo. */
+.obs-hora-opcao[aria-selected="true"] {
+    background: rgba(206, 147, 216, 0.26);
+    border-color: rgba(206, 147, 216, 0.55);
+    color: #fff;
+    font-weight: 700;
+}
+
+/* A que está debaixo do cursor de teclado. É outra coisa: andar com as setas
+   move esta sem mudar a hora — só o Enter (ou o clique) a muda. Quando as
+   duas são a mesma, o anel some-se no preenchimento de cima e não estorva. */
+.obs-hora-opcao.ativo {
+    box-shadow: inset 0 0 0 2px rgba(206, 147, 216, 0.65);
+}
+
+
+/* ── O seletor da data (o calendário) ────────────────────────────────────
+   A mesma história do campo da hora, logo acima: era um <input type="date"> e
+   o calendário que o browser lhe abria por cima era branco e indesenhável. O
+   campo é um botão (.obs-input) e o painel é nosso, na mesma língua.
+
+   Também este painel é criado pelo construirSeletorData (index.js) e posto no
+   <body>, com o position: fixed e o left/top do posicionarPopup — as razões
+   estão na nota do seletor de hora. */
+.obs-data-campo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+}
+
+.obs-data-seta {
+    color: rgba(206, 147, 216, 0.8);
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.obs-data-picker {
+    position: fixed;
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(9, 13, 30, 0.94);
+    border: 1px solid rgba(206, 147, 216, 0.32);
+    border-radius: 14px;
+    font-family: 'Courier New', monospace;
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 18px 44px rgba(0, 0, 0, 0.55),
+        0 0 28px rgba(206, 147, 216, 0.12);
+}
+
+/* Visível pela classe e não pelo [hidden], pela mesma razão do painel da hora:
+   este painel também define o seu próprio display, e ele ganharia ao atributo.
+   A animação é a mesma do painel da hora — são a mesma peça a abrir. */
+.obs-data-picker.aberto {
+    display: flex;
+    animation: obsHoraAbrir 0.16s ease;
+}
+
+.obs-data-cabecalho {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.obs-data-nav {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid rgba(206, 147, 216, 0.3);
+    border-radius: 8px;
+    color: rgba(206, 147, 216, 0.85);
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.obs-data-nav:hover {
+    background: rgba(206, 147, 216, 0.18);
+    border-color: rgba(206, 147, 216, 0.55);
+    color: #fff;
+}
+
+.obs-data-nav:focus-visible {
+    outline: 2px solid rgba(206, 147, 216, 0.85);
+    outline-offset: 2px;
+}
+
+.obs-data-titulo {
+    flex: 1;
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(206, 147, 216, 0.85);
+}
+
+/* A fila da semana e a grelha partilham as colunas: é isso que alinha as
+   iniciais dos dias por cima das casas. */
+.obs-data-semana,
+.obs-data-grelha {
+    display: grid;
+    grid-template-columns: repeat(7, 32px);
+    gap: 3px;
+}
+
+.obs-data-semana span {
+    text-align: center;
+    padding-bottom: 2px;
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(206, 147, 216, 0.55);
+}
+
+.obs-data-dia,
+.obs-data-vazio {
+    width: 32px;
+    height: 32px;
+}
+
+.obs-data-dia {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: rgba(232, 213, 240, 0.72);
+    font-family: inherit;
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.obs-data-dia:hover {
+    background: rgba(206, 147, 216, 0.14);
+    color: #fff;
+}
+
+/* O dia de hoje: um anel ténue, que não se confunde com a escolha nem lhe
+   rouba o lugar — calhando no mesmo dia, é o preenchimento de baixo que manda,
+   por vir depois. */
+.obs-data-dia.hoje {
+    border-color: rgba(206, 147, 216, 0.45);
+}
+
+/* O escolhido — o valor que está no campo. */
+.obs-data-dia.escolhido {
+    background: rgba(206, 147, 216, 0.26);
+    border-color: rgba(206, 147, 216, 0.6);
+    color: #fff;
+    font-weight: 700;
+}
+
+/* É este anel que diz onde vão ter as setas, por isso tem de se ver bem. */
+.obs-data-dia:focus-visible {
+    outline: 2px solid rgba(206, 147, 216, 0.85);
+    outline-offset: 1px;
+}
+
+
 /* ── Painel da ISS (Observatório) ──────────────────────────────────────── */
 
 /* Aviso: o que impede a posição de ser mostrada — sem elementos orbitais (não
@@ -1805,6 +2127,105 @@ body.red-velvet-mode input[type="checkbox"] {
 body.red-velvet-mode #lbl-mag,
 body.red-velvet-mode #obs-hora-label {
     color: #ff4760 !important;
+}
+
+/* O seletor de hora. O campo (.obs-input) já vem tratado lá em cima, com o
+   resto dos campos do Observatório; o que é novo é o painel, que vive no
+   <body> e por isso não apanha nenhuma dessas regras — sem estas linhas ele
+   ficava azul-lilás no meio de um céu vermelho, que é precisamente o que este
+   modo existe para não acontecer. */
+body.red-velvet-mode .obs-hora-seta {
+    color: rgba(255, 138, 156, 0.9) !important;
+}
+
+body.red-velvet-mode .obs-hora-picker {
+    background: rgba(26, 4, 9, 0.95) !important;
+    border-color: rgba(255, 60, 80, 0.4) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 18px 44px rgba(0, 0, 0, 0.6),
+        0 0 28px rgba(255, 40, 65, 0.14) !important;
+}
+
+body.red-velvet-mode .obs-hora-coluna-titulo {
+    color: rgba(255, 133, 149, 0.85) !important;
+    border-bottom-color: rgba(255, 60, 80, 0.22) !important;
+}
+
+body.red-velvet-mode .obs-hora-opcao {
+    color: #ffb8c3 !important;
+}
+
+body.red-velvet-mode .obs-hora-opcao:hover {
+    background: rgba(255, 40, 65, 0.18) !important;
+    color: #fff !important;
+}
+
+body.red-velvet-mode .obs-hora-opcao[aria-selected="true"] {
+    background: rgba(255, 40, 65, 0.3) !important;
+    border-color: rgba(255, 60, 80, 0.6) !important;
+    color: #fff !important;
+}
+
+body.red-velvet-mode .obs-hora-opcao.ativo {
+    box-shadow: inset 0 0 0 2px rgba(255, 60, 80, 0.7) !important;
+}
+
+body.red-velvet-mode .obs-hora-lista::-webkit-scrollbar-thumb {
+    background: rgba(255, 60, 80, 0.4);
+}
+
+/* O seletor da data, pela mesma razão do da hora: o painel vive no <body> e
+   não apanha nenhuma das regras do modo noturno que tratam o Observatório. */
+body.red-velvet-mode .obs-data-seta {
+    color: rgba(255, 138, 156, 0.9) !important;
+}
+
+body.red-velvet-mode .obs-data-picker {
+    background: rgba(26, 4, 9, 0.95) !important;
+    border-color: rgba(255, 60, 80, 0.4) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 18px 44px rgba(0, 0, 0, 0.6),
+        0 0 28px rgba(255, 40, 65, 0.14) !important;
+}
+
+body.red-velvet-mode .obs-data-nav {
+    color: rgba(255, 133, 149, 0.9) !important;
+    border-color: rgba(255, 60, 80, 0.35) !important;
+}
+
+body.red-velvet-mode .obs-data-nav:hover {
+    background: rgba(255, 40, 65, 0.18) !important;
+    border-color: rgba(255, 60, 80, 0.6) !important;
+    color: #fff !important;
+}
+
+body.red-velvet-mode .obs-data-titulo {
+    color: rgba(255, 133, 149, 0.85) !important;
+}
+
+body.red-velvet-mode .obs-data-semana span {
+    color: rgba(255, 133, 149, 0.6) !important;
+}
+
+body.red-velvet-mode .obs-data-dia {
+    color: #ffb8c3 !important;
+}
+
+body.red-velvet-mode .obs-data-dia:hover {
+    background: rgba(255, 40, 65, 0.18) !important;
+    color: #fff !important;
+}
+
+body.red-velvet-mode .obs-data-dia.hoje {
+    border-color: rgba(255, 60, 80, 0.5) !important;
+}
+
+body.red-velvet-mode .obs-data-dia.escolhido {
+    background: rgba(255, 40, 65, 0.3) !important;
+    border-color: rgba(255, 60, 80, 0.6) !important;
+    color: #fff !important;
 }
 
 @media (max-width: 600px) {
