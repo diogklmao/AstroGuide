@@ -4,38 +4,78 @@
 
 import requests
 import datetime
+import re
 
-APOD_URL = "https://api.nasa.gov/planetary/apod"
-API_KEY = "AnsFw60qh8k6TMITDyaX1ZnwmmWP6DJY1bu1a5g1"  
+APOD_URL = "https://science.nasa.gov/wp-json/wp/v2/apod-basic"
+API_KEY = "DEMO_KEY"
 
-# Cache simples em memória: guarda a última resposta e a data em que foi obtida
+# Cache simples em memória
 _cache = {"data": None, "resultado": None}
+
+
+def remover_html(texto):
+    """Remove tags HTML presentes na explicação/créditos da nova API."""
+    if not texto:
+        return ""
+    return re.sub(r"<[^>]+>", "", texto).strip()
 
 
 def get_imagem_do_dia():
     """
-    Devolve a imagem/vídeo astronómico do dia, com título e explicação.
-    Usa cache em memória para não repetir o pedido à NASA no mesmo dia.
+    Devolve a imagem/vídeo astronómico mais recente da NASA,
+    com título, explicação, imagem, data e autor.
+
+    Usa cache em memória para não repetir pedidos desnecessários.
     """
+
     hoje = datetime.date.today().isoformat()
 
+    # Se já temos a APOD de hoje em cache, devolve-a
     if _cache["data"] == hoje and _cache["resultado"] is not None:
-        return _cache["resultado"]  # já temos a imagem de hoje, poupa um pedido à NASA
+        return _cache["resultado"]
 
-    resposta = requests.get(APOD_URL, params={"api_key": API_KEY}, timeout=6)
-    resposta.raise_for_status()  # lança exceção se a NASA devolver erro (ex: limite excedido)
+    resposta = requests.get(
+        APOD_URL,
+        params={"api_key": API_KEY},
+        timeout=6
+    )
+
+    resposta.raise_for_status()
+
     dados = resposta.json()
 
+    # A nova API devolve uma lista de APODs
+    if not isinstance(dados, list) or len(dados) == 0:
+        raise ValueError("A NASA não devolveu nenhuma APOD.")
+
+    # O primeiro elemento é a APOD mais recente
+    apod = dados[0]
+
     resultado = {
-        "titulo": dados.get("title", "Imagem do Dia"),
-        "explicacao": dados.get("explanation", ""),
-        "url_imagem": dados.get("url"),
-        "url_hd": dados.get("hdurl"),          # versão em alta resolução, se existir
-        "tipo_media": dados.get("media_type", "image"),  # "image" ou "video"
-        "data": dados.get("date", hoje),
-        "autor": dados.get("copyright"),        # nem toda a imagem tem autor (muitas são domínio público da NASA)
+        "titulo": apod.get("title", "Imagem do Dia"),
+
+        "explicacao": remover_html(
+            apod.get("explanation", "")
+        ),
+
+        # Na nova API, hdurl contém diretamente a imagem
+        "url_imagem": apod.get("hdurl"),
+
+        "url_hd": apod.get("hdurl"),
+
+        "tipo_media": apod.get("media_type", "image"),
+
+        "data": apod.get("date", hoje),
+
+        "autor": remover_html(
+            apod.get("copyright") or apod.get("credit")
+        ),
+
+        # Página oficial da APOD na NASA
+        "pagina_nasa": apod.get("url")
     }
 
     _cache["data"] = hoje
     _cache["resultado"] = resultado
+
     return resultado
