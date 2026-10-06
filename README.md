@@ -287,9 +287,12 @@ astroguide/
     │   │                    abria antes passou a ser a página
     │   │                    /perfil.
     │   │
-    │   ├── perfil.css     → Página do perfil: o cabeçalho com
-    │   │                    as iniciais, os cartões das secções
-    │   │                    e as caixas dos formulários.
+    │   ├── perfil.css     → Página do perfil, no desenho da
+    │   │                    referência: o cabeçalho (avatar,
+    │   │                    nome e o selo "Conta AstroGuide"),
+    │   │                    as quatro caixas da localização,
+    │   │                    e os favoritos e o caderno lado a
+    │   │                    lado.
     │   │
     │   ├── admin.css      → Página de administração (tabela
     │   │                    das contas, totais, cartão de

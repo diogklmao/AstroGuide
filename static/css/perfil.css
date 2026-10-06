@@ -1,9 +1,15 @@
 /* ── Perfil — a conta, vista por quem é dono dela ─────────────────────── */
 /* A página veste a moldura do menu (page-menu + page-perfil, ver perfil.html)
    para ter o mesmo fundo do /entrar e do /admin. Só desfaz o que, sendo
-   verdade no menu, é falso aqui — e o resto dos cartões de vidro, do botão de
-   voltar e do campo de estrelas vem do glass.css e do shared-ui-controls.css,
-   tal e qual.
+   verdade no menu, é falso aqui — e o resto do botão de voltar e do campo de
+   estrelas vem do glass.css e do shared-ui-controls.css, tal e qual.
+
+   O desenho é o da referência: uma coluna estreita ao centro com quatro
+   cartões — quem sou, a localização de observação, os favoritos e o caderno
+   (estes dois últimos lado a lado). Os cartões não são o .glass-panel do
+   glass.css: na referência são vidro mais fechado, de canto mais redondo e
+   sem o brilho do topo, e bater no glass-panel para o mudar era mudar o
+   material de todas as outras páginas. São desenhados aqui, de raiz.
 
    Os campos e os botões desta página vivem aqui, e não no conta.css: nasceram
    lá, dentro do painel flutuante de conta que existia no canto, mas o painel
@@ -27,17 +33,39 @@ body.page-perfil {
 }
 
 /* ── Moldura do conteúdo ─────────────────────────────────────────────── */
-/* O padding de cima não é estético: o botão de voltar é fixo no canto
-   superior esquerdo (shared-ui-controls.css) e o botão de conta no direito
-   (conta.css) — sem esta folga o primeiro cartão nascia por baixo deles.
-   A largura é menor que a do /admin: aqui não há tabelas, há formulários e
-   listas, e uma linha de texto de 1000px de comprimento perde-se. */
+/* A coluna da referência: 753px de cartão dentro de uma coluna de 793 (20px
+   de margem de cada lado), quase encostada ao topo — o botão "◀ Menu" é fixo
+   no canto e vive fora dela, por isso não há nada para não tapar. O gap é o
+   vão entre cartões da referência (~13px). */
 .page-perfil .conteudo {
     align-items: stretch;
-    gap: 16px;
-    max-width: 820px;
+    gap: 13px;
+    max-width: 793px;
     margin: 0 auto;
-    padding: 84px 20px 56px;
+    padding: 26px 20px 56px;
+}
+
+/* ── Os cartões ──────────────────────────────────────────────────────── */
+/* O material da referência: vidro escuro quase fechado (0.72), borda fina
+   azulada com o topo um pouco mais claro, canto de 22px e uma sombra funda
+   que os despega do fundo. Igual nos quatro — quem sou não é especial. */
+.perfil-cabecalho,
+.perfil-cartao {
+    border: 1px solid rgba(130, 165, 235, 0.16);
+    border-top-color: rgba(170, 200, 255, 0.24);
+    border-radius: 22px;
+    background: rgba(15, 21, 46, 0.72);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Recuos por cartão: o da referência é mais curto no cabeçalho (o avatar
+   quase toca às bordas) e mais folgado nos cartões de secção. */
+.perfil-cartao {
+    padding: 18px 22px 16px;
 }
 
 /* ── Cabeçalho: quem é ───────────────────────────────────────────────── */
@@ -45,153 +73,332 @@ body.page-perfil {
 .perfil-cabecalho {
     display: flex;
     align-items: center;
-    gap: 18px;
-    /* Deixa o botão da administração descer sozinho para a linha de baixo num
-       ecrã estreito, em vez de espremer o nome e o email contra ele. */
+    gap: 20px;
+    padding: 14px 24px;
+    /* Deixa o lado direito (o selo da conta e a administração) descer sozinho
+       para a linha de baixo num ecrã estreito, em vez de espremer o nome e o
+       email contra ele. */
     flex-wrap: wrap;
-    padding: 24px 26px;
 }
 
-/* As iniciais. Não há upload de imagem: uma fotografia de perfil obrigaria a
-   guardar ficheiros, a limitar-lhes o tamanho e a moderá-los, e isto é um
-   projeto de céu, não uma rede social. */
+/* O avatar, grande e com anel — na referência é um círculo de ~88px com um
+   fio azul à volta e a inicial ao centro. Não há upload de imagem: uma
+   fotografia de perfil obrigaria a guardar ficheiros, a limitar-lhes o
+   tamanho e a moderá-los, e isto é um projeto de céu, não uma rede social. */
 .perfil-avatar {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
-    border: 1px solid rgba(110, 184, 255, 0.35);
+    width: 88px;
+    height: 88px;
+    border: 2px solid rgba(140, 175, 255, 0.5);
     border-radius: 50%;
-    background: radial-gradient(circle at 30% 25%, rgba(110, 184, 255, 0.3), rgba(8, 12, 32, 0.75));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 0 22px rgba(110, 184, 255, 0.18);
-    color: #dceaff;
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.55rem;
+    background: radial-gradient(circle at 32% 28%, rgba(110, 184, 255, 0.22), rgba(10, 15, 35, 0.9));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 0 26px rgba(110, 168, 255, 0.22);
+    color: #eaf0ff;
+    font-family: inherit;
+    font-size: 2.2rem;
     font-weight: 600;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.02em;
 }
 
-/* O flex:1 é o que empurra a ligação da administração para a direita; o
-   min-width a zero é o que deixa o email encolher — sem ele, a largura
-   natural do texto impediria o corte e a linha estourava para fora do cartão. */
+/* O flex:1 é o que empurra o lado direito para fora; o min-width a zero é o
+   que deixa o email encolher — sem ele, a largura natural do texto impediria
+   o corte e a linha estourava para fora do cartão. */
 .perfil-quem {
     flex: 1;
     min-width: 0;
 }
 
+/* O nome, em letra grande e branca. Sem serifa e em peso alto, como na
+   referência — aqui a hierarquia vem do tamanho, não da família. */
 .perfil-nome {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.65rem;
-    font-weight: 300;
-    line-height: 1.15;
-    letter-spacing: 0.06em;
-    color: rgba(255, 255, 255, 0.94);
-}
-
-.perfil-email {
-    margin-top: 3px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.78rem;
-    color: rgba(160, 175, 200, 0.7);
+    font-family: inherit;
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: #ffffff;
 }
 
+.perfil-email {
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.88rem;
+    color: rgba(165, 182, 215, 0.62);
+}
+
+/* "📅 Membro desde …" — a linha de baixo, discreta. O 📅 é o mesmo que a
+   referência traz à frente do texto. */
 .perfil-meta {
-    margin-top: 9px;
-    font-size: 0.72rem;
-    color: rgba(160, 175, 200, 0.6);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: rgba(165, 182, 215, 0.55);
 }
 
 .perfil-papel {
     color: #ffe9a8;
 }
 
-/* ── Cartões das secções ─────────────────────────────────────────────── */
+/* ── O lado direito do cabeçalho: o selo da conta ────────────────────── */
 
-.perfil-cartao {
-    padding: 22px 26px 26px;
+.perfil-cabecalho-lado {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
 }
 
+/* Pills. A da conta é um selo — diz a quem pertence este perfil — e não uma
+   porta: quem está no perfil já está dentro da conta (ver também o
+   "Perfil: dentro da conta", no conta.css). */
+.perfil-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border: 1px solid rgba(130, 165, 235, 0.22);
+    border-radius: 999px;
+    background: rgba(12, 18, 38, 0.6);
+    color: #eaf0ff;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+a.perfil-pill:hover {
+    border-color: rgba(160, 195, 255, 0.5);
+    background: rgba(20, 30, 60, 0.7);
+}
+
+a.perfil-pill:focus-visible {
+    outline: 2px solid var(--accent, #6eb8ff);
+    outline-offset: 3px;
+}
+
+/* O planeta com anel, azul, à esquerda do texto — desenhado em SVG e não em
+   emoji: o 🪐 muda de máquina para máquina e o anel dele não é azul. */
+.perfil-pill-icone {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: #6ea8ff;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+}
+
+/* A faíscula no canto de cima à direita da pill, como na referência. */
+.perfil-pill-faisca {
+    position: absolute;
+    top: -5px;
+    right: -3px;
+    font-size: 0.62rem;
+    color: rgba(150, 190, 255, 0.9);
+    text-shadow: 0 0 8px rgba(110, 184, 255, 0.6);
+}
+
+.perfil-pill-conta {
+    position: relative;
+}
+
+/* A entrada da administração: o mesmo corpo da pill da conta, só com o tom
+   quente que a separa — em azul ao lado do selo da conta, lia-se como mais
+   uma informação da conta, que é o que não é. */
+.perfil-pill-admin {
+    border-color: rgba(255, 204, 80, 0.4);
+    background: rgba(255, 204, 80, 0.12);
+    color: #ffe9a8;
+}
+
+a.perfil-pill-admin:hover {
+    border-color: #ffcc02;
+    background: rgba(255, 204, 80, 0.2);
+}
+
+/* ── Títulos das secções ─────────────────────────────────────────────── */
+
+/* Em maiúsculas, branco e com o ícone colorido à frente — na referência os
+   títulos são brancos e o que tem cor é o ícone (o pino rosa, a estrela
+   amarela, o caderno). */
 .perfil-secao-titulo {
-    margin-bottom: 14px;
-    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: inherit;
+    font-size: 0.95rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--accent, #6eb8ff);
+    color: #ffffff;
+}
+
+.perfil-secao-icone {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+/* A linha de apoio por baixo do título ("Define a tua localização…"). */
+.perfil-secao-sub {
+    margin: 6px 0 0;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    color: rgba(165, 182, 215, 0.6);
 }
 
 /* Texto de apoio às secções (por baixo de um rótulo, ou no lugar de uma
    lista vazia). */
 .perfil-ajuda {
     margin: 10px 0 0;
-    font-size: 0.72rem;
+    font-size: 0.78rem;
     line-height: 1.6;
-    color: #556070;
+    color: rgba(165, 182, 215, 0.55);
 }
 
 .perfil-ajuda strong {
-    color: #8ea6c4;
+    color: rgba(210, 225, 250, 0.85);
     font-weight: 600;
 }
 
-/* ── Linha de rótulo + valor (a localização a valer) ──────────────────── */
-
-.perfil-linha {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+/* ── As quatro caixas da localização ─────────────────────────────────── */
+/* Cidade, Coordenadas, Fuso horário e Hora local — 2×2, cada uma com o seu
+   ícone num quadradinho de cor. A cor é do ícone e do fundo do quadradinho
+   só: o resto da caixa é neutro, para as quatro lerem como uma lista. */
+.perfil-tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
-    margin-bottom: 12px;
-    font-size: 0.78rem;
+    margin-top: 16px;
 }
 
-/* O rótulo da linha é um <span> e herda o tamanho da linha; é o seletor
-   "label" em label.perfil-rotulo (mais abaixo) que separa os dois casos, e
-   sem ele esta regra apanhava também os rótulos dos campos. */
-.perfil-linha .perfil-rotulo {
-    color: #556070;
+.perfil-tile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    min-width: 0;
 }
 
-.perfil-linha .perfil-valor {
+/* O quadradinho do ícone. Os SVGs herdam a cor do contentor (currentColor),
+   e cada variante pinta o seu — os mesmos tons em toda a aplicação. */
+.perfil-tile-icone {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+}
+
+.perfil-tile-icone svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.perfil-tile-icone--azul {
+    background: rgba(96, 150, 255, 0.16);
+    color: #6ea8ff;
+}
+
+.perfil-tile-icone--roxo {
+    background: rgba(160, 120, 255, 0.16);
+    color: #a98cff;
+}
+
+.perfil-tile-icone--vermelho {
+    background: rgba(255, 110, 130, 0.15);
+    color: #ff7d92;
+}
+
+.perfil-tile-icone--verde {
+    background: rgba(80, 210, 150, 0.15);
+    color: #5fd6a0;
+}
+
+.perfil-tile-texto {
+    min-width: 0;
+}
+
+.perfil-tile-rotulo {
+    font-size: 0.72rem;
+    color: rgba(165, 182, 215, 0.6);
+}
+
+/* O valor: a cidade, as coordenadas, o fuso, a hora. Corta em vez de
+   estourar — "Vila Nova de Gaia, Portugal" cabe numa linha, como na
+   referência, e o resto fica nos três pontos. */
+.perfil-tile-valor {
+    margin-top: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: right;
-    color: #dce3f0;
+    font-size: 0.85rem;
+    color: #eaf0ff;
+    min-width: 0;
+}
+
+/* A hora local anda segundo a segundo (ver perfil.js). Com números de largura
+   fixa, o campo não muda de tamanho a cada segundo que passa — sem isto, o
+   valor mexia-se de lado a cada tique e puxava a atenção para ele. */
+#perfil-hora-local {
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── Campos dos formulários ──────────────────────────────────────────── */
 
+/* O rótulo dos campos ("Escolher uma cidade", "O que observaste"…): claro,
+   quase branco, como na referência. */
 label.perfil-rotulo {
     display: block;
     margin-top: 10px;
-    font-size: 0.72rem;
-    color: #7c8798;
+    font-size: 0.82rem;
+    color: rgba(225, 232, 250, 0.85);
 }
 
 .perfil-campo {
+    box-sizing: border-box;
     width: 100%;
     margin: 6px 0 2px;
-    padding: 8px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    background: rgba(4, 6, 20, 0.55);
-    color: #e8eefc;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    background: rgba(9, 14, 32, 0.6);
+    color: #eaf0ff;
     font-family: inherit;
-    font-size: 0.82rem;
+    font-size: 0.85rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .perfil-campo:focus {
     outline: none;
-    border-color: #6eb8ff;
+    border-color: #6ea8ff;
+    box-shadow: 0 0 0 3px rgba(110, 168, 255, 0.18);
 }
 
 .perfil-campo::placeholder {
-    color: #3d4757;
+    color: rgba(150, 165, 200, 0.42);
 }
 
 /* A nota do caderno é escrita à mão e pode ser longa: cresce para baixo, e não
@@ -211,40 +418,55 @@ textarea.perfil-campo {
     cursor: pointer;
 }
 
-/* Dois campos lado a lado, porque são um par. O min-width a zero é o que os
-   deixa encolher: sem ele, a largura natural de um <input> impede-o de descer
-   abaixo disso e a linha estoura para fora do cartão. */
-.perfil-campos-linha {
+/* ── O campo de procura de cidades ───────────────────────────────────── */
+/* Com a lupa à esquerda e o ⌄ à direita, como na referência. Os dois são
+   decorativos (pointer-events: none) e ficam por cima do campo: o que se
+   escreve continua a ser o <input>, com todo o espaço dele. */
+.perfil-procura {
+    position: relative;
     display: flex;
-    gap: 8px;
+    align-items: center;
 }
 
-.perfil-campos-linha > div {
-    flex: 1;
-    min-width: 0;
+.perfil-procura-icone {
+    position: absolute;
+    left: 12px;
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: rgba(165, 182, 215, 0.55);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    pointer-events: none;
 }
 
-/* A hora local anda segundo a segundo (ver perfil.js). Com números de largura
-   fixa, o campo não muda de tamanho a cada segundo que passa — sem isto, o
-   valor mexia-se de lado a cada tique e puxava a atenção para ele. */
-#perfil-hora-local {
-    font-variant-numeric: tabular-nums;
+.perfil-procura .perfil-campo {
+    padding: 6px 34px 6px 38px;
 }
 
-/* ── Seletor de cidade ───────────────────────────────────────────────── */
+.perfil-procura-seta {
+    position: absolute;
+    right: 13px;
+    color: rgba(165, 182, 215, 0.6);
+    font-size: 0.8rem;
+    line-height: 1;
+    pointer-events: none;
+}
+
+/* ── Seletor de cidade: os resultados ────────────────────────────────── */
 /* A lista de resultados aparece debaixo do campo onde se escreve, e empurra o
    que vem a seguir para baixo em vez de pairar por cima. Pairar tapava o botão
    da localização do dispositivo — que é justamente a alternativa que a própria
    lista sugere quando não encontra a terra. */
 .perfil-resultados {
     list-style: none;
-    margin: 6px 0 2px;
+    margin: 8px 0 2px;
     padding: 4px;
     max-height: 264px;
     overflow-y: auto;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    background: rgba(4, 6, 20, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    background: rgba(9, 14, 32, 0.75);
 }
 
 /* O [hidden] do HTML é o que esconde a lista e o cartão da escolha, mas o
@@ -264,7 +486,7 @@ textarea.perfil-campo {
     width: 100%;
     padding: 7px 9px;
     border: 0;
-    border-radius: 6px;
+    border-radius: 8px;
     background: transparent;
     color: inherit;
     font-family: inherit;
@@ -274,14 +496,14 @@ textarea.perfil-campo {
 
 .perfil-resultado:hover,
 .perfil-resultado:focus-visible {
-    background: rgba(110, 184, 255, 0.16);
+    background: rgba(110, 168, 255, 0.16);
     outline: none;
 }
 
 .perfil-resultado-nome {
     display: block;
     font-size: 0.84rem;
-    color: #e8eefc;
+    color: #eaf0ff;
 }
 
 /* A região e as coordenadas, em letra pequena: distinguem as terras com o
@@ -290,7 +512,7 @@ textarea.perfil-campo {
     display: block;
     margin-top: 2px;
     font-size: 0.7rem;
-    color: #7c8798;
+    color: rgba(165, 182, 215, 0.55);
 }
 
 /* "Não encontrámos essa terra" — não é um resultado, é uma resposta. */
@@ -298,18 +520,18 @@ textarea.perfil-campo {
     padding: 7px 9px;
     font-size: 0.75rem;
     line-height: 1.5;
-    color: #7c8798;
+    color: rgba(165, 182, 215, 0.55);
 }
 
 /* ── A escolha à espera de confirmação ───────────────────────────────── */
 /* Destacada do resto do cartão: é o que está escolhido mas ainda NÃO está a
    valer, e a diferença entre as duas coisas tem de se ver. */
 .perfil-escolha {
-    margin-top: 10px;
-    padding: 10px 12px;
-    border: 1px solid rgba(110, 184, 255, 0.35);
-    border-radius: 8px;
-    background: rgba(110, 184, 255, 0.09);
+    margin-top: 12px;
+    padding: 12px 14px;
+    border: 1px solid rgba(110, 168, 255, 0.35);
+    border-radius: 12px;
+    background: rgba(110, 168, 255, 0.09);
 }
 
 .perfil-escolha-cabeca {
@@ -327,35 +549,48 @@ textarea.perfil-campo {
 
 .perfil-escolha-regiao {
     font-size: 0.72rem;
-    color: #7c8798;
+    color: rgba(165, 182, 215, 0.55);
 }
 
 .perfil-escolha-dados {
     margin-top: 4px;
     font-size: 0.72rem;
-    color: #9fb0c8;
+    color: rgba(165, 182, 215, 0.7);
     font-variant-numeric: tabular-nums;
 }
 
 /* ── Botões ──────────────────────────────────────────────────────────── */
 
+/* O botão cheio da referência: índigo, de canto 10px, com o ícone à frente do
+   texto. É a cor das AÇÕES — o "Usar a localização deste dispositivo" e o
+   "Guardar observação" são a mesma peça. */
 .perfil-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     width: 100%;
-    padding: 9px;
-    margin-top: 8px;
-    border: 1px solid #1a1a3e;
-    border-radius: 8px;
-    background: #111130;
-    color: #dce3f0;
+    padding: 7px 14px;
+    margin-top: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #4a4ec9, #3b3fae);
+    color: #ffffff;
     font-family: inherit;
-    font-size: 0.82rem;
+    font-size: 0.86rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: border-color 0.2s ease, color 0.2s ease;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 
 .perfil-btn:hover {
-    border-color: #6eb8ff;
-    color: #6eb8ff;
+    background: linear-gradient(180deg, #565ae0, #4448c2);
+    box-shadow: 0 10px 24px rgba(70, 74, 200, 0.35);
+    transform: translateY(-1px);
+}
+
+.perfil-btn:active {
+    transform: translateY(0);
 }
 
 .perfil-btn:focus-visible {
@@ -368,57 +603,32 @@ textarea.perfil-campo {
 .perfil-btn:disabled {
     opacity: 0.5;
     cursor: progress;
+    transform: none;
+}
+
+/* O fantasma: o "↺ Voltar a Vila Nova de Gaia" é uma ação de desfazer, e não
+   compete com as ações de fazer. Mesmo corpo, sem preenchimento. */
+.perfil-btn-fantasma {
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(210, 222, 245, 0.8);
+}
+
+.perfil-btn-fantasma:hover {
+    background: rgba(255, 255, 255, 0.09);
+    box-shadow: none;
 }
 
 /* O botão de sair é o único com tom de aviso — é o que se carrega sem querer. */
+.perfil-btn-sair {
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(210, 222, 245, 0.8);
+}
+
 .perfil-btn-sair:hover {
-    border-color: #ff7085;
-    color: #ff7085;
-}
-
-/* Ligação com o mesmo corpo dos botões. Hoje só a administração a usa; fica
-   a forma pronta para as que vierem a seguir (mudar a password, por exemplo). */
-.perfil-ligacao {
-    display: inline-block;
-    padding: 10px 16px;
-    border: 1px solid rgba(110, 184, 255, 0.45);
-    border-radius: 8px;
-    background: rgba(110, 184, 255, 0.16);
-    color: #dceaff;
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-align: center;
-    text-decoration: none;
-    transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.perfil-ligacao:hover {
-    border-color: #6eb8ff;
-    background: rgba(110, 184, 255, 0.26);
-}
-
-.perfil-ligacao:focus-visible {
-    outline: 2px solid var(--accent, #6eb8ff);
-    outline-offset: 2px;
-}
-
-/* A entrada da administração. Só muda a cor — a forma é a mesma das outras
-   ligações. É de propósito: em azul, ao lado de "Terminar sessão" e "Voltar a
-   Vila Nova de Gaia", lia-se como mais uma ação da conta, que é o que não é.
-   O tom quente separa-a sem precisar de um botão de outro tamanho. */
-.perfil-ligacao-admin {
-    border-color: rgba(255, 204, 80, 0.4);
-    background: rgba(255, 204, 80, 0.12);
-    color: #ffe9a8;
-}
-
-.perfil-ligacao-admin:hover {
-    border-color: #ffcc02;
-    background: rgba(255, 204, 80, 0.2);
-}
-
-.perfil-ligacao-admin:focus-visible {
-    outline-color: #ffcc02;
+    border-color: rgba(255, 112, 133, 0.7);
+    background: rgba(255, 80, 105, 0.12);
+    color: #ff8ea0;
+    box-shadow: none;
 }
 
 /* ── Avisos (erro a vermelho, confirmação a verde) ────────────────────── */
@@ -455,18 +665,18 @@ textarea.perfil-campo {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
+    margin: 14px 0 8px;
     font-size: 0.72rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: rgba(160, 175, 200, 0.7);
+    color: rgba(165, 182, 215, 0.6);
 }
 
 .perfil-badge {
     padding: 1px 7px;
-    border: 1px solid rgba(110, 184, 255, 0.3);
+    border: 1px solid rgba(110, 168, 255, 0.3);
     border-radius: 10px;
-    background: rgba(110, 184, 255, 0.12);
+    background: rgba(110, 168, 255, 0.12);
     color: #9fd0ff;
     font-size: 0.68rem;
     font-variant-numeric: tabular-nums;
@@ -491,7 +701,7 @@ textarea.perfil-campo {
     padding: 9px 12px;
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 10px;
-    background: rgba(4, 6, 20, 0.35);
+    background: rgba(255, 255, 255, 0.035);
     font-size: 0.82rem;
 }
 
@@ -502,7 +712,7 @@ textarea.perfil-campo {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #dce3f0;
+    color: #eaf0ff;
 }
 
 .perfil-item-data {
@@ -511,7 +721,7 @@ textarea.perfil-campo {
     flex: 0 0 auto;
     font-size: 0.7rem;
     font-variant-numeric: tabular-nums;
-    color: rgba(160, 175, 200, 0.55);
+    color: rgba(165, 182, 215, 0.5);
 }
 
 /* O ✕ de remover. Redondo e discreto: é uma ação que se faz de vez em quando e
@@ -551,14 +761,58 @@ textarea.perfil-campo {
     cursor: progress;
 }
 
+/* ── A caixa do convite, quando a lista está vazia ───────────────────── */
+/* Em vez de uma linha de texto perdida, uma caixa com o ícone em cima e o
+   convite em baixo, como na referência: é o sítio onde a pessoa percebe onde
+   é que se marca o primeiro favorito. */
+.perfil-vazio {
+    margin-top: 16px;
+    padding: 34px 26px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    background:
+        radial-gradient(110% 130% at 88% 18%, rgba(120, 90, 220, 0.16), transparent 55%),
+        radial-gradient(110% 130% at 12% 92%, rgba(70, 110, 220, 0.12), transparent 55%),
+        rgba(255, 255, 255, 0.02);
+    text-align: center;
+}
+
+.perfil-vazio-icone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    margin: 0 auto 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(210, 225, 255, 0.75);
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.perfil-vazio-texto {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    color: rgba(185, 200, 235, 0.62);
+}
+
+.perfil-vazio-texto strong {
+    color: #eaf0ff;
+    font-weight: 600;
+}
+
 /* ── Caderno de observações ──────────────────────────────────────────── */
 
 .perfil-form {
-    margin-bottom: 18px;
+    margin-top: 4px;
 }
 
 .perfil-lista-obs {
     gap: 8px;
+    margin-top: 16px;
 }
 
 /* As observações são mais altas que uma linha de favorito (têm a nota), por
@@ -590,8 +844,20 @@ textarea.perfil-campo {
     overflow-wrap: anywhere;
 }
 
+/* ── Favoritos e caderno, lado a lado ────────────────────────────────── */
+/* As duas listas da conta, uma ao lado da outra — a da referência. São
+   independentes: a de cima cresce com os favoritos, a de baixo com as
+   observações, e nenhuma puxa a outra. O align-items: start é o que impede
+   as duas de ficarem com a altura da maior. */
+.perfil-dupla {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 13px;
+    align-items: start;
+}
+
 /* ── Terminar sessão ─────────────────────────────────────────────────── */
-/* Não leva a largura toda (é .perfil-btn, que a tem): um botão de 800px para
+/* Não leva a largura toda (é .perfil-btn, que a tem): um botão de 750px para
    uma ação de uma linha lê-se como a ação principal da página, e não é. */
 
 .perfil-fim {
@@ -607,30 +873,45 @@ textarea.perfil-campo {
 
 /* ── Ecrãs pequenos ──────────────────────────────────────────────────── */
 
+@media (max-width: 860px) {
+    /* Favoritos e caderno descem para cima e baixo: lado a lado, cada um
+       ficava com menos de metade do ecrã. */
+    .perfil-dupla {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 640px) {
     .page-perfil .conteudo {
         padding: 76px 14px 44px;
     }
 
-    .perfil-cabecalho {
-        padding: 20px 18px;
-    }
-
+    .perfil-cabecalho,
     .perfil-cartao {
         padding: 18px 16px 20px;
+        border-radius: 18px;
     }
 
     .perfil-avatar {
-        width: 54px;
-        height: 54px;
-        font-size: 1.3rem;
+        width: 68px;
+        height: 68px;
+        font-size: 1.75rem;
     }
 
     .perfil-nome {
-        font-size: 1.35rem;
+        font-size: 1.5rem;
     }
 
-    .perfil-ligacao {
+    .perfil-tiles {
+        grid-template-columns: 1fr;
+    }
+
+    .perfil-cabecalho-lado {
+        margin-left: 0;
+    }
+
+    .perfil-pill {
         width: 100%;
+        justify-content: center;
     }
 }

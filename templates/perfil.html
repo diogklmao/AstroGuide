@@ -48,25 +48,40 @@
              no auth.py). O avatar são as iniciais do nome: não há ficheiros
              de imagem nem upload, por isso não há nada para guardar, limitar
              de tamanho ou moderar. -->
-        <div class="perfil-cabecalho glass-panel glass-shimmer">
+        <div class="perfil-cabecalho">
             <div class="perfil-avatar" aria-hidden="true">{{ iniciais }}</div>
             <div class="perfil-quem">
                 <div class="perfil-nome">{{ utilizador.nome }}</div>
                 <div class="perfil-email">{{ utilizador.email }}</div>
                 <div class="perfil-meta">
-                    Membro desde {{ membro_desde }}
+                    <span aria-hidden="true">📅</span>
+                    <span>Membro desde {{ membro_desde }}</span>
                     {% if admin %}
-                    · <span class="perfil-papel">🔐 Administrador</span>
+                    <span>·</span>
+                    <span class="perfil-papel">🔐 Administrador</span>
                     {% endif %}
                 </div>
             </div>
-            {% if admin %}
-            <!-- Só aparece a quem tem o papel. Não é isto que protege a página:
-                 quem escrever /admin à mão bate na mesma na verificação do
-                 servidor, e é lá que a decisão está. Aqui só se evita o
-                 caminho inútil, como já se fazia no painel de conta. -->
-            <a class="perfil-ligacao perfil-ligacao-admin" href="/admin">🔐 Administração</a>
-            {% endif %}
+            <div class="perfil-cabecalho-lado">
+                {% if admin %}
+                <!-- Só aparece a quem tem o papel. Não é isto que protege a
+                     página: quem escrever /admin à mão bate na mesma na
+                     verificação do servidor, e é lá que a decisão está. Aqui
+                     só se evita o caminho inútil. -->
+                <a class="perfil-pill perfil-pill-admin" href="/admin">🔐 Administração</a>
+                {% endif %}
+                <!-- O selo da conta: diz a que pertence este perfil, e não é
+                     uma porta para lado nenhum — quem está aqui já está dentro
+                     da conta. -->
+                <div class="perfil-pill perfil-pill-conta">
+                    <svg class="perfil-pill-icone" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="5.2"></circle>
+                        <ellipse cx="12" cy="12" rx="9.6" ry="3.2" transform="rotate(-18 12 12)"></ellipse>
+                    </svg>
+                    Conta AstroGuide
+                    <span class="perfil-pill-faisca" aria-hidden="true">✦</span>
+                </div>
+            </div>
         </div>
 
         <!-- ── Localização de observação ──────────────────────────────────
@@ -77,51 +92,90 @@
              Madrid são 40,4168° N e 3,7038° O, e um número trocado punha o céu
              inteiro no sítio errado sem nada a avisar.
 
+             As quatro caixas em cima são o que está a valer, com as
+             coordenadas à vista: é a maneira de confirmar que a cidade
+             escolhida é mesmo a que a aplicação está a usar, sem ter de
+             acreditar só no nome.
+
              Fica ainda o botão da localização do dispositivo, que é o outro
              caminho para não escrever nada: o browser sabe onde está o
              computador e a aplicação vai buscar o nome da terra a essas
              coordenadas. O que ele faz vive no perfil.js. -->
-        <div class="perfil-cartao glass-panel">
-            <div class="perfil-secao-titulo">📍 Localização de observação</div>
-
-            <!-- O que está a valer, com as coordenadas à vista: é a maneira de
-                 confirmar que a cidade escolhida é mesmo a que a aplicação
-                 está a usar, sem ter de acreditar só no nome. -->
-            <div class="perfil-linha">
-                <span class="perfil-rotulo">A valer agora</span>
-                <span class="perfil-valor">{{ localizacao.nome }}</span>
+        <div class="perfil-cartao">
+            <div class="perfil-secao-titulo">
+                <span class="perfil-secao-icone" aria-hidden="true">📍</span>
+                Localização de observação
             </div>
-            <div class="perfil-linha">
-                <span class="perfil-rotulo">Coordenadas</span>
-                <span class="perfil-valor">{{ coordenadas }}</span>
-            </div>
-            <div class="perfil-linha">
-                <span class="perfil-rotulo">Fuso horário</span>
-                <span class="perfil-valor">{{ localizacao.timezone }}</span>
-            </div>
-            <div class="perfil-linha">
-                <span class="perfil-rotulo">Hora local</span>
-                <!-- Escrito pelo perfil.js, segundo a segundo, no fuso da
-                     localização escolhida (e não no do computador): é a prova
-                     de que a hora que o observatório simula é a hora certa
-                     naquele sítio. O fuso vai em data-*, que é de onde o
-                     perfil.js o lê — não há aqui um segundo sítio onde ele
-                     esteja escrito, e por isso não há dois fusos a poder
-                     discordar. -->
-                <span class="perfil-valor" id="perfil-hora-local"
-                      data-fuso="{{ localizacao.timezone }}">—</span>
-            </div>
-
-            <p class="perfil-ajuda">
-                {% if localizacao_propria %}
-                É esta a localização que guardaste, e é para aqui que o céu, o
-                calendário e o observatório são calculados.
-                {% else %}
-                Ainda não escolheste nenhuma, por isso os cálculos são feitos
-                para {{ localizacao.nome }}. Escolhe a tua e passam a ser
-                feitos para aí.
-                {% endif %}
+            <p class="perfil-secao-sub">
+                Define a tua localização para veres o céu, horários e eventos
+                astronómicos da tua região.
             </p>
+
+            <div class="perfil-tiles">
+                <div class="perfil-tile">
+                    <span class="perfil-tile-icone perfil-tile-icone--azul" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 21.5s6.5-5.8 6.5-10.5a6.5 6.5 0 1 0-13 0c0 4.7 6.5 10.5 6.5 10.5z"></path>
+                            <circle cx="12" cy="10.8" r="2.4"></circle>
+                        </svg>
+                    </span>
+                    <div class="perfil-tile-texto">
+                        <div class="perfil-tile-rotulo">Cidade</div>
+                        <div class="perfil-tile-valor">{{ localizacao.nome }}</div>
+                    </div>
+                </div>
+
+                <div class="perfil-tile">
+                    <span class="perfil-tile-icone perfil-tile-icone--roxo" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="6.4"></circle>
+                            <circle cx="12" cy="12" r="1.5"></circle>
+                            <line x1="12" y1="2.5" x2="12" y2="5.5"></line>
+                            <line x1="12" y1="18.5" x2="12" y2="21.5"></line>
+                            <line x1="2.5" y1="12" x2="5.5" y2="12"></line>
+                            <line x1="18.5" y1="12" x2="21.5" y2="12"></line>
+                        </svg>
+                    </span>
+                    <div class="perfil-tile-texto">
+                        <div class="perfil-tile-rotulo">Coordenadas</div>
+                        <div class="perfil-tile-valor">{{ coordenadas }}</div>
+                    </div>
+                </div>
+
+                <div class="perfil-tile">
+                    <span class="perfil-tile-icone perfil-tile-icone--vermelho" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="8"></circle>
+                            <polyline points="12 7.5 12 12 15.5 14"></polyline>
+                        </svg>
+                    </span>
+                    <div class="perfil-tile-texto">
+                        <div class="perfil-tile-rotulo">Fuso horário</div>
+                        <div class="perfil-tile-valor">{{ localizacao.timezone }}</div>
+                    </div>
+                </div>
+
+                <div class="perfil-tile">
+                    <span class="perfil-tile-icone perfil-tile-icone--verde" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="8"></circle>
+                            <polyline points="12 7.5 12 12 15.5 14"></polyline>
+                        </svg>
+                    </span>
+                    <div class="perfil-tile-texto">
+                        <!-- Escrito pelo perfil.js, segundo a segundo, no fuso
+                             da localização escolhida (e não no do computador):
+                             é a prova de que a hora que o observatório simula é
+                             a hora certa naquele sítio. O fuso vai em data-*,
+                             que é de onde o perfil.js o lê — não há aqui um
+                             segundo sítio onde ele esteja escrito, e por isso
+                             não há dois fusos a poder discordar. -->
+                        <div class="perfil-tile-rotulo">Hora local</div>
+                        <div class="perfil-tile-valor" id="perfil-hora-local"
+                             data-fuso="{{ localizacao.timezone }}">—</div>
+                    </div>
+                </div>
+            </div>
 
             <label for="local-procura" class="perfil-rotulo">Escolher uma cidade</label>
             <!-- type="search" e não type="text": é um campo de procura, e o
@@ -130,9 +184,16 @@
                  lista de endereços que o browser guardou de outros sítios —
                  aqui o que se procura é uma cidade do mundo, não um formulário
                  já preenchido. -->
-            <input type="search" id="local-procura" class="perfil-campo"
-                   placeholder="Escreve o nome — ex.: Lisboa, Madrid" autocomplete="off"
-                   maxlength="60" aria-controls="local-resultados" aria-expanded="false">
+            <div class="perfil-procura">
+                <svg class="perfil-procura-icone" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="6.5"></circle>
+                    <line x1="15.8" y1="15.8" x2="20" y2="20"></line>
+                </svg>
+                <input type="search" id="local-procura" class="perfil-campo"
+                       placeholder="Escreve o nome — ex: Lisboa, Madrid" autocomplete="off"
+                       maxlength="60" aria-controls="local-resultados" aria-expanded="false">
+                <span class="perfil-procura-seta" aria-hidden="true">⌄</span>
+            </div>
 
             <!-- Os resultados da procura. Os botões são escritos pelo
                  perfil.js a partir do que o servidor devolveu (ver
@@ -140,6 +201,11 @@
                  volta — nada do que veio da rede chega a ser interpretado como
                  código. -->
             <ul id="local-resultados" class="perfil-resultados" role="listbox" hidden></ul>
+
+            <button type="button" class="perfil-btn" id="btn-local-dispositivo"
+                    onclick="usarLocalizacaoDoBrowser()">
+                📍 Usar a localização deste dispositivo
+            </button>
 
             <!-- A cidade escolhida, à espera de confirmação. Só depois deste
                  "Guardar" é que ela passa a valer: escolher na lista não grava
@@ -157,15 +223,10 @@
                 </button>
             </div>
 
-            <button type="button" class="perfil-btn" id="btn-local-dispositivo"
-                    onclick="usarLocalizacaoDoBrowser()">
-                📍 Usar a localização deste dispositivo
-            </button>
-
             {% if localizacao_propria %}
             <!-- Só faz sentido para quem tem uma localização própria: sem ela,
                  já se está em Vila Nova de Gaia e o botão não fazia nada. -->
-            <button type="button" class="perfil-btn" onclick="reporLocalizacaoGaia()">
+            <button type="button" class="perfil-btn perfil-btn-fantasma" onclick="reporLocalizacaoGaia()">
                 ↺ Voltar a Vila Nova de Gaia
             </button>
             {% endif %}
@@ -176,109 +237,126 @@
             <div id="perfil-aviso" class="perfil-aviso" role="status" aria-live="polite"></div>
         </div>
 
-        <!-- ── Favoritos ──────────────────────────────────────────────────
-             Chegam da base de dados com o id do objeto ("Ori", "m42") e é
-             aqui, no servidor, que lhes é dado o nome: o catálogo vive do
-             lado do Python (ver _nome_do_favorito, no auth.py). Marcam-se no
-             Observatório, no painel de detalhes, com o ★. -->
-        <div class="perfil-cartao glass-panel">
-            <div class="perfil-secao-titulo">⭐ Favoritos</div>
+        <!-- Favoritos e Caderno, lado a lado: são as duas listas da conta e
+             nenhuma das duas manda na outra. Num ecrã estreito descem para
+             cima e baixo uma da outra (ver o .perfil-dupla, no perfil.css). -->
+        <div class="perfil-dupla">
 
-            {% if n_favoritos %}
-            <p class="perfil-ajuda perfil-contagem">{{ n_favoritos }} guardado{{ "s" if n_favoritos != 1 }} na tua conta.</p>
-
-            {% for grupo in grupos %}
-            {% if grupo.itens %}
-            <div class="perfil-grupo">
-                <div class="perfil-grupo-titulo">
-                    {{ grupo.titulo }} <span class="perfil-badge">{{ grupo.itens|length }}</span>
+            <!-- ── Favoritos ──────────────────────────────────────────────
+                 Chegam da base de dados com o id do objeto ("Ori", "m42") e é
+                 aqui, no servidor, que lhes é dado o nome: o catálogo vive do
+                 lado do Python (ver _nome_do_favorito, no auth.py). Marcam-se
+                 no Observatório, no painel de detalhes, com o ★. -->
+            <div class="perfil-cartao">
+                <div class="perfil-secao-titulo">
+                    <span class="perfil-secao-icone" aria-hidden="true">⭐</span>
+                    Favoritos
                 </div>
-                <ul class="perfil-lista">
-                    {% for f in grupo.itens %}
-                    <li class="perfil-item">
-                        <!-- O tipo e o id vão em data-*, e não dentro do
-                             onclick: assim o JavaScript lê-os do próprio
-                             elemento, e nada do que está guardado chega a ser
-                             interpretado como código. -->
+
+                {% if n_favoritos %}
+                <p class="perfil-ajuda perfil-contagem">{{ n_favoritos }} guardado{{ "s" if n_favoritos != 1 }} na tua conta.</p>
+
+                {% for grupo in grupos %}
+                {% if grupo.itens %}
+                <div class="perfil-grupo">
+                    <div class="perfil-grupo-titulo">
+                        {{ grupo.titulo }} <span class="perfil-badge">{{ grupo.itens|length }}</span>
+                    </div>
+                    <ul class="perfil-lista">
+                        {% for f in grupo.itens %}
+                        <li class="perfil-item">
+                            <!-- O tipo e o id vão em data-*, e não dentro do
+                                 onclick: assim o JavaScript lê-os do próprio
+                                 elemento, e nada do que está guardado chega a
+                                 ser interpretado como código. -->
+                            <button type="button" class="perfil-remover"
+                                    data-tipo="{{ f.tipo }}" data-objeto="{{ f.objeto_id }}"
+                                    onclick="removerFavorito(this)"
+                                    title="Remover dos favoritos"
+                                    aria-label="Remover {{ f.nome }} dos favoritos">✕</button>
+                            <span class="perfil-item-nome">{{ f.nome }}</span>
+                            <span class="perfil-item-data">guardado a {{ f.criado_em }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% endfor %}
+
+                {% else %}
+                <!-- Sem favoritos ainda, a caixa é o convite: diz onde se
+                     marca o primeiro, que é no painel de detalhes do
+                     Observatório e em nenhum outro sítio. -->
+                <div class="perfil-vazio">
+                    <div class="perfil-vazio-icone" aria-hidden="true">☆</div>
+                    <p class="perfil-vazio-texto">
+                        Ainda não tens favoritos. No Observatório, clica numa
+                        estrela, numa constelação ou num objeto de céu profundo
+                        e carrega em <strong>★ Guardar nos favoritos</strong> no
+                        painel de detalhes.
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- ── Caderno de observações ─────────────────────────────────
+                 O nome do objeto é guardado copiado (ver o esquema, no db.py):
+                 uma observação é o registo de um momento, e tem de continuar a
+                 fazer sentido mesmo que o objeto mude de nome no catálogo ou
+                 saia dele. É por isso que aqui não se vai buscar nada ao
+                 catálogo. -->
+            <div class="perfil-cartao">
+                <div class="perfil-secao-titulo">
+                    <span class="perfil-secao-icone" aria-hidden="true">📓</span>
+                    Caderno de observações
+                </div>
+                <p class="perfil-secao-sub">Regista o que observaste no céu.</p>
+
+                <form id="form-observacao" class="perfil-form" onsubmit="adicionarObservacao(event)">
+                    <label for="obs-nome" class="perfil-rotulo">O que observaste</label>
+                    <input type="text" id="obs-nome" class="perfil-campo" maxlength="80"
+                           placeholder="Ex.: Saturno, M42, chuva de meteoros">
+
+                    <label for="obs-data" class="perfil-rotulo">Data</label>
+                    <input type="date" id="obs-data" class="perfil-campo" value="{{ hoje }}">
+
+                    <label for="obs-nota" class="perfil-rotulo">Nota (opcional)</label>
+                    <textarea id="obs-nota" class="perfil-campo" rows="3" maxlength="1000"
+                              placeholder="O que viste, com que instrumento, ou o que chamou a atenção..."></textarea>
+
+                    <button type="submit" class="perfil-btn">📓 Guardar observação</button>
+                </form>
+
+                {% if observacoes %}
+                <ul class="perfil-lista perfil-lista-obs">
+                    {% for o in observacoes %}
+                    <li class="perfil-item perfil-obs">
                         <button type="button" class="perfil-remover"
-                                data-tipo="{{ f.tipo }}" data-objeto="{{ f.objeto_id }}"
-                                onclick="removerFavorito(this)"
-                                title="Remover dos favoritos"
-                                aria-label="Remover {{ f.nome }} dos favoritos">✕</button>
-                        <span class="perfil-item-nome">{{ f.nome }}</span>
-                        <span class="perfil-item-data">guardado a {{ f.criado_em }}</span>
+                                data-id="{{ o.id }}" onclick="removerObservacao(this)"
+                                title="Apagar esta observação"
+                                aria-label="Apagar a observação de {{ o.objeto_nome }}">✕</button>
+                        <div class="perfil-obs-corpo">
+                            <div class="perfil-obs-cabeca">
+                                <span class="perfil-item-nome">{{ o.objeto_nome }}</span>
+                                <span class="perfil-item-data">{{ o.data }}</span>
+                            </div>
+                            {% if o.nota %}
+                            <p class="perfil-obs-nota">{{ o.nota }}</p>
+                            {% endif %}
+                        </div>
                     </li>
                     {% endfor %}
                 </ul>
+                {% else %}
+                <p class="perfil-ajuda">
+                    O caderno está vazio. É onde se guarda o que se viu —
+                    &ldquo;vi Saturno, anéis bem visíveis&rdquo; — e a data de cada
+                    noite.
+                </p>
+                {% endif %}
+
+                <div id="perfil-aviso-obs" class="perfil-aviso" role="status" aria-live="polite"></div>
             </div>
-            {% endif %}
-            {% endfor %}
-
-            {% else %}
-            <p class="perfil-ajuda">
-                Ainda não tens favoritos. No Observatório, clica numa estrela,
-                numa constelação ou num objeto de céu profundo e carrega em
-                <strong>☆ Guardar nos favoritos</strong> no painel de detalhes.
-            </p>
-            {% endif %}
-        </div>
-
-        <!-- ── Caderno de observações ─────────────────────────────────────
-             O nome do objeto é guardado copiado (ver o esquema, no db.py): uma
-             observação é o registo de um momento, e tem de continuar a fazer
-             sentido mesmo que o objeto mude de nome no catálogo ou saia dele.
-             É por isso que aqui não se vai buscar nada ao catálogo. -->
-        <div class="perfil-cartao glass-panel">
-            <div class="perfil-secao-titulo">📓 Caderno de observações</div>
-
-            <form id="form-observacao" class="perfil-form" onsubmit="adicionarObservacao(event)">
-                <label for="obs-nome" class="perfil-rotulo">O que observaste</label>
-                <input type="text" id="obs-nome" class="perfil-campo" maxlength="80"
-                       placeholder="Ex.: Saturno, M42, chuva de meteoros">
-
-                <div class="perfil-campos-linha">
-                    <div>
-                        <label for="obs-data" class="perfil-rotulo">Data</label>
-                        <input type="date" id="obs-data" class="perfil-campo" value="{{ hoje }}">
-                    </div>
-                </div>
-
-                <label for="obs-nota" class="perfil-rotulo">Nota (opcional)</label>
-                <textarea id="obs-nota" class="perfil-campo" rows="3" maxlength="1000"
-                          placeholder="O que viste, com que instrumento, o que chamou a atenção"></textarea>
-
-                <button type="submit" class="perfil-btn">Acrescentar ao caderno</button>
-            </form>
-
-            {% if observacoes %}
-            <ul class="perfil-lista perfil-lista-obs">
-                {% for o in observacoes %}
-                <li class="perfil-item perfil-obs">
-                    <button type="button" class="perfil-remover"
-                            data-id="{{ o.id }}" onclick="removerObservacao(this)"
-                            title="Apagar esta observação"
-                            aria-label="Apagar a observação de {{ o.objeto_nome }}">✕</button>
-                    <div class="perfil-obs-corpo">
-                        <div class="perfil-obs-cabeca">
-                            <span class="perfil-item-nome">{{ o.objeto_nome }}</span>
-                            <span class="perfil-item-data">{{ o.data }}</span>
-                        </div>
-                        {% if o.nota %}
-                        <p class="perfil-obs-nota">{{ o.nota }}</p>
-                        {% endif %}
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p class="perfil-ajuda">
-                O caderno está vazio. É onde se guarda o que se viu —
-                &ldquo;vi Saturno, anéis bem visíveis&rdquo; — e a data de cada
-                noite.
-            </p>
-            {% endif %}
-
-            <div id="perfil-aviso-obs" class="perfil-aviso" role="status" aria-live="polite"></div>
         </div>
 
         <div class="perfil-fim">
@@ -294,7 +372,7 @@
          do menu para o céu, do céu para o Observatório e do Observatório
          para aqui. Fica no fim do body, e é o ia.css que lhe dá o canto de
          baixo à esquerda — o único que o botão de voltar (em cima à esquerda)
-         e o de conta (em cima à direita) deixam livre.
+         deixa livre.
 
          Nesta página há sessão iniciada quase sempre (é o próprio perfil),
          por isso o que o painel recebe é o /api/ia/estado a dizer se há chave
@@ -356,8 +434,10 @@
 
     <script src="/static/js/shared-ui-controls.js"></script>
     <!-- O conta.js entra aqui como entra no menu e na aplicação: é ele que
-         desenha o botão do canto. Nesta página o botão aponta para onde já se
-         está, o que é inofensivo, e mantém a moldura igual à do resto. -->
+         desenha o botão do canto. Nesta página o botão está escondido (ver o
+         "Perfil: dentro da conta" no conta.css), mas o ficheiro entra à mesma
+         — é a moldura igual à do resto, e é dele que sai o rótulo se um dia
+         voltar. -->
     <script src="/static/js/conta.js"></script>
     <script src="/static/js/perfil.js"></script>
     <script src="/static/js/ia.js"></script>

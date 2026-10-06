@@ -303,6 +303,15 @@ async function carregarCalendario() {
 }
 
 async function verDia(dia, celula) {
+    // Escolher o dia que já está escolhido é desescolhê-lo: é o mesmo gesto
+    // que fez a escolha, e é assim que se fecha o painel sem ter de achar
+    // outro sítio para clicar. O mesmo faz um clique fora (ver o
+    // limparDiaSelecionado, mais abaixo).
+    if (celula && celula.classList.contains("selecionado")) {
+        limparDiaSelecionado();
+        return;
+    }
+
     document.querySelectorAll(".cal-dia.selecionado").forEach(d => d.classList.remove("selecionado"));
     if (celula) celula.classList.add("selecionado");
 
@@ -336,6 +345,31 @@ async function verDia(dia, celula) {
         <div class="detalhe-linha"><span class="detalhe-icon">${data.fase.emoji}</span><span class="detalhe-label">Fase da Lua</span><span class="detalhe-valor" style="color:${corFase}">${data.fase.nome} (${data.fase.iluminacao}%)</span></div>
         ${eventosHTML}`;
 }
+
+// Desfaz a escolha do dia: tira a marca à casa e fecha o painel de detalhes.
+// Não faz nada quando não há dia escolhido — quem chama (o clique fora, o
+// segundo clique no mesmo dia) não precisa de saber se havia.
+function limparDiaSelecionado() {
+    const escolhido = document.querySelector(".cal-dia.selecionado");
+    if (!escolhido) return;
+
+    escolhido.classList.remove("selecionado");
+    const painel = document.getElementById("detalhe-dia");
+    painel.innerHTML = "";
+    painel.classList.remove("visivel");
+}
+
+// O clique fora do calendário e do painel de detalhes também desfaz a escolha:
+// quem está a clicar noutra coisa da página deixou de olhar para o dia. O que
+// fica de fora do alvo são as próprias casas dos dias (é o verDia que trata
+// delas, e uma casa escolhida é desescolhida ali) e o painel, onde se lê o que
+// a escolha mostra — apagá-lo a um clique de rolagem dentro dele era o
+// contrário de útil.
+document.addEventListener("click", function (e) {
+    const alvo = e.target && e.target.closest ? e.target : null;
+    if (alvo && alvo.closest(".cal-dia:not(.cal-vazio), #detalhe-dia")) return;
+    limparDiaSelecionado();
+});
 
 function mesAnterior() {
     if (calMes === 1) { calMes = 12; calAno--; } else calMes--;
