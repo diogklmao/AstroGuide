@@ -25,6 +25,13 @@
     /* Lighting */
     --highlight-angle:       135deg;
     --content-z:             2;
+
+    /* Tipografia dos números — uma só fonte para todos os valores lidos
+       (Céu Agora, Calendário, Observatório). O Outfit é o sans geométrico
+       que o resto da app já usa: os dígitos são limpos e redondos, o que
+       assenta no vidro sem competir com ele. O Space Grotesk fica como
+       rede de segurança — só entra se o Outfit não carregar. */
+    --font-num:              'Outfit', 'Space Grotesk', sans-serif;
 }
 
 /* Vinheta + gradiente para legibilidade do UI */

@@ -219,7 +219,22 @@ function dadoVisivel(visivel) {
 }
 
 function planetaHTML(p) {
-    return `<div class="planeta-card ${p.visivel ? "" : "invisivel"}"><div class="planeta-nome">${p.nome}</div><div class="planeta-info">Alt: ${p.altitude}°<br>Az: ${p.azimute}°<br>${p.visivel ? "✓ Visível" : "× Não visível"}</div></div>`;
+    return `<div class="planeta-card ${p.visivel ? "planeta-visivel" : "invisivel"}">
+        <div class="planeta-nome">${p.nome}</div>
+        <div class="planeta-info">
+            <div class="planeta-dado">
+                <span class="planeta-label">Alt</span>
+                <span class="planeta-valor">${p.altitude}°</span>
+            </div>
+            <div class="planeta-dado">
+                <span class="planeta-label">Az</span>
+                <span class="planeta-valor">${p.azimute}°</span>
+            </div>
+            <div class="planeta-status ${p.visivel ? "visivel-sim" : "visivel-nao"}">
+                ${p.visivel ? "✓ Visível" : "× Não visível"}
+            </div>
+        </div>
+    </div>`;
 }
 
 // ── NASA - Imagem do Dia (APOD) ─────────────────────────────────────

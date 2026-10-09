@@ -47,11 +47,14 @@ header .subtitulo {
 }
 
 #relogio {
-    font-family: 'Courier New', monospace;
-    color: rgba(150, 190, 230, 0.85);
-    font-size: 0.85rem;
+    font-family: 'Outfit', 'Space Grotesk', sans-serif;
+    font-weight: 400;
+    color: rgba(180, 215, 255, 0.9);
+    font-size: 0.86rem;
     margin-top: 8px;
-    text-shadow: 0 0 12px rgba(110, 184, 255, 0.3);
+    letter-spacing: 0.08em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 12px rgba(110, 184, 255, 0.35);
 }
 
 
@@ -163,15 +166,23 @@ nav button:hover:not(.ativo) {
 }
 
 .dado-label {
-    color: #556070;
+    color: #8fa7c7;
     font-size: 0.85rem;
+    font-weight: 400;
+    letter-spacing: 0.02em;
 }
 
+/* Valores do Sol e da Lua — a mesma voz do número do Calendário Cósmico:
+   sem branco puro nem halo forte, senão o vidro perde-se atrás dos dígitos.
+   O text-shadow é só o suficiente para o número descolar do fundo. */
 .dado-valor {
-    font-family: 'Courier New', monospace;
-    font-size: 0.9rem;
-    color: #dce3f0;
+    font-family: var(--font-num, 'Outfit', 'Space Grotesk', sans-serif);
+    font-size: 0.95rem;
     font-weight: 600;
+    color: #dbe7f8;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 10px rgba(140, 195, 255, 0.14);
 }
 
 /* Cores de visibilidade dos corpos celestes */
@@ -197,9 +208,9 @@ nav button:hover:not(.ativo) {
 /* Card individual de planeta */
 .planeta-card {
     background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 12px;
-    padding: 14px;
+    padding: 14px 16px;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
@@ -207,33 +218,83 @@ nav button:hover:not(.ativo) {
 
 .planeta-card:hover {
     border-color: rgba(255, 204, 80, 0.45);
-    box-shadow: 0 0 22px rgba(255, 204, 80, 0.15);
+    box-shadow: 0 0 22px rgba(255, 204, 80, 0.18);
     transform: translateY(-3px);
 }
 
-/* Planeta abaixo do horizonte (não visível) */
+/* Planeta abaixo do horizonte (não visível) - agora com visibilidade clara nos números e dados */
 .planeta-card.invisivel {
-    opacity: 0.35;
+    opacity: 0.75;
+    background: rgba(15, 20, 32, 0.5);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.planeta-card.invisivel:hover {
+    opacity: 0.95;
+    border-color: rgba(140, 175, 220, 0.3);
 }
 
 .planeta-nome {
     font-weight: 700;
-    font-size: 0.95rem;
-    margin-bottom: 6px;
+    font-size: 1rem;
+    margin-bottom: 8px;
     color: #ffcc02;
-    /* dourado para planetas visíveis */
+    letter-spacing: 0.02em;
 }
 
 /* Nome do planeta quando invisível */
 .planeta-card.invisivel .planeta-nome {
-    color: #445566;
+    color: #8da4c4;
 }
 
 .planeta-info {
-    font-family: 'Courier New', monospace;
-    font-size: 0.8rem;
-    color: #556070;
-    line-height: 1.6;
+    font-family: 'Outfit', 'Space Grotesk', sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Linha com label + valor */
+.planeta-dado {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    padding: 2px 0;
+}
+
+.planeta-label {
+    font-size: 0.78rem;
+    color: #8fa7c7;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* Altitude e azimute dos planetas — mesma fonte e mesmo peso dos valores do
+   Sol e da Lua, para os três cards do Céu Agora lerem como um só. */
+.planeta-valor {
+    font-family: var(--font-num, 'Outfit', 'Space Grotesk', sans-serif);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #dbe7f8;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 10px rgba(160, 210, 255, 0.16);
+}
+
+/* Planeta abaixo do horizonte: o número recua, não desaparece — quem quiser
+   lê-o, mas não rouba o olho aos planetas que estão visíveis. */
+.planeta-card.invisivel .planeta-valor {
+    color: #b3c6e0;
+    text-shadow: none;
+}
+
+.planeta-status {
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 4px;
+    letter-spacing: 0.02em;
 }
 
 /* ── Navegação do calendário ──────────────────────────────────────── */
@@ -245,7 +306,10 @@ nav button:hover:not(.ativo) {
 }
 
 .cal-nav h2 {
+    font-family: 'Outfit', 'Space Grotesk', sans-serif;
     font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     color: #9ed4ff;
     text-shadow: 0 0 20px rgba(110, 184, 255, 0.35);
 }
@@ -362,20 +426,36 @@ nav button:hover:not(.ativo) {
     color: #ce93d8;
 }
 
-/* Número do dia dentro da célula */
+/* Número do dia dentro da célula — é este o número que serve de referência
+   aos do Céu Agora: mesma fonte, mesmo peso, mesmo branco-gelo. A célula é
+   quadrada e leva ainda o emoji da fase, por isso fica um dedo abaixo do
+   tamanho que teria numa linha de dados. */
 .cal-dia-num {
-    font-size: 0.9rem;
+    font-family: var(--font-num, 'Outfit', 'Space Grotesk', sans-serif);
+    font-size: 1rem;
     font-weight: 600;
-    color: #dce3f0;
+    color: #dbe7f8;
     line-height: 1;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
 }
 
 .cal-dia.hoje .cal-dia-num {
-    color: #4fc3f7;
+    color: #38bdf8;
+    font-weight: 700;
+    text-shadow: 0 0 14px rgba(56, 189, 248, 0.65);
 }
 
 .cal-dia.tem-evento .cal-dia-num {
-    color: #ff8f00;
+    color: #fbbf24;
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+}
+
+.cal-dia.selecionado .cal-dia-num {
+    color: #e879f9;
+    font-weight: 700;
+    text-shadow: 0 0 14px rgba(232, 121, 249, 0.65);
 }
 
 /* Emoji da fase lunar dentro da célula */
@@ -475,8 +555,10 @@ nav button:hover:not(.ativo) {
 }
 
 .detalhe-valor {
+    font-family: var(--font-num, 'Outfit', 'Space Grotesk', sans-serif);
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 1.02rem;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── Imagem da constelação (painel do Observatório) ──────────────── */
