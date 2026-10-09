@@ -317,8 +317,46 @@
                     <input type="text" id="obs-nome" class="perfil-campo" maxlength="80"
                            placeholder="Ex.: Saturno, M42, chuva de meteoros">
 
-                    <label for="obs-data" class="perfil-rotulo">Data</label>
-                    <input type="date" id="obs-data" class="perfil-campo" value="{{ hoje }}">
+                    <!-- A data da observação, com o calendário do
+                         Observatório: o campo é um botão e o calendário é
+                         nosso, pela mesma razão do seletor de horas logo
+                         abaixo — o calendário branco que o browser abre para
+                         um <input type="date"> não se veste com CSS, quem o
+                         desenha é o browser (ver o construirSeletorData, no
+                         perfil.js).
+                         O valor vive no #obs-data, escondido, e continua em
+                         "AAAA-MM-DD" — o mesmo formato do input nativo que
+                         substituiu, e por isso o envio ao servidor e a
+                         validação não mudaram nada. -->
+                    <label for="obs-data-campo" class="perfil-rotulo">Data</label>
+                    <button type="button" id="obs-data-campo" class="perfil-campo perfil-data-campo"
+                            onclick="alternarSeletorData()" aria-haspopup="dialog"
+                            aria-expanded="false" aria-controls="obs-data-picker"
+                            title="Escolher a data da observação">
+                        <span id="obs-data-texto">{{ hoje[8:10] }}/{{ hoje[5:7] }}/{{ hoje[0:4] }}</span>
+                        <span class="perfil-data-seta" aria-hidden="true">▾</span>
+                    </button>
+                    <input type="hidden" id="obs-data" value="{{ hoje }}">
+
+                    <!-- A hora da observação. O campo é um botão e o painel é
+                         nosso, pela mesma razão do Observatório: a lista
+                         branca que o browser abre para um <input type="time">
+                         não se veste com CSS — quem a desenha é o browser. É
+                         a mesma peça do seletor de horas do Observatório (ver
+                         o construirSeletorHora, no perfil.js), com as mesmas
+                         colunas de horas e minutos.
+                         O valor vive no #obs-hora, escondido, e fica vazio
+                         quando não se indicou hora nenhuma — vazia não é
+                         meia-noite, é "não sei a que horas". -->
+                    <label for="obs-hora-campo" class="perfil-rotulo">Hora (opcional)</label>
+                    <button type="button" id="obs-hora-campo" class="perfil-campo perfil-hora-campo"
+                            onclick="alternarSeletorHora()" aria-haspopup="listbox"
+                            aria-expanded="false" aria-controls="obs-hora-picker"
+                            title="Escolher a hora da observação">
+                        <span id="obs-hora-texto">--:--</span>
+                        <span class="perfil-hora-seta" aria-hidden="true">▾</span>
+                    </button>
+                    <input type="hidden" id="obs-hora" value="">
 
                     <label for="obs-nota" class="perfil-rotulo">Nota (opcional)</label>
                     <textarea id="obs-nota" class="perfil-campo" rows="3" maxlength="1000"
@@ -338,7 +376,10 @@
                         <div class="perfil-obs-corpo">
                             <div class="perfil-obs-cabeca">
                                 <span class="perfil-item-nome">{{ o.objeto_nome }}</span>
-                                <span class="perfil-item-data">{{ o.data }}</span>
+                                <!-- A hora aparece quando existe: uma
+                                     observação sem hora não mostra um
+                                     "--:--" que não quer dizer nada. -->
+                                <span class="perfil-item-data">{{ o.data }}{% if o.hora %} · {{ o.hora }}{% endif %}</span>
                             </div>
                             {% if o.nota %}
                             <p class="perfil-obs-nota">{{ o.nota }}</p>

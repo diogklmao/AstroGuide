@@ -467,6 +467,32 @@ textarea.perfil-campo {
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 10px;
     background: rgba(9, 14, 32, 0.75);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(110, 168, 255, 0.3) transparent;
+}
+
+/* A barra de scroll da lista de resultados, no mesmo desenho das do
+   AstroGuide (ver o .obs-resultados, no index.css, e o .ia-mensagens, no
+   ia.css): fina, translúcida e no azul desta página, em vez da barra cinzenta
+   e grossa que o browser traz por omissão — que era a única parte desta lista
+   que não era do tema. Os dois blocos são as duas metades da mesma coisa: o
+   scrollbar-color para o Firefox, as regras ::-webkit-scrollbar para o Chrome
+   e o Safari. */
+.perfil-resultados::-webkit-scrollbar {
+    width: 6px;
+}
+
+.perfil-resultados::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.perfil-resultados::-webkit-scrollbar-thumb {
+    background: rgba(110, 168, 255, 0.3);
+    border-radius: 3px;
+}
+
+.perfil-resultados::-webkit-scrollbar-thumb:hover {
+    background: rgba(110, 168, 255, 0.55);
 }
 
 /* O [hidden] do HTML é o que esconde a lista e o cartão da escolha, mas o
@@ -842,6 +868,325 @@ textarea.perfil-campo {
     color: rgba(200, 215, 240, 0.72);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+}
+
+/* ── O seletor de horas do caderno ──────────────────────────────────
+   A mesma peça do seletor de horas do Observatório (ver o .obs-hora-picker,
+   no index.css, e o construirSeletorHora, no perfil.js): o campo é um botão
+   (o .perfil-campo dos outros campos, mais o flex para o texto e a seta
+   ficarem nas pontas) e o painel é nosso — a lista branca que o browser abre
+   para um <input type="time"> não se veste com CSS, quem a desenha é o
+   browser. Copiado com as mesmas medidas e o mesmo lilás de propósito: é o
+   mesmo desenho, nas duas páginas.
+
+   O painel é criado pelo construirSeletorHora e posto no <body>, não dentro do
+   cartão: é position: fixed e leva o left/top do posicionarPopup, para não
+   ficar cortado dentro de um contentor com overflow. */
+.perfil-hora-campo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.perfil-hora-seta {
+    color: rgba(206, 147, 216, 0.8);
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.perfil-hora-picker {
+    position: fixed;
+    z-index: 9999;
+    display: none;
+    gap: 6px;
+    padding: 12px;
+    background: rgba(9, 13, 30, 0.94);
+    border: 1px solid rgba(206, 147, 216, 0.32);
+    border-radius: 14px;
+    font-family: 'Courier New', monospace;
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 18px 44px rgba(0, 0, 0, 0.55),
+        0 0 28px rgba(206, 147, 216, 0.12);
+}
+
+/* Visível pela classe e não pelo [hidden]: este painel define o seu próprio
+   display, e ele ganharia ao atributo. */
+.perfil-hora-picker.aberto {
+    display: flex;
+    animation: perfilHoraAbrir 0.16s ease;
+}
+
+@keyframes perfilHoraAbrir {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.perfil-hora-coluna {
+    display: flex;
+    flex-direction: column;
+}
+
+.perfil-hora-coluna-titulo {
+    font-family: inherit;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgba(206, 147, 216, 0.7);
+    text-align: center;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(206, 147, 216, 0.16);
+}
+
+/* As duas listas rolam por si: são 24 horas e 60 minutos, e a coluna fica com
+   a altura da lista mais curta — o painel não cresce com o conteúdo. O
+   position: relative é para o offsetTop das opções ser contado a partir daqui
+   (ver o trazerParaVista, no perfil.js). */
+.perfil-hora-lista {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 62px;
+    max-height: 186px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(206, 147, 216, 0.35) transparent;
+}
+
+.perfil-hora-lista:focus-visible {
+    outline: 2px solid rgba(206, 147, 216, 0.7);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+.perfil-hora-lista::-webkit-scrollbar {
+    width: 6px;
+}
+
+.perfil-hora-lista::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.perfil-hora-lista::-webkit-scrollbar-thumb {
+    background: rgba(206, 147, 216, 0.35);
+    border-radius: 3px;
+}
+
+.perfil-hora-lista::-webkit-scrollbar-thumb:hover {
+    background: rgba(206, 147, 216, 0.55);
+}
+
+.perfil-hora-opcao {
+    /* Sem encolher: numa coluna flex com overflow os filhos encolhem por
+       omissão, e as 60 opções espremiam-se umas nas outras em vez de rolar. */
+    flex: 0 0 auto;
+    padding: 5px 0;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: rgba(232, 213, 240, 0.72);
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.perfil-hora-opcao:hover {
+    background: rgba(206, 147, 216, 0.14);
+    color: #fff;
+}
+
+/* A escolhida — o valor que está no campo. */
+.perfil-hora-opcao[aria-selected="true"] {
+    background: rgba(206, 147, 216, 0.26);
+    border-color: rgba(206, 147, 216, 0.55);
+    color: #fff;
+    font-weight: 700;
+}
+
+/* A que está debaixo do cursor de teclado. É outra coisa: andar com as setas
+   move esta sem mudar a hora — só o Enter (ou o clique) a muda. Quando as
+   duas são a mesma, o anel some-se no preenchimento de cima e não estorva. */
+.perfil-hora-opcao.ativo {
+    box-shadow: inset 0 0 0 2px rgba(206, 147, 216, 0.65);
+}
+
+/* ── O seletor de data do caderno ──────────────────────────────────────
+   A mesma peça do calendário do Observatório (ver o .obs-data-picker, no
+   index.css, e o construirSeletorData, no perfil.js): o campo é um botão e o
+   calendário é nosso, pela razão de sempre — o calendário branco que o
+   browser abre para um <input type="date"> não se veste com CSS. Copiado com
+   as mesmas medidas e o mesmo lilás: é o mesmo desenho do seletor de horas
+   logo acima, com uma grelha no lugar das colunas. */
+.perfil-data-campo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.perfil-data-seta {
+    color: rgba(206, 147, 216, 0.8);
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.perfil-data-picker {
+    position: fixed;
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(9, 13, 30, 0.94);
+    border: 1px solid rgba(206, 147, 216, 0.32);
+    border-radius: 14px;
+    font-family: 'Courier New', monospace;
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 18px 44px rgba(0, 0, 0, 0.55),
+        0 0 28px rgba(206, 147, 216, 0.12);
+}
+
+/* Visível pela classe e não pelo [hidden], pela mesma razão do painel da
+   hora. A animação é a mesma — são a mesma peça a abrir. */
+.perfil-data-picker.aberto {
+    display: flex;
+    animation: perfilHoraAbrir 0.16s ease;
+}
+
+.perfil-data-cabecalho {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.perfil-data-nav {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid rgba(206, 147, 216, 0.3);
+    border-radius: 8px;
+    color: rgba(206, 147, 216, 0.85);
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.perfil-data-nav:hover {
+    background: rgba(206, 147, 216, 0.18);
+    border-color: rgba(206, 147, 216, 0.55);
+    color: #fff;
+}
+
+.perfil-data-nav:focus-visible {
+    outline: 2px solid rgba(206, 147, 216, 0.85);
+    outline-offset: 2px;
+}
+
+.perfil-data-titulo {
+    flex: 1;
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(206, 147, 216, 0.85);
+}
+
+/* A fila da semana e a grelha partilham as colunas: é isso que alinha as
+   iniciais dos dias por cima das casas. */
+.perfil-data-semana,
+.perfil-data-grelha {
+    display: grid;
+    grid-template-columns: repeat(7, 32px);
+    gap: 3px;
+}
+
+.perfil-data-semana span {
+    text-align: center;
+    padding-bottom: 2px;
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(206, 147, 216, 0.55);
+}
+
+.perfil-data-dia,
+.perfil-data-vazio {
+    width: 32px;
+    height: 32px;
+}
+
+.perfil-data-dia {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: rgba(232, 213, 240, 0.72);
+    font-family: inherit;
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.perfil-data-dia:hover {
+    background: rgba(206, 147, 216, 0.14);
+    color: #fff;
+}
+
+/* O dia de hoje: um anel ténue, que não se confunde com a escolha nem lhe
+   rouba o lugar — calhando no mesmo dia, é o preenchimento de baixo que manda,
+   por vir depois. */
+.perfil-data-dia.hoje {
+    border-color: rgba(206, 147, 216, 0.45);
+}
+
+/* O escolhido — o valor que está no campo. */
+.perfil-data-dia.escolhido {
+    background: rgba(206, 147, 216, 0.26);
+    border-color: rgba(206, 147, 216, 0.6);
+    color: #fff;
+    font-weight: 700;
+}
+
+/* É este anel que diz onde vão ter as setas, por isso tem de se ver bem. */
+.perfil-data-dia:focus-visible {
+    outline: 2px solid rgba(206, 147, 216, 0.85);
+    outline-offset: 1px;
 }
 
 /* ── Favoritos e caderno, lado a lado ────────────────────────────────── */

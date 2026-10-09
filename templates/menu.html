@@ -33,7 +33,7 @@
         <div class="titulo">
             <!-- Sem o glass-shimmer: o brilho a passar de lado em lado era
                  movimento constante, e esta página pede calma. -->
-            <div class="frosted-card glass-panel">
+            <div class="frosted-card glass-panel liquid-interactive">
                 <div class="frosted-title">AstroGuide</div>
                 <div class="frosted-sub">Observatório Digital</div>
             </div>
@@ -184,6 +184,29 @@
     <script src="/static/js/conta.js"></script>
     <script src="/static/js/menu.js"></script>
     <script src="/static/js/ia.js"></script>
+
+    <!-- Liquid Glass: mouse-reactive highlight -->
+    <script>
+    (function () {
+        'use strict';
+        var panels = document.querySelectorAll('.glass-panel.liquid-interactive');
+        function onMouseMove(e) {
+            var r = this.getBoundingClientRect();
+            var x = ((e.clientX - r.left) / r.width)  * 100;
+            var y = ((e.clientY - r.top)  / r.height) * 100;
+            this.style.setProperty('--mx', x.toFixed(1) + '%');
+            this.style.setProperty('--my', y.toFixed(1) + '%');
+        }
+        function onMouseLeave() {
+            this.style.setProperty('--mx', '20%');
+            this.style.setProperty('--my', '0%');
+        }
+        panels.forEach(function (panel) {
+            panel.addEventListener('mousemove',  onMouseMove.bind(panel),  { passive: true });
+            panel.addEventListener('mouseleave', onMouseLeave.bind(panel), { passive: true });
+        });
+    }());
+    </script>
 </body>
 
 </html>

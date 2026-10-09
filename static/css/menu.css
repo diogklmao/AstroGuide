@@ -87,12 +87,44 @@ body.page-menu {
     margin-bottom: clamp(24px, 1.7vw, 40px);
 }
 
-/* Título — glass definido em glass.css (.glass-panel).
-   Sem as animações em ciclo que havia (o cartão a flutuar e o brilho da
-   borda a acender-se e apagar-se): eram movimento constante, e esta página
-   pede que nada se mexa sozinho. O que fica é o brilho parado — borda fina
-   azulada e um halo suave por fora —, para o cartão parecer vidro
-   iluminado e não um retângulo a fazer festa. */
+/* Título — glass definido em glass.css (.glass-panel), com o liquid glass
+   do cartão por cima: o corpo em gradiente, a aresta iluminada, o reflexo
+   da superfície e as manchas de luz por dentro.
+
+   As animações em ciclo voltaram, a pedido — mas é só luz que respira:
+   o halo a acender-se devagar (cartao-respirar), uma vaga a percorrer a
+   aresta (aresta-vaga) e uma mancha a deslizar pelo miolo (luz-interna).
+   Nada acelera, nada pisca, e o cartão em si não se mexe um milímetro:
+   a página continua a pedir calma, e o movimento é o de vidro a ser
+   iluminado. */
+/* Overrides do glass.css — o .frosted-card tem os seus próprios ::before e
+   ::after (aresta iluminada + reflexo + mancha interna), definidos abaixo.
+   O ::before e ::after genéricos do .glass-panel seriam sobrepostos por
+   eles de qualquer forma, mas zeramos aquí explicitamente para garantir
+   que nenhum gradiente genérico vaza para a superfície do cartão.
+   O hover genérico também se anula: o cartão tem o seu próprio ritmo. */
+.frosted-card.glass-panel::before,
+.frosted-card.glass-panel::after {
+    all: unset;
+    content: "";
+    position: absolute;
+    pointer-events: none;
+}
+
+.frosted-card.glass-panel:hover {
+    background:
+        linear-gradient(180deg,
+            rgba(214, 232, 255, 0.18) 0%,
+            rgba(150, 190, 255, 0.06) 12%,
+            rgba(6, 10, 26, 0.4) 44%,
+            rgba(8, 12, 30, 0.36) 72%,
+            rgba(150, 195, 255, 0.14) 100%),
+        rgba(9, 13, 30, 0.66);
+    border-color: rgba(150, 185, 255, 0.24);
+    border-top-color: rgba(214, 232, 255, 0.42);
+    transform: none;
+}
+
 .frosted-card {
     display: inline-block;
     /* As medidas da referência, EM ESCALA: o cartão é ~35% da largura da
@@ -102,15 +134,207 @@ body.page-menu {
     border-radius: 22px;
     /* Vidro mais fechado que o do resto da moldura (0.66 e não 0.52): na
        referência o cartão lê-se como vidro escuro, e não como um véu. */
-    background: rgba(9, 13, 30, 0.66);
+    /* O liquid glass do cartão: o corpo do vidro em camadas, o mesmo
+       desenho do das letras (frosted-title) mas apagado o suficiente para
+       o texto ler-se por cima — a aresta de topo a apanhar luz, o miolo
+       mais fundo (o azul que a luz deixa no meio de uma laje de vidro) e a
+       base a voltar a brilhar. A base translúcida de antes fica por baixo,
+       como camada de segurança: onde os gradientes forem quase transparentes
+       é ela que segura a leitura. O blur do fundo continua a ser do
+       .glass-panel — aqui só muda a superfície. */
+    background:
+        linear-gradient(180deg,
+            rgba(214, 232, 255, 0.18) 0%,
+            rgba(150, 190, 255, 0.06) 12%,
+            rgba(6, 10, 26, 0.4) 44%,
+            rgba(8, 12, 30, 0.36) 72%,
+            rgba(150, 195, 255, 0.14) 100%),
+        rgba(9, 13, 30, 0.66);
     border-color: rgba(150, 185, 255, 0.24);
+    /* A borda de cima é mais clara: a aresta que fica virada à luz é a
+       primeira coisa que o olho lê como "vidro". */
+    border-top-color: rgba(214, 232, 255, 0.42);
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        /* As arestas do vidro a apanhar luz (mantêm-se) e, por fora, o
+           halo largo da referência: o cartão não é só iluminado, é ele
+           próprio uma fonte de luz azul no meio da página. */
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        inset 0 -1px 0 rgba(150, 195, 255, 0.14),
+        inset 0 0 44px rgba(120, 165, 255, 0.09),
         0 20px 45px rgba(0, 0, 0, 0.45),
-        0 0 30px rgba(110, 140, 255, 0.08);
+        0 0 55px rgba(95, 140, 255, 0.3),
+        0 0 130px rgba(70, 110, 235, 0.18);
+    /* A respiração do halo: 7 s entre dois níveis de brilho, de ida e
+       volta. Só a luz varia — o cartão não se move. */
+    animation: cartao-respirar 7s ease-in-out infinite alternate;
 }
 
-/* Título principal dentro do cartão */
+/* O reflexo da superfície e as luzes de dentro — as camadas que fazem o
+   liquid glass da referência. Três coisas, todas calmas:
+
+     1. os dois clarões dos cantos de cima, onde a aresta apanha a luz de
+        frente (é o que na foto mais se vê);
+     2. uma mancha de luz que se arrasta devagar por dentro do vidro — o
+        "liquid" do liquid glass: o brilho de cima é fixo, mas o miolo
+        respira;
+     3. e, por baixo, o reflexo especular parado na mesma diagonal das
+        letras (112deg), a aresta de topo e a base a devolver o azul.
+
+   Fica tudo por cima do texto, como um reflexo real ficaria — a superfície
+   do vidro é o primeiro que se vê —, mas em alfas baixos para não pesar no
+   título. O overflow:hidden do .glass-panel garante que nada escapa do
+   raio de 22px. */
+.frosted-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        /* 1. os clarões dos cantos */
+        radial-gradient(circle at 4% 1%,
+            rgba(255, 255, 255, 0.3), transparent 15%),
+        radial-gradient(circle at 96% 1%,
+            rgba(255, 255, 255, 0.24), transparent 15%),
+        /* 2. a mancha que desliza — é a única camada que se mexe */
+        radial-gradient(ellipse 55% 95% at 22% 55%,
+            rgba(195, 218, 255, 0.16), transparent 62%),
+        /* 3. o reflexo especular, congelado na diagonal, alinhado com o das
+           letras para os dois lerem como um só pedaço de vidro */
+        linear-gradient(112deg,
+            transparent 28%,
+            rgba(255, 255, 255, 0.09) 40%,
+            rgba(255, 255, 255, 0.05) 50%,
+            transparent 62%),
+        /* a aresta de topo a apanhar a luz, a apagar-se para dentro */
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.16) 0%,
+            rgba(255, 255, 255, 0.04) 9%,
+            transparent 24%),
+        /* e a base a devolver o azul, como a das letras */
+        linear-gradient(0deg,
+            rgba(130, 175, 255, 0.12) 0%,
+            transparent 22%);
+    /* Só a mancha anda: a posição dela é a terceira, e as outras ficam
+       onde estão (0 0). Mover a background-position não depende de
+       chaves registadas — anda liso em qualquer browser. */
+    background-size: auto, auto, 220% 160%, auto, auto, auto;
+    background-position: 0 0, 0 0, 0% 50%, 0 0, 0 0, 0 0;
+    animation: luz-interna 11s ease-in-out infinite alternate;
+}
+
+/* A aresta iluminada — a camada que falta para o cartão ser o da
+   referência: um filete de luz a contornar a forma toda, branco no topo,
+   azul em baixo, quase apagado nas laterais, com uma vaga a percorrer em
+   ciclo. Faz-se com máscara: o fundo inteiro fica recortado ao anel de
+   2px (o padding dá a espessura, e o mask-composite xor deixa só o que
+   está fora do miolo). A vaga anda pela background-position, tal como a
+   mancha de dentro — sem chaves registadas e sem saltos. */
+.frosted-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 2px;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        /* o filete fixo: claro em cima, azul em baixo, quase aceso nas
+           laterais — é assim que a referência lê a luz na aresta */
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(200, 222, 255, 0.6) 22%,
+            rgba(120, 160, 255, 0.22) 50%,
+            rgba(150, 190, 255, 0.55) 78%,
+            rgba(215, 232, 255, 0.92) 100%),
+        /* e a vaga: uma mancha branca que sobe e desce pela aresta */
+        linear-gradient(115deg,
+            transparent 38%,
+            rgba(255, 255, 255, 0.85) 48%,
+            rgba(255, 255, 255, 0.25) 53%,
+            transparent 62%);
+    background-size: 100% 100%, 240% 240%;
+    background-position: 0 0, 0% 50%;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: aresta-vaga 6.5s ease-in-out infinite alternate;
+}
+
+/* As três animações de luz — todas de ida e volta, todas lentas: acender
+   o halo, correr a vaga pela aresta e arrastar a mancha pelo miolo. O
+   cartão em si não tem transform nenhum — não flutua nem cresce. */
+@keyframes cartao-respirar {
+    from {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.14),
+            inset 0 -1px 0 rgba(150, 195, 255, 0.1),
+            inset 0 0 44px rgba(120, 165, 255, 0.07),
+            0 20px 45px rgba(0, 0, 0, 0.45),
+            0 0 40px rgba(95, 140, 255, 0.22),
+            0 0 100px rgba(70, 110, 235, 0.12);
+    }
+
+    to {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.24),
+            inset 0 -1px 0 rgba(150, 195, 255, 0.18),
+            inset 0 0 50px rgba(120, 165, 255, 0.12),
+            0 20px 45px rgba(0, 0, 0, 0.45),
+            0 0 70px rgba(110, 155, 255, 0.38),
+            0 0 160px rgba(80, 120, 245, 0.24);
+    }
+}
+
+@keyframes aresta-vaga {
+    from {
+        background-position: 0 0, 0% 50%;
+    }
+
+    to {
+        background-position: 0 0, 100% 50%;
+    }
+}
+
+@keyframes luz-interna {
+    from {
+        background-position: 0 0, 0 0, 0% 50%, 0 0, 0 0, 0 0;
+    }
+
+    to {
+        background-position: 0 0, 0 0, 100% 50%, 0 0, 0 0, 0 0;
+    }
+}
+
+/* Quem pediu "menos movimento" no sistema ganha o cartão parado: as três
+   animações de luz desligam e fica o brilho fixo — o mesmo desenho, só
+   que imóvel. A entrada e o hover continuam: não são movimento em ciclo. */
+@media (prefers-reduced-motion: reduce) {
+    .frosted-card,
+    .frosted-card::before,
+    .frosted-card::after {
+        animation: none;
+    }
+}
+
+/* Título principal dentro do cartão — em "liquid glass": as letras são o
+   material, e não texto branco por cima dele. O vidro faz-se em camadas,
+   todas presas à forma das letras (o background-clip: text):
+
+     1. o corpo do vidro, claro no alto e na base e mais fundo a meio — a
+        luz que atravessa uma laje de vidro assenta nas arestas e deixa o
+        miolo mais escuro;
+     2. um brilho especular parado a atravessá-las na diagonal, como um
+        reflexo congelado no meio do vidro;
+     3. e, por baixo de tudo, uma sombra curta e um halo azul — a
+        profundidade que faz o vidro pairar sobre o cartão em vez de estar
+        colado a ele.
+
+   Nada disto se mexe: esta página pede calma (ver o frosted-card), e um
+   reflexo a passar de lado a lado era justamente o brilho que daqui se
+   tirou. O "color: transparent" só entra onde o background-clip é apoiado
+   (ver o @supports, no fim): onde não for, o título continua a ser o texto
+   claro de sempre — invisível nunca. */
 .frosted-title {
     font-family: 'Cormorant Garamond', serif;
     /* O título da referência: ~70px na janela de 1500 (4.67vw), ~90 numa
@@ -120,12 +344,46 @@ body.page-menu {
     font-weight: 300;
     color: rgba(255, 255, 255, 0.95);
     letter-spacing: 0.15em;
-    text-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.3),
-        0 0 20px rgba(160, 210, 255, 0.6);
     line-height: 1;
     /* O vão para o divisor do subtítulo, que é o que os separa. */
     margin-bottom: 0.12em;
+    /* A profundidade do vidro: uma sombra curta que o descola do cartão e o
+       halo azul de sempre. São drop-shadows e não text-shadows porque, com
+       o preenchimento transparente, o text-shadow aparecia por dentro das
+       letras e sujava o vidro. */
+    filter:
+        drop-shadow(0 2px 2px rgba(2, 6, 20, 0.55))
+        drop-shadow(0 0 24px rgba(140, 190, 255, 0.5))
+        drop-shadow(0 0 60px rgba(120, 175, 255, 0.18));
+}
+
+/* O vidro das letras, em duas camadas presas a elas. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .frosted-title {
+        color: transparent;
+        background:
+            /* 2. o reflexo especular, parado: uma faixa diagonal a
+               atravessar as letras, clara no ponto alto e a desaparecer
+               para os lados. */
+            linear-gradient(112deg,
+                transparent 24%,
+                rgba(255, 255, 255, 0.5) 33%,
+                rgba(255, 255, 255, 0.95) 38%,
+                rgba(255, 255, 255, 0.3) 44%,
+                transparent 54%),
+            /* 1. o corpo do vidro: a aresta de topo iluminada, o miolo mais
+               fundo (o azul que a luz deixa no meio do vidro) e a base a
+               voltar a apanhar luz. */
+            linear-gradient(180deg,
+                rgba(255, 255, 255, 0.99) 0%,
+                rgba(222, 236, 255, 0.9) 16%,
+                rgba(158, 192, 255, 0.82) 44%,
+                rgba(196, 222, 255, 0.9) 72%,
+                rgba(255, 255, 255, 0.98) 92%,
+                rgba(182, 212, 255, 0.88) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+    }
 }
 
 /* Subtítulo decorativo. Por cima dele, o divisor: uma linha fina que nasce

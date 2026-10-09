@@ -1,15 +1,30 @@
-/* ── AstroGuide — design system glass ───────────────────────────────── */
+/* ── AstroGuide — Liquid Glass Design System (iOS 26 inspired) ──────── */
 
 :root {
-    --glass-bg: rgba(10, 14, 32, 0.52);
-    --glass-border: rgba(255, 255, 255, 0.14);
-    --glass-border-top: rgba(255, 255, 255, 0.28);
-    --glass-blur: 22px;
-    --glass-radius: 18px;
-    --accent: #6eb8ff;
-    --accent-soft: rgba(110, 184, 255, 0.25);
-    --accent-glow: rgba(110, 184, 255, 0.45);
-    --content-z: 2;
+    /* Liquid Glass tokens */
+    --glass-bg:              rgba(12, 16, 38, 0.38);
+    --glass-bg-hover:        rgba(16, 22, 52, 0.45);
+    --glass-border:          rgba(255, 255, 255, 0.13);
+    --glass-border-top:      rgba(255, 255, 255, 0.32);
+    --glass-border-bottom:   rgba(120, 160, 255, 0.08);
+    --glass-blur:            28px;
+    --glass-radius:          20px;
+    --glass-sat:             130%;
+
+    /* Colour palette */
+    --accent:                #6eb8ff;
+    --accent-soft:           rgba(110, 184, 255, 0.22);
+    --accent-glow:           rgba(110, 184, 255, 0.42);
+    --ice-blue:              rgba(180, 210, 255, 0.18);
+    --ice-white:             rgba(255, 255, 255, 0.22);
+
+    /* Refraction tints */
+    --refract-top:           rgba(255, 255, 255, 0.26);
+    --refract-bottom:        rgba(90, 150, 255, 0.10);
+
+    /* Lighting */
+    --highlight-angle:       135deg;
+    --content-z:             2;
 }
 
 /* Vinheta + gradiente para legibilidade do UI */
@@ -23,96 +38,217 @@
         linear-gradient(180deg, rgba(8, 12, 40, 0.15) 0%, transparent 35%, rgba(2, 4, 16, 0.5) 100%);
 }
 
-/* Painel glass genérico */
+/* ══════════════════════════════════════════════════════════════════════
+   LIQUID GLASS PANEL — núcleo do efeito iOS 26
+   ══════════════════════════════════════════════════════════════════════ */
 .glass-panel {
     position: relative;
+    /* Vidro translúcido com saturação elevada — frosted glass do iOS */
     background: var(--glass-bg);
+    border-radius: var(--glass-radius);
+    overflow: hidden;
+
+    /* Borda luminosa: topo branco-gelo, base azul-gelo subtil */
     border: 1px solid var(--glass-border);
     border-top-color: var(--glass-border-top);
-    border-radius: var(--glass-radius);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-bottom-color: var(--glass-border-bottom);
+
+    /* Backdrop: blur + saturação + brightness = Liquid Glass */
+    backdrop-filter:
+        blur(var(--glass-blur))
+        saturate(var(--glass-sat))
+        brightness(1.04);
+    -webkit-backdrop-filter:
+        blur(var(--glass-blur))
+        saturate(var(--glass-sat))
+        brightness(1.04);
+
+    /* Sombra difusa flutuante multicamada */
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 12px 40px rgba(0, 0, 0, 0.45),
-        0 0 0 1px rgba(255, 255, 255, 0.04);
-    overflow: hidden;
+        /* linha de luz especular no bordo superior */
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        /* luzes laterais internas */
+        inset 1px 0 0 rgba(255, 255, 255, 0.06),
+        inset -1px 0 0 rgba(255, 255, 255, 0.04),
+        /* refração inferior — azul-gelo */
+        inset 0 -1px 0 rgba(110, 184, 255, 0.12),
+        /* sombra ambiente profunda */
+        0 18px 52px rgba(0, 0, 0, 0.52),
+        0 4px 16px rgba(0, 0, 0, 0.28),
+        /* anel externo muito subtil */
+        0 0 0 1px rgba(255, 255, 255, 0.045);
+
+    transition:
+        box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 0.4s ease,
+        background 0.4s ease,
+        transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, box-shadow;
 }
 
+/* ── Camada de refração e iluminação interior ───────────────────────── */
 .glass-panel::before {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(125deg,
-            rgba(255, 255, 255, 0.14) 0%,
-            transparent 40%,
-            transparent 60%,
-            rgba(110, 184, 255, 0.06) 100%);
+    /* Gradiente multicamada: luz diagonal + radial no canto superior */
+    background:
+        radial-gradient(
+            ellipse 70% 45% at 18% 0%,
+            rgba(255, 255, 255, 0.17) 0%,
+            transparent 65%
+        ),
+        linear-gradient(
+            var(--highlight-angle, 135deg),
+            rgba(255, 255, 255, 0.18) 0%,
+            rgba(200, 225, 255, 0.08) 22%,
+            transparent 45%,
+            transparent 62%,
+            rgba(110, 184, 255, 0.07) 80%,
+            rgba(80, 140, 230, 0.11) 100%
+        );
     pointer-events: none;
+    z-index: 0;
+    transition: opacity 0.3s ease;
 }
 
-.glass-shimmer::after {
+/* ── Reflexo curvo superior — faixa de luz interna ──────────────────── */
+.glass-panel::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 38%;
+    border-radius: inherit;
+    border-bottom-left-radius: 55% 28%;
+    border-bottom-right-radius: 55% 28%;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.11) 0%,
+        rgba(200, 220, 255, 0.05) 55%,
+        transparent 100%
+    );
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* ── Hover: vidro mais luminoso ─────────────────────────────────────── */
+.glass-panel:hover {
+    background: var(--glass-bg-hover);
+    border-color: rgba(255, 255, 255, 0.18);
+    border-top-color: rgba(255, 255, 255, 0.42);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.34),
+        inset 1px 0 0 rgba(255, 255, 255, 0.08),
+        inset -1px 0 0 rgba(255, 255, 255, 0.06),
+        inset 0 -1px 0 rgba(110, 184, 255, 0.18),
+        0 22px 62px rgba(0, 0, 0, 0.56),
+        0 6px 20px rgba(0, 0, 0, 0.30),
+        0 0 0 1px rgba(255, 255, 255, 0.07),
+        0 0 32px rgba(110, 184, 255, 0.08);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   SHIMMER — reflexo de luz a varrer o cabeçalho (.glass-shimmer)
+   ══════════════════════════════════════════════════════════════════════ */
+.glass-shimmer::before {
+    animation: liquidGlassLight 7s ease-in-out infinite;
+}
+
+@keyframes liquidGlassLight {
+    0%   { opacity: 0.85; }
+    25%  { opacity: 1; }
+    50%  { opacity: 0.90; }
+    75%  { opacity: 1; }
+    100% { opacity: 0.85; }
+}
+
+/* Elemento de sheen — faixa brilhante a varrer */
+.glass-sheen {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.glass-sheen::after {
     content: "";
     position: absolute;
     top: -50%;
-    left: -60%;
-    width: 45%;
+    left: -80%;
+    width: 42%;
     height: 200%;
-    background: linear-gradient(90deg,
-            transparent,
-            rgba(255, 255, 255, 0.08),
-            transparent);
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.08) 40%,
+        rgba(255, 255, 255, 0.12) 50%,
+        rgba(255, 255, 255, 0.08) 60%,
+        transparent 100%
+    );
     transform: rotate(18deg);
-    animation: glassShimmer 5s ease-in-out infinite;
+    animation: glassShimmer 8s ease-in-out infinite;
     pointer-events: none;
 }
 
 @keyframes glassShimmer {
+    0%   { left: -80%; opacity: 0; }
+    14%  { opacity: 0; }
+    38%  { opacity: 1; }
+    58%  { left: 120%; opacity: 0.7; }
+    59%  { left: -80%; opacity: 0; }
+    100% { left: -80%; opacity: 0; }
+}
 
-    0%,
-    100% {
-        left: -80%;
-        opacity: 0;
-    }
-
-    45% {
-        opacity: 1;
-    }
-
-    55% {
-        left: 120%;
-        opacity: 0.6;
-    }
+/* ══════════════════════════════════════════════════════════════════════
+   MOUSE-REACTIVE HIGHLIGHT — ponto de luz que segue o rato
+   O JS injeta --mx e --my no style inline de cada .liquid-interactive
+   ══════════════════════════════════════════════════════════════════════ */
+.glass-panel.liquid-interactive::before {
+    background:
+        radial-gradient(
+            ellipse 55% 42% at var(--mx, 20%) var(--my, 0%),
+            rgba(255, 255, 255, 0.21) 0%,
+            rgba(200, 225, 255, 0.08) 42%,
+            transparent 72%
+        ),
+        linear-gradient(
+            var(--highlight-angle, 135deg),
+            rgba(255, 255, 255, 0.15) 0%,
+            rgba(200, 225, 255, 0.07) 22%,
+            transparent 45%,
+            transparent 62%,
+            rgba(110, 184, 255, 0.06) 80%,
+            rgba(80, 140, 230, 0.10) 100%
+        );
+    /* Sem transition para seguir o rato em tempo real */
+    transition: none;
 }
 
 @keyframes floatSoft {
-
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-6px);
-    }
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-5px); }
 }
 
 @keyframes borderGlow {
-
-    0%,
-    100% {
+    0%, 100% {
         box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.12),
-            0 12px 40px rgba(0, 0, 0, 0.4),
-            0 0 24px var(--accent-soft);
+            inset 0 1px 0 rgba(255, 255, 255, 0.28),
+            inset 0 -1px 0 rgba(110, 184, 255, 0.12),
+            0 18px 52px rgba(0, 0, 0, 0.52),
+            0 0 28px var(--accent-soft);
     }
-
     50% {
         box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.18),
-            0 16px 48px rgba(0, 0, 0, 0.5),
-            0 0 36px var(--accent-glow);
+            inset 0 1px 0 rgba(255, 255, 255, 0.38),
+            inset 0 -1px 0 rgba(110, 184, 255, 0.20),
+            0 22px 60px rgba(0, 0, 0, 0.57),
+            0 0 44px var(--accent-glow);
     }
 }
 
@@ -131,39 +267,27 @@
        conteúdo — não são movimento contínuo);
      · o spinner de carregamento, que não é decoração: é a indicação de que
        algo está a acontecer. Um spinner parado parece um ecrã bloqueado. */
+/* ══════════════════════════════════════════════════════════════════════
+   ACESSIBILIDADE — respeita prefers-reduced-motion
+   ══════════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
-    .glass-shimmer::after {
+    .glass-shimmer::before,
+    .glass-sheen::after {
         animation: none;
     }
 
-    /* Campo de estrelas do menu e da app (o estilo .star está em
-       shared-ui-controls.css) — aqui a cintilação não é desligada, é trocada.
-       O que o "menos movimento" visa evitar é movimento, e no @keyframes
-       twinkle original é o transform: scale que o faz (as estrelas a crescer
-       e a encolher). Um simples esbatimento de opacidade não provoca esse
-       efeito, por isso mantém-se a cintilação sem o "zoom" — e com o dobro da
-       duração, para ser mais calma. O animation-delay de cada estrela é posto
-       pelo JS no style inline, por isso continua a valer e elas não ficam
-       todas sincronizadas. */
+    .glass-panel {
+        transition: none;
+    }
+
+    /* Campo de estrelas: mantém cintilação mas sem zoom */
     .star {
         animation-name: twinkle-calmo;
         animation-duration: calc(var(--dur) * 2);
     }
 
     @keyframes twinkle-calmo {
-
-        0%,
-        100% {
-            opacity: 0.35;
-        }
-
-        50% {
-            opacity: 1;
-        }
+        0%, 100% { opacity: 0.35; }
+        50%       { opacity: 1; }
     }
-
-    /* O cartão do título do menu e as fotografias dos cards já não têm
-       animação nenhuma em ciclo: as de movimento constante saíram todas do
-       menu.css. O que lá ficou — a entrada e o hover — não é para desligar:
-       não se mexe sozinho. */
 }

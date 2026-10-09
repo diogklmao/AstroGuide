@@ -105,12 +105,18 @@ CREATE TABLE IF NOT EXISTS favoritos (
 -- de mostrar: uma observação é o registo de um momento ("vi Saturno em
 -- 18/09"), e tem de continuar a fazer sentido mesmo que o objeto mude de nome
 -- no catálogo ou saia dele.
+--
+-- A hora é opcional (fica vazia quando não foi indicada): "vi Saturno" sem
+-- que horas é uma observação perfeitamente boa, e obrigar a inventar uma hora
+-- era pior do que deixá-la em branco. Quando existe, é "HH:MM" na hora local
+-- de quem observou — a mesma convenção da data ao lado dela.
 CREATE TABLE IF NOT EXISTS observacoes (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     utilizador_id INTEGER NOT NULL REFERENCES utilizadores(id) ON DELETE CASCADE,
     objeto_id     TEXT,
     objeto_nome   TEXT    NOT NULL,
     data          TEXT    NOT NULL,
+    hora          TEXT    NOT NULL DEFAULT '',
     nota          TEXT    NOT NULL DEFAULT '',
     criado_em     TEXT    NOT NULL
 );
@@ -129,6 +135,7 @@ _COLUNAS_ACRESCENTADAS = (
     ("utilizadores", "papel", f"TEXT NOT NULL DEFAULT '{PAPEL_UTILIZADOR}'"),
     ("localizacoes", "cidade", "TEXT NOT NULL DEFAULT ''"),
     ("localizacoes", "pais", "TEXT NOT NULL DEFAULT ''"),
+    ("observacoes", "hora", "TEXT NOT NULL DEFAULT ''"),
 )
 
 
@@ -208,7 +215,7 @@ def _acrescentar_colunas_em_falta(bd):
     # escolheu, porque os campos não existiam.
     colunas_de = {
         tabela: {linha["name"] for linha in bd.execute(f"PRAGMA table_info({tabela})")}
-        for tabela in ("utilizadores", "localizacoes")
+        for tabela in ("utilizadores", "localizacoes", "observacoes")
     }
 
     for tabela, coluna, definicao in _COLUNAS_ACRESCENTADAS:

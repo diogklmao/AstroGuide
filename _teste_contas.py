@@ -311,15 +311,26 @@ r = c.get("/api/favoritos")
 verificar("ficou vazio", r.get_json()["favoritos"] == [])
 
 print("\n== 8. Observações ==")
-r = c.post("/api/observacoes", json={"objeto_nome": "Saturno", "data": "2026-09-18", "nota": "Anéis bem visíveis"})
+r = c.post("/api/observacoes", json={"objeto_nome": "Saturno", "data": "2026-09-18",
+                                     "hora": "21:35", "nota": "Anéis bem visíveis"})
 verificar("criar observação -> 201", r.status_code == 201, r.get_json())
 obs_id = r.get_json()["observacao"]["id"]
+# A hora é opcional, mas quando vem tem de ser guardada e devolvida — é ela
+# que o caderno mostra ao lado da data.
+verificar("e a hora guardada volta na resposta",
+          r.get_json()["observacao"]["hora"] == "21:35", r.get_json())
 r = c.post("/api/observacoes", json={"objeto_nome": "X", "data": "2026-02-31"})
 verificar("data impossível -> 400", r.status_code == 400, r.get_json().get("erro"))
+r = c.post("/api/observacoes", json={"objeto_nome": "X", "data": "2026-09-18", "hora": "25:00"})
+verificar("hora impossível -> 400", r.status_code == 400, r.get_json().get("erro"))
+r = c.post("/api/observacoes", json={"objeto_nome": "X", "data": "2026-09-18", "hora": "9:5"})
+verificar("hora fora do formato HH:MM -> 400", r.status_code == 400, r.get_json().get("erro"))
 r = c.post("/api/observacoes", json={"objeto_nome": "", "data": "2026-09-18"})
 verificar("sem objeto -> 400", r.status_code == 400, r.get_json().get("erro"))
 r = c.get("/api/observacoes")
 verificar("aparece na lista", len(r.get_json()["observacoes"]) == 1)
+verificar("e a lista leva a hora", r.get_json()["observacoes"][0]["hora"] == "21:35",
+          r.get_json()["observacoes"])
 
 print("\n== 9. Isolamento entre contas ==")
 c3 = server.app.test_client()
@@ -773,7 +784,7 @@ verificar("o admin vê o papel e a ligação para a administração",
 c.post("/api/favoritos", json={"tipo": "constelacao", "objeto_id": "Ori"})
 c.post("/api/favoritos", json={"tipo": "estrela", "objeto_id": "ja-nao-existe"})
 c.post("/api/observacoes", json={"objeto_nome": "Vénus", "data": "2026-09-18",
-                                 "nota": "Anéis bem visíveis"})
+                                 "hora": "22:10", "nota": "Anéis bem visíveis"})
 texto = c.get("/perfil").get_data(as_text=True)
 
 # O nome do favorito sai do catálogo do Python: o que está guardado é o id
@@ -786,6 +797,33 @@ verificar("o favorito mostra o nome do catálogo, não o id", "Orion" in texto)
 verificar("um favorito que saiu do catálogo mostra o id", "ja-nao-existe" in texto)
 verificar("a observação aparece com a data legível", "Vénus" in texto and "18/09/2026" in texto)
 verificar("e com a nota escrita", "Anéis bem visíveis" in texto)
+verificar("e com a hora, ao lado da data", "22:10" in texto)
+
+# O campo da hora do formulário, com o seletor do Observatório em vez do
+# <input type="time"> branco do browser (ver o construirSeletorHora, no
+# perfil.js). O valor fica num input escondido, e começa vazio porque "sem hora
+# indicada" não é o mesmo que meia-noite.
+verificar("o formulário do caderno tem o campo da hora",
+          'id="obs-hora-campo"' in texto and 'id="obs-hora"' in texto
+          and '"obs-hora" value=""' in texto)
+verificar("e o seletor de horas é a peça do Observatório",
+          "construirSeletorHora" in js and "perfil-hora-picker" in js
+          and ".perfil-hora-picker" in css)
+# O campo da data é a mesma história: um botão com o calendário do
+# Observatório em vez do <input type="date"> branco do browser. O valor
+# continua em "AAAA-MM-DD" no campo escondido — é o formato que o servidor
+# recebe e valida, e não mudou nada.
+verificar("o campo da data é o calendário do Observatório, não o do browser",
+          'id="obs-data-campo"' in texto and 'id="obs-data-texto"' in texto
+          and 'type="hidden" id="obs-data" value="' in texto
+          and "construirSeletorData" in js and ".perfil-data-picker" in css)
+verificar("e o valor guardado continua em AAAA-MM-DD",
+          "dataParaISO" in js and 'valor.split(\"-\").reverse()' in js)
+# A barra de scroll da lista de resultados passou a ser do tema (fina e
+# translúcida, como as do Observatório e do painel da IA) em vez da barra
+# cinzenta do browser.
+verificar("a lista de resultados tem a barra de scroll do tema",
+          ".perfil-resultados::-webkit-scrollbar" in css and "scrollbar-width: thin" in css)
 
 # O isolamento entre contas, do lado da página e não só da API: o perfil é
 # desenhado a partir da conta que está a pedir, e não da última que mexeu em

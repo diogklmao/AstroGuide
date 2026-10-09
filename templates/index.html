@@ -26,7 +26,8 @@
     <a id="btn-voltar" class="glass-panel" href="/">◀ Menu</a>
 
     <div class="app">
-        <header class="glass-panel glass-header glass-shimmer">
+        <header class="glass-panel glass-header glass-shimmer liquid-interactive">
+            <div class="glass-sheen" aria-hidden="true"></div>
             <div class="subtitulo" id="localizacao">📍 A carregar...</div>
             <div id="relogio">🕐 --/--/---- --:--:--</div>
         </header>
@@ -393,6 +394,36 @@
     <script src="/static/js/ia.js"></script>
     <script src="/static/js/vr-observatorio.js"></script>
     <script src="/static/js/index.js"></script>
+
+    <!-- Liquid Glass: reflexo que acompanha o rato («mouse-reactive highlight»)
+         O script injeta as custom properties --mx e --my em cada painel
+         com a classe .liquid-interactive, que o glass.css converte num
+         ponto de luz que segue o cursor em tempo real. -->
+    <script>
+    (function () {
+        'use strict';
+        const panels = document.querySelectorAll('.glass-panel.liquid-interactive');
+
+        function onMouseMove(e) {
+            const r = this.getBoundingClientRect();
+            const x = ((e.clientX - r.left) / r.width)  * 100;
+            const y = ((e.clientY - r.top)  / r.height) * 100;
+            this.style.setProperty('--mx', x.toFixed(1) + '%');
+            this.style.setProperty('--my', y.toFixed(1) + '%');
+        }
+
+        function onMouseLeave() {
+            /* Volta à posição padrão (canto superior esquerdo) */
+            this.style.setProperty('--mx', '20%');
+            this.style.setProperty('--my', '0%');
+        }
+
+        panels.forEach(function (panel) {
+            panel.addEventListener('mousemove',  onMouseMove.bind(panel),  { passive: true });
+            panel.addEventListener('mouseleave', onMouseLeave.bind(panel), { passive: true });
+        });
+    }());
+    </script>
 </body>
 
 </html>

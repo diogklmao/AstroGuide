@@ -264,11 +264,12 @@ def pagina_perfil():
             "id":          linha["id"],
             "objeto_nome": linha["objeto_nome"],
             "data":        _data_legivel(linha["data"]),
+            "hora":        linha["hora"],
             "nota":        linha["nota"],
         }
         for linha in consultar_todos(
-            "SELECT id, objeto_nome, data, nota FROM observacoes "
-            "WHERE utilizador_id = ? ORDER BY data DESC, id DESC",
+            "SELECT id, objeto_nome, data, hora, nota FROM observacoes "
+            "WHERE utilizador_id = ? ORDER BY data DESC, hora DESC, id DESC",
             (u["id"],),
         )
     ]
@@ -644,8 +645,8 @@ def api_listar_observacoes():
         return jsonify({"observacoes": []})
 
     linhas = consultar_todos(
-        "SELECT id, objeto_id, objeto_nome, data, nota FROM observacoes "
-        "WHERE utilizador_id = ? ORDER BY data DESC, id DESC",
+        "SELECT id, objeto_id, objeto_nome, data, hora, nota FROM observacoes "
+        "WHERE utilizador_id = ? ORDER BY data DESC, hora DESC, id DESC",
         (u["id"],),
     )
     return jsonify({"observacoes": [dict(l) for l in linhas]})
@@ -662,6 +663,7 @@ def api_adicionar_observacao():
     objeto_id   = (dados.get("objeto_id") or "").strip() or None
     nota        = (dados.get("nota") or "").strip()
     data        = (dados.get("data") or "").strip()
+    hora        = (dados.get("hora") or "").strip()
 
     if not objeto_nome:
         return jsonify({"erro": "Escreve o que observaste."}), 400
@@ -680,15 +682,26 @@ def api_adicionar_observacao():
     except ValueError:
         return jsonify({"erro": "Data inválida (usa AAAA-MM-DD)."}), 400
 
+    # A hora é opcional — vazia quer dizer "não foi indicada", e não meia-noite.
+    # Quando vem, é "HH:MM" (o formato que o seletor do caderno escreve), e o
+    # fromisoformat valida os limites de uma vez: "25:00" não passa.
+    if hora:
+        try:
+            if len(hora) != 5 or hora[2] != ":":
+                raise ValueError
+            datetime.time.fromisoformat(hora)
+        except ValueError:
+            return jsonify({"erro": "Hora inválida (usa HH:MM)."}), 400
+
     novo_id = executar(
-        "INSERT INTO observacoes (utilizador_id, objeto_id, objeto_nome, data, nota, criado_em) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (u["id"], objeto_id, objeto_nome, data, nota, agora_iso()),
+        "INSERT INTO observacoes (utilizador_id, objeto_id, objeto_nome, data, hora, nota, criado_em) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (u["id"], objeto_id, objeto_nome, data, hora, nota, agora_iso()),
     )
     return jsonify({
         "observacao": {
             "id": novo_id, "objeto_id": objeto_id, "objeto_nome": objeto_nome,
-            "data": data, "nota": nota,
+            "data": data, "hora": hora, "nota": nota,
         }
     }), 201
 
