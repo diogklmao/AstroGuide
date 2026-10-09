@@ -17,9 +17,12 @@ env/
 .env/
 
 # ── Variáveis de ambiente (segredos) ─────────────────────
+# O .env leva as chaves da AstroGuide AI e afins (ver .env.example). O exemplo
+# fica de fora da ignorância de propósito — é o modelo que vai para o Git, sem
+# valores; todo o resto que comece por .env. fica de fora do Git.
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
 
 # ── Efemérides NASA (ficheiros grandes, descarregados auto) ──
 # O sky_engine.py descarrega este ficheiro automaticamente
@@ -57,11 +60,13 @@ desktop.ini
 # o repositório — é gerada automaticamente na primeira execução.
 .secret_key
 
-# Chave da AstroGuide AI (ver _chave em py/ia/ai_engine.py).
+# Chave da AstroGuide AI (ver py/ia/ai_engine.py).
 # É uma chave paga ao pedido: quem a tiver gasta o dinheiro de quem a criou,
 # e uma chave publicada num repositório é encontrada por robôs em minutos.
-# Pode estar neste ficheiro ou na variável de ambiente GEMINI_API_KEY — em
-# qualquer dos casos, nunca no Git.
+# A chave da Groq (GROQ_API_KEY) vive só em variável de ambiente — no .env,
+# que está aqui em cima, ou no painel do alojamento. Este ficheiro é a
+# alternativa local da GEMINI_API_KEY, e em qualquer dos casos nunca vai para
+# o Git.
 .ai_key
 
 # ── Claude ───────────────────────────────────────────────

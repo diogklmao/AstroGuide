@@ -470,10 +470,10 @@
         "serviço de IA.\n\n" +
         "Instala-se com: py -m pip install -r requirements.txt"
       : "A AstroGuide AI não está configurada neste servidor.\n\n" +
-        "Quem o administra tem de criar uma chave no Google AI Studio e " +
-        "guardá-la na variável de ambiente GEMINI_API_KEY ou num ficheiro " +
-        ".ai_key na raiz do projeto. Enquanto isso, o resto da aplicação " +
-        "funciona como sempre.";
+        "Quem o administra tem de criar uma chave no site da Groq e guardá-la " +
+        "na variável de ambiente GROQ_API_KEY (ver .env.example). Se o " +
+        "servidor usar a alternativa Gemini, a chave é a GEMINI_API_KEY. " +
+        "Enquanto isso, o resto da aplicação funciona como sempre.";
 
     const aviso = document.createElement("div");
     aviso.className = "ia-aviso";

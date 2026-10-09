@@ -16,8 +16,17 @@ tzdata==2025.2
 # Pedidos HTTP – usado para ir buscar a Imagem Astronómica do Dia (APOD) à NASA
 requests==2.32.3
 
-# AstroGuide AI – o SDK do Google Gemini, usado pelo py/ia/ai_engine.py
-# É o único pacote do projeto que serve uma funcionalidade opcional: sem a
-# chave configurada a aplicação corre igual, só o painel da IA fica a dizer
-# que não está disponível.
+# AstroGuide AI – a API Groq é chamada com o requests (em cima); não há SDK
+# nenhum para ela. O modelo e a chave vêm das variáveis de ambiente
+# GROQ_MODEL e GROQ_API_KEY (ver .env.example).
+
+# AstroGuide AI (alternativa Gemini) – o SDK do Google Gemini, usado pelo
+# py/ia/ai_engine.py quando AI_PROVIDER=gemini. É o único pacote do projeto
+# que serve uma funcionalidade opcional: sem ele a aplicação corre igual, e é
+# só o caminho Gemini — nunca o principal — que fica indisponível.
 google-genai==2.28.0
+
+# Variáveis de ambiente – carrega o ficheiro .env para o ambiente no arranque
+# do server.py, para correr na própria máquina sem exportar variáveis à mão.
+# Também opcional: sem ele, as variáveis vêm do ambiente de sempre.
+python-dotenv==1.0.1

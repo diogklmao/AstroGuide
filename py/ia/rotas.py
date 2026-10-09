@@ -18,13 +18,15 @@
 #  sobre isso.
 # ============================================================
 
+import datetime
+import os
 import threading
 import time
 
 from flask import Blueprint, jsonify, request
 
 from py.database.auth import localizacao_do_utilizador, utilizador_atual
-from py.ia.ai_engine import ECRAS, responder, estado
+from py.ia.ai_engine import ECRAS, responder, estado, renovacao_diaria
 
 
 ia_bp = Blueprint("ia", __name__)
@@ -46,10 +48,10 @@ MAXIMO_MENSAGENS = 20
 #
 # Isto não é uma regra de cortesia: é a proteção de uma quota paga. Cada
 # pergunta vale dois pedidos ao serviço de IA (a pergunta e a resposta já com
-# os dados), o plano gratuito dá vinte por dia e por modelo, e o /api/ia/chat
-# não exige conta — sem este tecto, uma pessoa sózinha com um script de dez
-# linhas deixava o painel de toda a gente a dizer que não havia quota. E é
-# também a diferença entre um ataque e um colega com o painel aberto.
+# os dados), a quota do fornecedor é de todos os que usam o servidor, e sem
+# este tecto uma pessoa sózinha com um script de dez linhas deixava o painel
+# de toda a gente a dizer que não havia quota. E é também a diferença entre um
+# ataque e um colega com o painel aberto.
 #
 # Dez por minuto é muito acima do que alguém escreve à mão e abaixo do que
 # um script quer. Vem em memória e por processo: o AstroGuide corre num só
@@ -65,8 +67,38 @@ JANELA_SEGUNDOS = 60
 # limite, e não um servidor sem memória.
 MAXIMO_IPS_ACOMPANHADOS = 4096
 
+# Quantas perguntas por dia cada conta pode fazer.
+#
+# O limite por minuto (em cima) corta o script que dispara; este corta o dia
+# inteiro de quem insiste — e é ele que faz a quota do serviço chegar ao fim do
+# dia para todos os que usam o servidor, em vez de chegar só ao primeiro a
+# acordar. Dez por conta por dia, e o número vem da variável de ambiente
+# LIMITE_PERGUNTAS_DIA (ver .env.example): quem tiver quota a mais — ou a
+# menos — muda-o sem tocar em código.
+#
+# A janela é o dia UTC, a mesma do relógio dos serviços de IA (ver o
+# renovacao_diaria, no ai_engine.py): quando o balde deles volta a encher, o
+# nosso volta também, e o painel mostra os dois a contar para o mesmo lado.
+def _limite_perguntas_dia():
+    try:
+        valor = int(os.environ.get("LIMITE_PERGUNTAS_DIA") or 10)
+    except ValueError:
+        return 10
+    return max(1, valor)
+
+
+LIMITE_PERGUNTAS_DIA = _limite_perguntas_dia()
+
 _pedidos = {}
 _pedidos_trava = threading.Lock()
+
+# As contagens do dia, por id de conta: {id: {"dia": data UTC, "contagem": n}}.
+# Em memória e por processo, como o limite por minuto — e pela mesma razão: o
+# AstroGuide corre num só processo, e isto não é um registo de auditoria, é
+# uma trava. Um reinício do servidor põe os contadores a zero, e está bem
+# assim: é o que também acontece às janelas dos limites do próprio serviço.
+_pedidos_dia = {}
+_pedidos_dia_trava = threading.Lock()
 
 
 def _passou_do_limite(ip):
@@ -86,6 +118,35 @@ def _passou_do_limite(ip):
             return True
 
         tempos.append(agora)
+        return False
+
+
+def _passou_do_limite_dia(uid):
+    # True se esta conta já gastou as perguntas de hoje. Contam-se os pedidos
+    # que se deixaram ir — cada um chega ao serviço de IA e gasta quota dele —
+    # e não os que responderam bem.
+    dia = datetime.datetime.now(datetime.timezone.utc).date()
+
+    with _pedidos_dia_trava:
+        # A memória: cada conta tem uma entrada, que morre com o dia. As velhas
+        # limpam-se quando o dicionário cresce; se mesmo assim for grande
+        # demais (milhares de contas novas à pressa), começa-se de novo — o
+        # pior caso é um dia sem limite, e não um servidor sem memória.
+        if len(_pedidos_dia) > MAXIMO_IPS_ACOMPANHADOS:
+            for chave in [c for c, r in _pedidos_dia.items() if r["dia"] != dia]:
+                del _pedidos_dia[chave]
+            if len(_pedidos_dia) > MAXIMO_IPS_ACOMPANHADOS:
+                _pedidos_dia.clear()
+
+        registo = _pedidos_dia.get(uid)
+        if registo is None or registo["dia"] != dia:
+            registo = {"dia": dia, "contagem": 0}
+            _pedidos_dia[uid] = registo
+
+        if registo["contagem"] >= LIMITE_PERGUNTAS_DIA:
+            return True
+
+        registo["contagem"] += 1
         return False
 
 
@@ -156,7 +217,8 @@ def api_ia_chat():
     # Quem não tem sessão nem chega a gastar um pedido ao serviço de IA: a
     # funcionalidade é de contas, e a recusa vem escrita para o painel a dizer
     # o (o ia.js trata o "sem_conta" com a porta de saída para o /entrar).
-    if utilizador_atual() is None:
+    utilizador = utilizador_atual()
+    if utilizador is None:
         return jsonify({
             "ok": False, "tipo": "sem_conta",
             "erro": "A AstroGuide AI é para contas com sessão iniciada. "
@@ -185,6 +247,21 @@ def api_ia_chat():
             "ok": False, "tipo": "limite_local",
             "erro": "Estás a fazer perguntas depressa demais. "
                     "Espera um minuto e tenta outra vez.",
+        }), 429
+
+    # O limite diário por conta, o segundo dos dois travões. Ao contrário do
+    # por minuto, este não é sobre velocidade: é o que faz a quota do serviço
+    # chegar ao fim do dia para toda a gente, e vem com o momento em que se
+    # renova (campo "quota_renova_em") — o mesmo que as falhas de quota trazem,
+    # para o painel mostrar a contagem em vez de uma espera às cegas.
+    if _passou_do_limite_dia(utilizador["id"]):
+        _, iso, hora_local = renovacao_diaria(localizacao_do_utilizador())
+        return jsonify({
+            "ok": False, "tipo": "limite_dia",
+            "erro": f"Gastaste as {LIMITE_PERGUNTAS_DIA} perguntas de hoje na "
+                    f"AstroGuide AI. Volta a tentar amanhã — renova às "
+                    f"{hora_local}, hora local.",
+            "quota_renova_em": iso,
         }), 429
 
     historico = corpo.get("historico")

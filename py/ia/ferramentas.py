@@ -36,8 +36,9 @@
 #  Cada ferramenta é um dicionário com nome, descrição,
 #  parâmetros (JSON Schema, que é o que os fornecedores de IA
 #  aceitam) e a função que a executa. Não há aqui nada
-#  específico do Gemini: é de propósito, para o dia em que o
-#  fornecedor mudar.
+#  específico de nenhum fornecedor: é de propósito — o Gemini e
+#  a Groq comem este mesmo catálogo, cada um traduzido na sua
+#  porta de entrada (ver o ai_engine.py).
 # ============================================================
 
 import datetime

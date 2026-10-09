@@ -4,8 +4,13 @@
 #  É o único ficheiro do projeto que fala com um serviço de IA.
 #  Tudo o resto — o endpoint, o painel, o histórico — fala com
 #  este módulo sem saber sequer qual é o fornecedor: é isso que
-#  faz com que trocar o Gemini por outro serviço seja mexer
-#  aqui e mais nada.
+#  faz com que trocar de fornecedor seja mexer aqui e mais nada.
+#
+#  O fornecedor principal é a Groq (AI_PROVIDER=groq, por
+#  omissão), com o modelo em GROQ_MODEL; o Gemini continua aqui
+#  como alternativa (AI_PROVIDER=gemini). A escolha lê-se da
+#  variável de ambiente AI_PROVIDER e muda só este ficheiro — as
+#  rotas e o painel não sabem de qual dos dois se trata.
 #
 #  O que este módulo NÃO faz, de propósito: cálculos astronómicos.
 #  Recebe a localização já resolvida — a mesma que o /api/ceu usa
@@ -22,10 +27,13 @@
 # ============================================================
 
 import datetime
+import json
 import os
 import re
 import time
 from zoneinfo import ZoneInfo
+
+import requests
 
 from py.config import LOCATION
 from py.ia import ferramentas
@@ -33,7 +41,8 @@ from py.ia import ferramentas
 
 # ── Configuração ──────────────────────────────────────────────────────────────
 
-# O modelo principal. É um "flash" de propósito: isto é uma janela de conversa,
+# O modelo principal do caminho Gemini (o da Groq é o MODELO_GROQ, mais
+# abaixo). É um "flash" de propósito: isto é uma janela de conversa,
 # e interessa responder depressa e barato, não raciocinar durante meio minuto.
 MODELO = "gemini-3.8-flash"
 
@@ -80,6 +89,49 @@ MODELOS_ALTERNATIVOS = (
 
 # A lista completa, pela ordem por que se tenta.
 MODELOS = (MODELO,) + MODELOS_ALTERNATIVOS
+
+# ── O fornecedor ──────────────────────────────────────────────────────────────
+# A Groq é o fornecedor principal; o Gemini fica como alternativa, para o dia
+# em que a Groq não servir. A escolha vem da variável de ambiente AI_PROVIDER
+# ("groq" por omissão, "gemini" para a alternativa) e é lida aqui, num sítio
+# só: o resto do projeto não sabe qual dos dois está ligado.
+#
+# Não há fallback automático de um para o outro, de propósito: um fallback que
+# passasse despercebido chamava os dois serviços à mesma pergunta, gastava
+# quota dos dois sem ninguém o pedir, e ainda mentia ao painel sobre quem
+# respondeu. Quando um não responde, o painel diz-o — e quem administra troca
+# o AI_PROVIDER.
+FORNECEDOR = (os.environ.get("AI_PROVIDER") or "groq").strip().lower()
+if FORNECEDOR not in ("groq", "gemini"):
+    FORNECEDOR = "groq"
+
+# O modelo Groq, e o tecto da resposta dele. O modelo vem da variável de
+# ambiente GROQ_MODEL — é ela que prepara o projeto para a mudança de modelo
+# seguinte, sem tocar em código.
+#
+# O openai/gpt-oss-120b é um modelo de raciocínio: pensa antes de responder, e
+# esses tokens de pensamento contam para o limite de resposta. Daí o
+# MAXIMO_TOKENS_RESPOSTA_GROQ ser maior do que o do Gemini (2048): é o tecto,
+# não o consumo — subi-lo não custa token nenhum, e evita uma resposta cortada
+# a meio que chega vazia ao painel.
+MODELO_GROQ = (os.environ.get("GROQ_MODEL") or "openai/gpt-oss-120b").strip()
+MAXIMO_TOKENS_RESPOSTA_GROQ = 4096
+
+# O endpoint da API Groq. Vem da variável de ambiente GROQ_API_URL para quem
+# precisar de apontar noutro sítio (um proxy, uma versão nova do endpoint);
+# por omissão é o endpoint público da Groq, que é onde o modelo mora.
+URL_GROQ = (os.environ.get("GROQ_API_URL")
+            or "https://api.groq.com/openai/v1/chat/completions").strip()
+
+# Quanto o modelo pensa antes de responder: "low", "medium" ou "high"
+# (GROQ_REASONING_EFFORT). "low" por omissão — este painel quer respostas
+# rápidas e curtas, cada token de raciocínio é um token a mais de quota, e as
+# perguntas deste painel não precisam de grande reflexão: têm as ferramentas à
+# frente para os números. Quem preferir mais cuidado que suba para "medium" no
+# .env, sem tocar em código.
+ESFORCO_RACIOCINIO = (os.environ.get("GROQ_REASONING_EFFORT") or "low").strip().lower()
+if ESFORCO_RACIOCINIO not in ("low", "medium", "high"):
+    ESFORCO_RACIOCINIO = "low"
 
 # O tecto de uma resposta. Um painel de conversa não é sítio para respostas
 # longas, e este número é também a defesa contra um pedido que fuja: sem ele,
@@ -179,18 +231,27 @@ MAXIMO_MENSAGENS_HISTORICO = 20
 # seguinte não o endireita.
 MAXIMO_VOLTAS_FERRAMENTAS = 3
 
-# Onde a chave pode estar, por ordem de preferência:
+# Onde as chaves podem estar. Duas, uma por fornecedor, e só se lê a do
+# fornecedor escolhido no AI_PROVIDER.
 #
-#   1. a variável de ambiente GEMINI_API_KEY — é o nome que o próprio SDK lê,
-#      e é o que se usa num servidor a sério, porque nunca chega ao disco;
-#   2. um ficheiro .ai_key ao lado do server.py — para quem corre isto na
-#      própria máquina e não quer mexer em variáveis de ambiente.
+# A GROQ_API_KEY — a do fornecedor principal — vive NA VARIÁVEL DE AMBIENTE e
+# em mais lado nenhum: não há ficheiro alternativo para ela, de propósito. Um
+# ficheiro com uma chave dentro é uma cópia dela, e cada cópia é mais um sítio
+# de onde pode escapar; num servidor a sério a variável de ambiente é o sítio
+# onde as chaves ficam. (Para correr na própria máquina sem mexer no ambiente,
+# há o ficheiro .env — ver .env.example —, que carrega para as variáveis de
+# ambiente e também está fora do Git.)
 #
-# O ficheiro está no .gitignore pela mesma razão que o .secret_key: quem tiver
-# a chave gasta o dinheiro de quem a criou. E nada disto chega ao browser — a
-# chave não sai deste processo, e é por isso que o painel fala com o nosso
-# servidor e não com o serviço de IA.
-VARIAVEL_CHAVE = "GEMINI_API_KEY"
+# A GEMINI_API_KEY — a da alternativa — mantém o comportamento de sempre: a
+# variável de ambiente primeiro, e depois o ficheiro .ai_key ao lado do
+# server.py, para quem não quer mexer em variáveis. O ficheiro está no
+# .gitignore pela mesma razão que o .secret_key: quem tiver a chave gasta o
+# dinheiro de quem a criou.
+#
+# E nada disto chega ao browser — a chave não sai deste processo, e é por isso
+# que o painel fala com o nosso servidor e não com o serviço de IA.
+VARIAVEL_CHAVE = "GROQ_API_KEY"
+VARIAVEL_CHAVE_GEMINI = "GEMINI_API_KEY"
 FICHEIRO_CHAVE = ".ai_key"
 
 # A raiz do projeto: py/ia/ai_engine.py -> py/ia -> py -> AstroGuide.
@@ -201,7 +262,8 @@ _RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 
 # ── O SDK ─────────────────────────────────────────────────────────────────────
 # O google-genai importa-se aqui dentro, e não no topo do ficheiro, de
-# propósito.
+# propósito. Serve só o caminho Gemini — o da Groq fala HTTP com o requests,
+# que já é dependência do projeto —, e é por isso que pode ser opcional.
 #
 # No topo, um servidor sem o pacote instalado não arrancava de todo: o
 # server.py importa as rotas da IA, as rotas importam este módulo, e um
@@ -229,14 +291,27 @@ def _sdk():
 
 # ── A chave ───────────────────────────────────────────────────────────────────
 
-def _chave():
-    # A chave do serviço, ou None se não houver nenhuma configurada.
+def _chave_groq():
+    # A chave do fornecedor principal, e só da variável de ambiente — ver o
+    # VARIAVEL_CHAVE, em cima, para a razão de não haver ficheiro nenhum aqui.
     #
     # Devolver None não é um erro: é o estado normal de quem acabou de clonar
     # o repositório e ainda não tem chave. Quem chama decide o que fazer com
     # isso — e o que a aplicação faz é continuar a funcionar sem IA, com o
     # painel a dizê-lo, em vez de rebentar.
-    do_ambiente = (os.environ.get(VARIAVEL_CHAVE) or "").strip()
+    return (os.environ.get(VARIAVEL_CHAVE) or "").strip() or None
+
+
+def _chave_gemini():
+    # A chave da alternativa Gemini, ou None se não houver nenhuma configurada.
+    # Duas fontes, por ordem de preferência:
+    #
+    #   1. a variável de ambiente GEMINI_API_KEY — é o nome que o próprio SDK
+    #      lê, e é o que se usa num servidor a sério, porque nunca chega ao
+    #      disco;
+    #   2. um ficheiro .ai_key ao lado do server.py — para quem corre isto na
+    #      própria máquina e não quer mexer em variáveis de ambiente.
+    do_ambiente = (os.environ.get(VARIAVEL_CHAVE_GEMINI) or "").strip()
     if do_ambiente:
         return do_ambiente
 
@@ -279,11 +354,25 @@ def estado():
     # saber qual delas falta: ter a chave e não ter o pacote é um problema
     # diferente de ter o pacote e não ter a chave, e a resolução é diferente
     # em cada caso. Dizer só "não está disponível" obrigava a adivinhar.
-    if _chave() is None:
-        return {"disponivel": False, "motivo": "sem_chave", "modelo": None}
-    if _sdk() is None:
-        return {"disponivel": False, "motivo": "sem_dependencia", "modelo": None}
-    return {"disponivel": True, "motivo": None, "modelo": MODELO}
+    #
+    # Os campos "fornecedor" e "modelo" dizem quem está ligado (o AI_PROVIDER)
+    # e quem responde quando está tudo. Não são segredo nenhum — é a mesma
+    # informação que um log quereria, e nada disto é a chave.
+    if FORNECEDOR == "gemini":
+        if _chave_gemini() is None:
+            return {"disponivel": False, "motivo": "sem_chave", "modelo": None,
+                    "fornecedor": FORNECEDOR}
+        if _sdk() is None:
+            return {"disponivel": False, "motivo": "sem_dependencia", "modelo": None,
+                    "fornecedor": FORNECEDOR}
+        return {"disponivel": True, "motivo": None, "modelo": MODELO,
+                "fornecedor": FORNECEDOR}
+
+    if _chave_groq() is None:
+        return {"disponivel": False, "motivo": "sem_chave", "modelo": None,
+                "fornecedor": FORNECEDOR}
+    return {"disponivel": True, "motivo": None, "modelo": MODELO_GROQ,
+            "fornecedor": FORNECEDOR}
 
 
 def disponivel():
@@ -451,7 +540,9 @@ def _construir_conteudo(historico, mensagem):
         if not isinstance(m, dict):
             continue
         # "assistant" é o nome que o painel usa para as respostas; "model" é o
-        # que a API usa. A tradução é aqui, e só aqui.
+        # nome neutro com que ficam aqui. Cada fornecedor traduz na sua porta
+        # de entrada: o Gemini come "model" tal e qual, o Groq recebe
+        # "assistant" (ver o _para_groq).
         papel = "model" if m.get("papel") == "assistant" else "user"
         texto = (m.get("texto") or "").strip()
         if not texto:
@@ -541,16 +632,18 @@ def _duracao(segundos):
     return f"{s} s"
 
 
-def _renovacao_quota(detalhe, localizacao=None):
+def _renovacao_quota(detalhe, localizacao=None, retry_after=None):
     # Quando é que o balde diário volta a encher: (segundos até lá, momento em
     # ISO para o painel, hora local para a frase).
     #
-    # Duas fontes, por ordem de confiança:
+    # Três fontes, por ordem de confiança:
     #
-    #   1. o próprio erro diz — "Please retry in 7h36m24.365373576s." ou o
-    #      campo RetryInfo com "retryDelay": "27384s". É o relógio do
-    #      serviço, e não o nosso, por isso vale mais;
-    #   2. sem prazo nenhum no erro, calcula-se pela meia-noite UTC — que é
+    #   1. o cabeçalho retry-after do serviço (em segundos) — a Groq manda-o
+    #      sempre que responde 429, e é número, sem nada para interpretar;
+    #   2. o próprio erro diz — "Please retry in 7h36m24.365373576s." (Gemini),
+    #      "Please try again in 2m59.56s" (Groq) ou o campo RetryInfo com
+    #      "retryDelay": "27384s". É o relógio do serviço, e não o nosso;
+    #   3. sem prazo nenhum em lado nenhum, calcula-se pela meia-noite UTC — que é
     #      onde o relógio do próprio serviço aponta: em medições de 2026-10,
     #      com a quota esgotada, o "Please retry in" deles dava sempre 00:00
     #      em ponto. (A documentação pública fala em meia-noite da
@@ -563,8 +656,17 @@ def _renovacao_quota(detalhe, localizacao=None):
 
     segundos = None
 
-    m = re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?", detalhe)
-    if m and any(m.groups()):
+    if retry_after is not None:
+        try:
+            segundos = float(retry_after)
+        except (TypeError, ValueError):
+            segundos = None
+
+    # As duas grafias do mesmo prazo: "retry in" (Gemini) e "try again in"
+    # (Groq), cada uma com as suas horas, minutos e segundos.
+    m = re.search(r"(?:retry|try again) in\s+(?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?",
+                  detalhe, re.IGNORECASE)
+    if segundos is None and m and any(m.groups()):
         segundos = (float(m.group(1) or 0) * 3600
                     + float(m.group(2) or 0) * 60
                     + float(m.group(3) or 0))
@@ -582,6 +684,18 @@ def _renovacao_quota(detalhe, localizacao=None):
     momento = agora_utc + datetime.timedelta(seconds=max(segundos, 0))
     hora_local = momento.astimezone(_fuso(localizacao)).strftime("%H:%M")
     return segundos, momento.isoformat(timespec="minutes"), hora_local
+
+
+def renovacao_diaria(localizacao=None):
+    # Quando o balde DIÁRIO volta a encher — o mesmo relógio do
+    # _renovacao_quota, sem erro nenhum do serviço pelo caminho: cai na
+    # meia-noite UTC, que é onde o relógio dos serviços aponta.
+    #
+    # É o que as rotas usam para responder ao limite diário de perguntas por
+    # utilizador (ver py/ia/rotas.py) com a mesma frase e a mesma contagem do
+    # painel que as falhas de quota trazem: para quem está à espera, um balde
+    # cheio é um balde cheio, seja nosso ou do serviço.
+    return _renovacao_quota("", localizacao)
 
 
 def _classificar(excecao, localizacao=None):
@@ -628,14 +742,18 @@ def _classificar(excecao, localizacao=None):
         # parte que interessa. Procura-se no texto da exceção, e não numa
         # estrutura do SDK, porque a estrutura muda entre versões e o texto
         # diz sempre o mesmo.
+        # O "per day" da Groq ("for requests per day (X / Y)") entra na mesma
+        # gaveta que o "PerDay" do Gemini: é o balde do dia, e não o do minuto.
         detalhe = str(excecao)
-        if "PerDay" in detalhe or "per_day" in detalhe.lower():
+        if ("PerDay" in detalhe or "per_day" in detalhe.lower()
+                or "per day" in detalhe.lower()):
             # A frase leva o tempo que falta, e não "renova à meia-noite da
             # Califórnia": é a diferença entre mandar alguém esperar "um
             # pouco" por um dia inteiro e dizer-lhe quanto é que é. O prazo
             # vem do próprio erro quando ele o traz; sem ele, calcula-se pela
             # meia-noite da Califórnia (ver _renovacao_quota).
-            segundos, iso, hora_local = _renovacao_quota(detalhe, localizacao)
+            segundos, iso, hora_local = _renovacao_quota(
+                detalhe, localizacao, getattr(excecao, "retry_after", None))
             return (
                 "limite",
                 "A AstroGuide AI esgotou o limite diário do plano "
@@ -721,6 +839,225 @@ def _cliente(sdk, chave):
     return _CLIENTE["cliente"]
 
 
+# ── O fornecedor Groq ─────────────────────────────────────────────────────────
+# O caminho principal. A API da Groq fala o protocolo da OpenAI — uma chamada
+# HTTP a um endpoint, com a conversa e as ferramentas em JSON —, e é por aí que
+# se vai: o requests já é dependência do projeto (é ele que busca o APOD à
+# NASA), por isso este caminho não precisa de SDK nenhum a mais.
+#
+# A conversa troca-se em mensagens: "system" (as instruções), "user" e
+# "assistant" (a conversa) e "tool" (o resultado de cada ferramenta, pendurado
+# no pedido que o modelo fez). É o mesmo vaivém do caminho Gemini, com outras
+# roupas: o modelo pede ferramentas, recebe os dados do motor da AstroGuide, e
+# só então escreve a resposta.
+
+
+def _para_groq(turnos):
+    # Os turnos do _construir_conteudo traduzidos para o que a API da Groq come:
+    # "model" vira "assistant", e as partes de texto de um turno juntam-se numa
+    # mensagem só. É a única tradução que este caminho precisa — o formato de
+    # cima é neutro de propósito.
+    mensagens = []
+    for turno in turnos:
+        papel = "assistant" if turno.get("role") == "model" else "user"
+        texto = "\n\n".join(p["text"] for p in turno.get("parts", []) if p.get("text"))
+        if texto:
+            mensagens.append({"role": papel, "content": texto})
+    return mensagens
+
+
+def _ferramentas_groq():
+    # O mesmo CATALOGO do ferramentas.py, no formato da Groq. Os parâmetros vão
+    # tal e qual saem de lá: já são JSON Schema, que é o que este campo quer.
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": t["nome"],
+                "description": t["descricao"],
+                "parameters": t["parametros"],
+            },
+        }
+        for t in ferramentas.CATALOGO
+    ]
+
+
+class _ErroAPI(Exception):
+    # Um erro HTTP vindo da API da Groq, com o que ele trouxe: o código de
+    # estado, a frase onde o serviço se explica e, quando há, o retry-after —
+    # os segundos que o serviço manda esperar antes de voltar a tentar.
+    #
+    # Tem de ter um atributo "code": é o que o _classificar procura primeiro,
+    # e é o que faz este erro cair nas mesmas famílias dos erros do Gemini —
+    # uma só tabela de falhas para os dois fornecedores.
+    def __init__(self, codigo, detalhe, retry_after=None):
+        super().__init__(detalhe)
+        self.code = codigo
+        self.retry_after = retry_after
+
+
+def _texto_erro_groq(resposta):
+    # A frase do erro, como a Groq a escreve: dentro do corpo, no campo
+    # error.message. Lê-se de lá e não do texto cru porque o corpo é JSON e o
+    # que interessa vem embrulhado lá dentro.
+    try:
+        corpo = resposta.json()
+        erro = corpo.get("error") if isinstance(corpo, dict) else None
+        if isinstance(erro, dict) and erro.get("message"):
+            return str(erro["message"])
+    except Exception:
+        pass
+    return (resposta.text or "").strip()[:500] or f"HTTP {resposta.status_code}"
+
+
+def _pedido_groq(chave, mensagens):
+    # Uma chamada à API: a conversa vai, a resposta do modelo vem — ou o erro
+    # vem, já embrulhado em _ErroAPI para o _classificar saber do que se trata.
+    #
+    # As exceções de rede e de timeout não se embrulham: sobem como são (do
+    # requests), e o _classificar já as conhece pelo nome.
+    corpo = {
+        "model": MODELO_GROQ,
+        "messages": mensagens,
+        "tools": _ferramentas_groq(),
+        "tool_choice": "auto",
+        "max_completion_tokens": MAXIMO_TOKENS_RESPOSTA_GROQ,
+        "reasoning_effort": ESFORCO_RACIOCINIO,
+        # O raciocínio do modelo fica para ele: com "hidden", o content traz só
+        # a resposta para a pessoa. Sem isto, o painel mostrava o pensamento do
+        # modelo antes da resposta — e pagava-se em tokens à mesma.
+        "reasoning_format": "hidden",
+    }
+
+    resposta = requests.post(
+        URL_GROQ,
+        headers={
+            "Authorization": f"Bearer {chave}",
+            "Content-Type": "application/json",
+        },
+        json=corpo,
+        timeout=TIMEOUT_PEDIDO_MS / 1000,
+    )
+
+    if resposta.status_code >= 400:
+        retry_after = None
+        try:
+            retry_after = float(resposta.headers.get("retry-after"))
+        except (TypeError, ValueError):
+            retry_after = None
+        raise _ErroAPI(resposta.status_code, _texto_erro_groq(resposta), retry_after)
+
+    escolhas = (resposta.json() or {}).get("choices") or []
+    if not escolhas:
+        # Resposta sem escolha nenhuma — sem mensagem nenhuma a ler. O texto
+        # lá do ciclo há de sair vazio, e tem a frase dele.
+        return {}
+    return escolhas[0].get("message") or {}
+
+
+def _ciclo_groq(turnos, instrucoes, local, inicio):
+    # O caminho principal: um modelo só (MODELO_GROQ), sem cascata nenhuma. Ao
+    # contrário da alternativa Gemini — onde cada modelo tem o seu balde de
+    # quota e a lista existe para os juntar —, aqui não há baldes por modelo
+    # que valha a pena perseguir, e uma cascata só chamaria o serviço vezes a
+    # mais para perguntar o mesmo (ver o AI_PROVIDER, em cima).
+    chave = _chave_groq()
+    if not chave:
+        return _falha("sem_chave",
+                      "A AstroGuide AI ainda não está configurada neste servidor.")
+
+    mensagens = [{"role": "system", "content": instrucoes}] + _para_groq(turnos)
+
+    for _ in range(MAXIMO_VOLTAS_FERRAMENTAS):
+        # O prazo da pergunta, visto antes de cada chamada — a mesma regra do
+        # caminho Gemini: só se arranca uma chamada se ainda sobrar
+        # TEMPO_MINIMO_RESTANTE para ela.
+        restante = TEMPO_MAXIMO_PERGUNTA - (time.monotonic() - inicio)
+        if restante < TEMPO_MINIMO_RESTANTE:
+            return _falha("tempo_esgotado", FRASE_TEMPO_ESGOTADO)
+
+        try:
+            mensagem = _pedido_groq(chave, mensagens)
+        except Exception as e:
+            # Um erro da API, da rede ou do nosso próprio prazo: cada um vira a
+            # sua família e a sua frase (ver o _classificar). Não há modelo
+            # seguinte onde se esconder, por isso o erro sobe já — e sobe com a
+            # causa certa, que é o que a pessoa precisa de ler.
+            tipo, frase, extra = _classificar(e, local)
+            return _falha(tipo, frase, **extra)
+
+        pedidos = mensagem.get("tool_calls") or []
+        if not pedidos:
+            # Sem pedidos, a resposta está no content — e se vier vazia, é
+            # porque não veio nada (resposta bloqueada, ou gasta toda em
+            # raciocínio). O caso vazio tem a sua frase, que é a de baixo.
+            texto = (mensagem.get("content") or "").strip()
+            if texto:
+                return {"ok": True, "resposta": texto, "modelo": MODELO_GROQ}
+            return _falha("vazia",
+                          "A AstroGuide AI não devolveu resposta. "
+                          "Tenta reformular a pergunta.")
+
+        # O turno do modelo — com os pedidos lá dentro — entra na conversa
+        # antes dos resultados: o pedido e a resposta são um par, e é o par que
+        # faz sentido. Vai só com o que a API aceita de volta (o papel, o
+        # conteúdo e os pedidos); o resto — o raciocínio, quando existe — é
+        # dele e não volta.
+        mensagens.append({
+            "role": "assistant",
+            "content": mensagem.get("content"),
+            "tool_calls": [
+                {
+                    "id": p.get("id"),
+                    "type": "function",
+                    "function": {
+                        "name": (p.get("function") or {}).get("name"),
+                        "arguments": (p.get("function") or {}).get("arguments") or "{}",
+                    },
+                }
+                for p in pedidos
+            ],
+        })
+
+        # Corre-se tudo o que ele pediu. Numa pergunta sobre o céu pode pedir
+        # mais do que uma ferramenta na mesma volta — a posição e a fase, por
+        # exemplo —, e nesse caso vão todas juntas.
+        #
+        # A localização é a NOSSA, e não a que vier nos argumentos: o executar
+        # deita fora qualquer "localizacao" que o modelo invente (ver o
+        # ferramentas.py). O modelo não sabe onde a pessoa está; sabe que nós
+        # sabemos.
+        for pedido in pedidos:
+            funcao = pedido.get("function") or {}
+            try:
+                argumentos = json.loads(funcao.get("arguments") or "{}") or {}
+            except Exception:
+                argumentos = {}
+            if not isinstance(argumentos, dict):
+                argumentos = {}
+
+            resultado = ferramentas.executar(
+                funcao.get("name"),
+                argumentos,
+                localizacao=local,
+            )
+
+            # O resultado volta como mensagem "tool", pendurada no pedido que
+            # o fez pelo tool_call_id — é o que faz o par pedido/resultado
+            # fechar-se do lado da API.
+            mensagens.append({
+                "role": "tool",
+                "tool_call_id": pedido.get("id"),
+                "content": json.dumps(resultado, ensure_ascii=False, default=str),
+            })
+
+    # Gastaram-se as voltas todas e o modelo ainda estava a pedir ferramentas.
+    # Perdeu-se, e insistir só gastaria pedidos a quem está a andar em círculos.
+    return _falha("servico",
+                  "A AstroGuide AI não conseguiu concluir a resposta. "
+                  "Tenta reformular a pergunta.")
+
+
 # ── A resposta ────────────────────────────────────────────────────────────────
 def responder(mensagem, historico=None, localizacao=None, ecra=None):
     # Uma pergunta, uma resposta, e onde é que ela foi feita: devolve
@@ -732,9 +1069,30 @@ def responder(mensagem, historico=None, localizacao=None, ecra=None):
     # endpoint que chama isto responde a um browser, e um 500 com um traceback
     # não diz nada a quem está a usar o painel. Aqui cada família de falha tem
     # o seu nome e uma frase que se pode mostrar.
+    #
+    # A pergunta prepara-se uma vez, à prova de fornecedor: os turnos da
+    # conversa e as instruções são os mesmos para a Groq e para o Gemini, e o
+    # que muda é a porta de entrada por onde saem (_ciclo_groq, _ciclo_gemini).
     local = localizacao or LOCATION
 
-    chave = _chave()
+    if not isinstance(mensagem, str) or not mensagem.strip():
+        return _falha("pedido_invalido", "Escreve uma pergunta para eu poder responder.")
+
+    turnos = _construir_conteudo(historico, mensagem)
+    instrucoes = _instrucoes(local, ecra)
+    inicio = time.monotonic()
+
+    if FORNECEDOR == "gemini":
+        return _ciclo_gemini(turnos, instrucoes, local, inicio)
+    return _ciclo_groq(turnos, instrucoes, local, inicio)
+
+
+def _ciclo_gemini(turnos, instrucoes, local, inicio):
+    # O caminho da alternativa Gemini: o mesmo vaivém de ferramentas, com a
+    # lista de modelos e a cascata de baldes de quota (ver o
+    # MODELOS_ALTERNATIVOS, em cima) — é o corpo do que era o responder()
+    # antes de a Groq entrar, intacto.
+    chave = _chave_gemini()
     if not chave:
         return _falha("sem_chave",
                       "A AstroGuide AI ainda não está configurada neste servidor.")
@@ -745,16 +1103,11 @@ def responder(mensagem, historico=None, localizacao=None, ecra=None):
                       "A AstroGuide AI não está instalada neste servidor: "
                       "falta o pacote google-genai.")
 
-    if not isinstance(mensagem, str) or not mensagem.strip():
-        return _falha("pedido_invalido", "Escreve uma pergunta para eu poder responder.")
-
     # O pedido prepara-se uma vez e reaproveita-se em todas as tentativas: o que
     # muda de uma para a outra é só o nome do modelo.
-    conteudo = _construir_conteudo(historico, mensagem)
-    instrucoes = _instrucoes(local, ecra)
+    conteudo = turnos
     cliente = _cliente(sdk, chave)
     declaracoes = _declaracoes(sdk)
-    inicio = time.monotonic()
 
     ultima = None
 

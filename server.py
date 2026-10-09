@@ -9,6 +9,19 @@ from flask import Flask, jsonify, render_template, send_from_directory
 import os
 import secrets
 
+# As variáveis de ambiente do ficheiro .env (se existir) entram no ambiente
+# antes de o resto do projeto as ler — é assim que quem corre a aplicação na
+# própria máquina configura a chave da AstroGuide AI sem exportar variáveis à
+# mão. Em produção usa-se o painel do alojamento para as mesmas variáveis, e
+# este bloco não faz falta nenhuma: o load_dotenv não mexe no que já está no
+# ambiente. Sem o pacote instalado, a aplicação corre na mesma — só se perde
+# o atalho do .env.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from py.astronomia.sky_engine import (
     get_sol, get_lua, get_todos_planetas,
     get_fase_lua_dia, get_nascer_por_sol, get_fases_mes,

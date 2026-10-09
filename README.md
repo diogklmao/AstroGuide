@@ -39,7 +39,7 @@ execuções. As dependências continuam a ser as mesmas de antes:
 o SQLite vem dentro do Python e o resto já vinha com o Flask.
 
 A AstroGuide AI é a única funcionalidade que precisa de mais
-alguma coisa: uma chave da API do Gemini. Sem ela, tudo o resto
+alguma coisa: uma chave da API Groq (GROQ_API_KEY). Sem ela, tudo o resto
 funciona como sempre e é só o painel da IA que fica a dizer que
 não está configurada. Para a ligar, ver ASTROGUIDE AI — Como
 configurar, mais abaixo.
@@ -169,8 +169,8 @@ astroguide/
 │   ├── ai_engine.py       → O motor da conversa
 │   │                        Monta o pedido (a pergunta, o
 │   │                        histórico e o contexto do local de
-│   │                        observação), fala com a API do
-│   │                        Gemini e devolve a resposta ou uma
+│   │                        observação), fala com a API da
+│   │                        Groq e devolve a resposta ou uma
 │   │                        falha já explicada em português.
 │   │                        Não faz cálculos astronómicos: é a
 │   │                        regra que está escrita nas suas
@@ -193,13 +193,22 @@ astroguide/
 │                            sky_engine.py e o eventos.py. Ver
 │                            FUNCTION CALLING, mais abaixo.
 │
-├── .ai_key                → Chave da AstroGuide AI (opcional)
-│                            Um ficheiro com a chave do Gemini
-│                            numa linha só. Alternativa à
-│                            variável de ambiente
-│                            GEMINI_API_KEY. Não está no GitHub —
-│                            uma chave publicada é gasta por
-│                            outros em minutos.
+├── .env                   → Variáveis de ambiente locais
+│                            (opcional). Cópia do .env.example
+│                            com as chaves preenchidas,
+│                            carregada no arranque do server.py.
+│                            Não está no GitHub — é lá que a
+│                            chave da Groq vive em máquinas
+│                            locais.
+│
+├── .ai_key                → Chave do Gemini (opcional)
+│                            O ficheiro com a chave do Gemini,
+│                            numa linha só. Alternativa local à
+│                            variável de ambiente GEMINI_API_KEY
+│                            — a chave da Groq vive só em
+│                            variável de ambiente. Não está no
+│                            GitHub: uma chave publicada é gasta
+│                            por outros em minutos.
 │
 ├── promover_admin.py      → Dá (ou tira) o papel de admin
 │                            Corre no terminal, na pasta do
@@ -786,12 +795,15 @@ no Observatório.
 
 ### A chave nunca sai do servidor
 
-A chave da API do Gemini é um segredo pago ao pedido: quem a
-tiver gasta o dinheiro de quem a criou. Por isso:
+A chave da API da Groq — a do fornecedor de IA — é um segredo
+pago ao pedido: quem a tiver gasta o dinheiro de quem a criou.
+Por isso:
 
-  · vive na variável de ambiente GEMINI_API_KEY ou num
-    ficheiro .ai_key na raiz do projeto — os dois fora do Git
-    (ver .gitignore);
+  · vive na variável de ambiente GROQ_API_KEY, e só aí (o .env
+    carrega-a para o ambiente — ver .env.example). A
+    alternativa Gemini, em AI_PROVIDER=gemini, aceita ainda o
+    ficheiro .ai_key na raiz do projeto. Tudo fora do Git (ver
+    .gitignore);
   · nunca chega ao browser. O painel (ia.js) fala com o nosso
     /api/ia/chat, e é o py/ia/rotas.py que chama o
     py/ia/ai_engine.py, que é o único ficheiro que fala com o
@@ -921,7 +933,35 @@ Observatório, e não dos cartões do menu. Um ecrã errado vale
 tanto como um número inventado — a pessoa chega lá e não
 encontra o que lhe foi prometido.
 
-### Vinte pedidos por dia, por modelo
+### A Groq, o fornecedor principal
+
+A AstroGuide AI fala com a Groq (AI_PROVIDER=groq, por omissão),
+com o modelo openai/gpt-oss-120b — e o nome vem todo da
+variável de ambiente GROQ_MODEL: a mudança de modelo seguinte é
+uma linha no .env, e não uma alteração de código. A chave é a
+GROQ_API_KEY, e as chamadas vão todas pelo servidor (o painel →
+/api/ia/chat → py/ia/ai_engine.py → API da Groq): o browser
+nunca fala com a Groq, e é por isso que qualquer pessoa pode
+usar o AstroGuide AI sem ter chave nenhuma sua.
+
+Os limites da Groq são outros (pedidos por minuto e tokens por
+dia, na conta de quem criou a chave), e a defesa nossa é
+dupla — toda validada no servidor, e nunca só no browser: dez
+perguntas por minuto por IP (contra o script que dispara) e dez
+perguntas por dia por conta (LIMITE_PERGUNTAS_DIA, para a quota
+durar o dia inteiro a toda a gente). Quem chega ao diário vê no
+painel a contagem a correr: a frase diz quanto falta e a que
+horas renova, dentro da bolha, como nas falhas de quota do
+serviço (campo "quota_renova_em").
+
+Não há fallback automático para o Gemini, de propósito: um
+fallback que passasse despercebido chamava os dois serviços à
+mesma pergunta e gastava quota dos dois sem ninguém o pedir.
+Quando a Groq não responde — 429, 5xx, rede —, o painel diz-o
+com uma frase em português, e quem administra troca o
+AI_PROVIDER=gemini para a alternativa, descrita a seguir.
+
+### Vinte pedidos por dia, por modelo (a alternativa Gemini)
 
 O plano gratuito do Google não dá um limite por minuto: dá
 **20 pedidos por dia, e por modelo**. O erro di-lo por extenso
@@ -981,8 +1021,10 @@ se resolve à espera de um minuto, e mandar esperar quem já tem a
 resposta do outro lado do ecrã à espera de horas é trocar um
 problema por outro.
 
-O momento exato vem do próprio erro da API, que o traz escrito
-("Please retry in 6h10m…"); na falta dele, calcula-se pela
+O momento exato vem do próprio serviço: o cabeçalho retry-after
+da Groq (em segundos), ou a frase do erro, que o traz escrito
+("Please retry in 6h10m…" no Gemini, "Please try again in
+2m59.56s" na Groq); na falta de tudo, calcula-se pela
 meia-noite UTC — que é onde o relógio do serviço aponta (medido
 em 2026-10, o "retry in" deles dava sempre 00:00 em ponto, e não
 a meia-noite da Califórnia que a documentação pública descreve;
@@ -1016,13 +1058,16 @@ português, e é essa frase que o painel mostra:
   429 → um limite de pedidos. O do serviço de IA muda de frase
         consoante o balde que encheu: o por minuto manda esperar
         um pouco, o diário diz quanto falta e a que horas, com a
-        contagem a correr dentro da bolha; antes de desistir, o
-        motor já tentou todos os modelos da lista.
-        O nosso é de dez perguntas por minuto por IP, e existe
-        pela mesma razão dos outros — a quota é paga e é de
-        todos os que usam o servidor
+        contagem a correr dentro da bolha; na alternativa
+        Gemini, antes de desistir o motor já tentou todos os
+        modelos da lista.
+        O nosso é de dez perguntas por minuto por IP e dez por
+        dia por conta (LIMITE_PERGUNTAS_DIA), e existe pela
+        mesma razão dos outros — a quota é paga e é de todos os
+        que usam o servidor. O diário nosso vem com a mesma
+        contagem e a mesma hora dos do serviço
   503 → não há chave, a chave não está a ser aceite, ou falta o
-        pacote google-genai
+        pacote google-genai (só na alternativa Gemini)
   502 → o serviço de IA está com problemas, um dos modelos já
         não existe, ou não devolveu resposta nenhuma (a
         resposta foi bloqueada)
@@ -1057,25 +1102,39 @@ utilizador.
 
 ### Como configurar
 
-  1. Criar uma chave no Google AI Studio (Get API key);
-  2. Guardá-la numa das duas formas:
-       · variável de ambiente GEMINI_API_KEY (recomendado
-         num servidor — nunca chega ao disco);
-       · ficheiro .ai_key na raiz do projeto, com a chave
-         numa linha só (mais simples para correr na própria
-         máquina);
-  3. Instalar a dependência: py -m pip install -r
-     requirements.txt (traz o google-genai);
+  1. Criar uma chave em https://console.groq.com/keys (Groq
+     Console → API Keys);
+  2. Guardá-la na variável de ambiente GROQ_API_KEY. Para correr
+     na própria máquina, o mais simples é copiar o .env.example
+     para .env e escrevê-la lá — o server.py carrega o .env no
+     arranque. Num servidor, escreve-se a mesma variável no
+     painel do alojamento. Não há ficheiro alternativo para esta
+     chave, de propósito: a variável de ambiente é o único sítio
+     onde ela vive;
+  3. Instalar as dependências: py -m pip install -r
+     requirements.txt;
   4. Reiniciar o servidor.
 
-O ficheiro .ai_key leva a chave numa linha só, sem aspas e sem
-espaços à volta. O formato das chaves do Google tem mudado — as
+Opcional, tudo no .env.example: GROQ_MODEL muda o modelo
+(openai/gpt-oss-120b por omissão), GROQ_REASONING_EFFORT o
+quanto ele pensa antes de responder (low, medium ou high — low
+por omissão, que é o que responde mais depressa e gasta menos
+tokens), e LIMITE_PERGUNTAS_DIA as perguntas por conta por dia
+(10 por omissão).
+
+Se a chave for inválida ou tiver sido revogada, o /api/ia/chat
+responde 503 e o painel diz que a chave não está a ser aceite — a
+distinção entre "não há chave" e "a chave não serve" está lá
+precisamente para não se andar às cegas.
+
+Para usar a alternativa Gemini em vez da Groq: AI_PROVIDER=gemini
+no ambiente, uma chave do Google AI Studio (Get API key) na
+variável de ambiente GEMINI_API_KEY — ou no ficheiro .ai_key na
+raiz do projeto, com a chave numa linha só, sem aspas e sem
+espaços à volta —, e o pacote google-genai instalado (já vem no
+requirements.txt). O formato das chaves do Google tem mudado — as
 mais recentes começam por "AQ." e não por "AIza" —, por isso o
-que vale é copiar o que o Google AI Studio dá, sem inventar. Se a
-chave for inválida ou tiver sido revogada, o /api/ia/chat responde
-503 e o painel diz que a chave não está a ser aceite — a distinção
-entre "não há chave" e "a chave não serve" está lá precisamente
-para não se andar às cegas.
+que vale é copiar o que o Google AI Studio dá, sem inventar.
 
 ### FUNCTION CALLING (ligado)
 
@@ -1111,7 +1170,7 @@ texto. O servidor corre o que ele pediu, devolve-lhe o resultado,
 e só então ele escreve a resposta. Uma pergunta normal são, por
 isso, dois pedidos ao serviço de IA — e não um.
 
-**O que isso custa.** Com 20 pedidos por dia e por modelo, isto
+**O que isso custa.** Com os 20 pedidos/dia/modelo do Gemini, isto
 baixa a capacidade de cada balde de cerca de 20 perguntas para
 cerca de 10. A lista de modelos de recurso (ver acima) continua a
 dar folga suficiente para uma demonstração, mas é a razão pela
@@ -1127,10 +1186,11 @@ py/database/auth.py). Sem isso, uma pergunta com "estou em Marte"
 escrito lá dentro respondia com o céu de Marte.
 
 **O catálogo não sabe de que marca é.** As ferramentas estão
-descritas em JSON Schema puro, sem nada específico do Gemini, e é
-o ai_engine.py que as traduz para o formato que a API come (ver o
-_declaracoes). Trocar de fornecedor mexe no _sdk() e pouco mais —
-o ferramentas.py fica como está.
+descritas em JSON Schema puro, sem nada específico de fornecedor
+nenhum, e é o ai_engine.py que as traduz para o formato que cada
+API come (o _declaracoes no caminho Gemini, o _ferramentas_groq
+no da Groq). Trocar de fornecedor mexe no ai_engine.py e pouco
+mais — o ferramentas.py fica como está.
 
 E a regra mantém-se, agora mais forte: os números que a IA der vêm
 todos do motor da aplicação, e são exatamente os mesmos que
@@ -1205,11 +1265,12 @@ requests (pip install requests)
   à API pública da NASA), no py/astronomia/iss.py (elementos
   orbitais da ISS, à Celestrak) e no py/localizacao/geocoding.py
   (o nome de uma terra a partir das coordenadas do dispositivo,
-  ao BigDataCloud).
+  ao BigDataCloud) e no py/ia/ai_engine.py (as chamadas à API
+  da Groq, no AstroGuide AI).
 
 google-genai (pip install google-genai)
-  O SDK oficial do Google para a API do Gemini — a IA da
-  AstroGuide AI.
+  O SDK oficial do Google para a API do Gemini — a alternativa
+  Gemini da AstroGuide AI (AI_PROVIDER=gemini).
   Usado só no py/ia/ai_engine.py: é o único ficheiro do
   projeto que fala com um serviço externo de IA, e é essa
   fronteira que faz com que trocar de fornecedor seja mexer
@@ -1217,6 +1278,14 @@ google-genai (pip install google-genai)
   A chave não vai no código: vem da variável de ambiente
   GEMINI_API_KEY ou do ficheiro .ai_key, os dois fora do Git.
   Incluído no requirements.txt.
+
+python-dotenv (pip install python-dotenv)
+  Carrega o ficheiro .env para as variáveis de ambiente no
+  arranque do server.py — é o que permite correr a aplicação
+  na própria máquina com a chave da Groq no .env, sem exportar
+  variáveis à mão. Sem ele, as variáveis vêm do ambiente de
+  sempre.
+  Opcional. Incluído no requirements.txt.
 
 ## BIBLIOTECAS JAVASCRIPT USADAS
 
@@ -1348,7 +1417,8 @@ sessionStorage
 
 Chave de API
   A credencial que identifica quem está a usar um serviço
-  externo — no caso da AstroGuide AI, a chave do Gemini.
+  externo — no caso da AstroGuide AI, a chave da Groq (ou a do
+Gemini, quando AI_PROVIDER=gemini).
   É um segredo pago ao pedido: quem a tiver gasta o dinheiro
   de quem a criou, e uma chave publicada num repositório é
   encontrada por robôs em minutos. Por isso vive numa
@@ -1523,9 +1593,10 @@ Fuso horário IANA
   [x] Página /admin — só para quem tem esse papel: as contas
       registadas e o que cada uma guardou, numa tabela só de
       leitura, com os totais no topo
-  [x] AstroGuide AI — um painel de conversa com a IA (Gemini),
-      aberto pelo botão "✦ AstroGuide AI". A chave da API vive
-      só no servidor (variável de ambiente ou .ai_key) e nunca
+  [x] AstroGuide AI — um painel de conversa com a IA (Groq, com
+      o Gemini como alternativa em AI_PROVIDER=gemini), aberto
+      pelo botão "✦ AstroGuide AI". A chave da API vive só no
+      servidor (variável de ambiente GROQ_API_KEY) e nunca
       chega ao browser; o histórico da conversa vive no
       sessionStorage e atravessa a navegação entre ecrãs. A IA
       é instruída a não inventar dados astronómicos — os
