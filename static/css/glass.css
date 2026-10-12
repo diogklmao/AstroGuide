@@ -1,12 +1,14 @@
 /* ── AstroGuide — Liquid Glass Design System (iOS 26 inspired) ──────── */
 
 :root {
-    /* Liquid Glass tokens */
-    --glass-bg:              rgba(12, 16, 38, 0.38);
-    --glass-bg-hover:        rgba(16, 22, 52, 0.45);
-    --glass-border:          rgba(255, 255, 255, 0.13);
-    --glass-border-top:      rgba(255, 255, 255, 0.32);
-    --glass-border-bottom:   rgba(120, 160, 255, 0.08);
+    /* Liquid Glass tokens.
+       O vidro é deliberadamente mais transparente do que o habitual: o céu tem
+       de atravessá-lo. O que o segura não é o fundo, é o blur. */
+    --glass-bg:              rgba(10, 14, 34, 0.22);
+    --glass-bg-hover:        rgba(16, 22, 52, 0.30);
+    --glass-border:          rgba(255, 255, 255, 0.11);
+    --glass-border-top:      rgba(255, 255, 255, 0.20);
+    --glass-border-bottom:   rgba(120, 160, 255, 0.10);
     --glass-blur:            28px;
     --glass-radius:          20px;
     --glass-sat:             130%;
@@ -18,9 +20,19 @@
     --ice-blue:              rgba(180, 210, 255, 0.18);
     --ice-white:             rgba(255, 255, 255, 0.22);
 
-    /* Refraction tints */
-    --refract-top:           rgba(255, 255, 255, 0.26);
-    --refract-bottom:        rgba(90, 150, 255, 0.10);
+    /* Refraction tints — o branco ficou mais baixo: era ele que lavava o vidro
+       a branco sobre a Via Láctea. O fundo passa a ter cauda violeta. */
+    --refract-top:           rgba(255, 255, 255, 0.13);
+    --refract-bottom:        rgba(110, 150, 255, 0.12);
+
+    /* Poeira de estrelas dentro do vidro — o "toque espacial": quatro pontos
+       minúsculos, quase impercetíveis, sempre por baixo do conteúdo. Ficam na
+       camada de fundo (e não em ::before) para não taparem texto nenhum. */
+    --glass-stars:
+        radial-gradient(1.4px 1.4px at 82% 14%, rgba(255, 255, 255, 0.30), transparent 100%),
+        radial-gradient(1px 1px at 63% 40%, rgba(170, 205, 255, 0.26), transparent 100%),
+        radial-gradient(1px 1px at 33% 72%, rgba(255, 255, 255, 0.20), transparent 100%),
+        radial-gradient(1.2px 1.2px at 12% 26%, rgba(190, 170, 255, 0.24), transparent 100%);
 
     /* Lighting */
     --highlight-angle:       135deg;
@@ -50,8 +62,9 @@
    ══════════════════════════════════════════════════════════════════════ */
 .glass-panel {
     position: relative;
-    /* Vidro translúcido com saturação elevada — frosted glass do iOS */
-    background: var(--glass-bg);
+    /* Vidro translúcido com saturação elevada — frosted glass do iOS, com a
+       poeira de estrelas por baixo */
+    background: var(--glass-stars), var(--glass-bg);
     border-radius: var(--glass-radius);
     overflow: hidden;
 
@@ -73,10 +86,10 @@
     /* Sombra difusa flutuante multicamada */
     box-shadow:
         /* linha de luz especular no bordo superior */
-        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.17),
         /* luzes laterais internas */
-        inset 1px 0 0 rgba(255, 255, 255, 0.06),
-        inset -1px 0 0 rgba(255, 255, 255, 0.04),
+        inset 1px 0 0 rgba(255, 255, 255, 0.05),
+        inset -1px 0 0 rgba(255, 255, 255, 0.03),
         /* refração inferior — azul-gelo */
         inset 0 -1px 0 rgba(110, 184, 255, 0.12),
         /* sombra ambiente profunda */
@@ -99,21 +112,23 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    /* Gradiente multicamada: luz diagonal + radial no canto superior */
+    /* Gradiente multicamada: luz diagonal + radial no canto superior.
+       O branco ficou pelo menos metade mais baixo e a cauda é violeta — o que
+       havia aqui era o "esbranquicado" de que se quer fugir. */
     background:
         radial-gradient(
             ellipse 70% 45% at 18% 0%,
-            rgba(255, 255, 255, 0.17) 0%,
+            rgba(255, 255, 255, 0.09) 0%,
             transparent 65%
         ),
         linear-gradient(
             var(--highlight-angle, 135deg),
-            rgba(255, 255, 255, 0.18) 0%,
-            rgba(200, 225, 255, 0.08) 22%,
+            rgba(255, 255, 255, 0.09) 0%,
+            rgba(200, 225, 255, 0.05) 22%,
             transparent 45%,
             transparent 62%,
             rgba(110, 184, 255, 0.07) 80%,
-            rgba(80, 140, 230, 0.11) 100%
+            rgba(120, 100, 230, 0.11) 100%
         );
     pointer-events: none;
     z-index: 0;
@@ -133,8 +148,8 @@
     border-bottom-right-radius: 55% 28%;
     background: linear-gradient(
         180deg,
-        rgba(255, 255, 255, 0.11) 0%,
-        rgba(200, 220, 255, 0.05) 55%,
+        rgba(255, 255, 255, 0.055) 0%,
+        rgba(200, 220, 255, 0.028) 55%,
         transparent 100%
     );
     pointer-events: none;
@@ -144,13 +159,13 @@
 
 /* ── Hover: vidro mais luminoso ─────────────────────────────────────── */
 .glass-panel:hover {
-    background: var(--glass-bg-hover);
-    border-color: rgba(255, 255, 255, 0.18);
-    border-top-color: rgba(255, 255, 255, 0.42);
+    background: var(--glass-stars), var(--glass-bg-hover);
+    border-color: rgba(255, 255, 255, 0.15);
+    border-top-color: rgba(255, 255, 255, 0.28);
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.34),
-        inset 1px 0 0 rgba(255, 255, 255, 0.08),
-        inset -1px 0 0 rgba(255, 255, 255, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.20),
+        inset 1px 0 0 rgba(255, 255, 255, 0.06),
+        inset -1px 0 0 rgba(255, 255, 255, 0.04),
         inset 0 -1px 0 rgba(110, 184, 255, 0.18),
         0 22px 62px rgba(0, 0, 0, 0.56),
         0 6px 20px rgba(0, 0, 0, 0.30),
@@ -220,18 +235,18 @@
     background:
         radial-gradient(
             ellipse 55% 42% at var(--mx, 20%) var(--my, 0%),
-            rgba(255, 255, 255, 0.21) 0%,
-            rgba(200, 225, 255, 0.08) 42%,
+            rgba(255, 255, 255, 0.12) 0%,
+            rgba(200, 225, 255, 0.05) 42%,
             transparent 72%
         ),
         linear-gradient(
             var(--highlight-angle, 135deg),
-            rgba(255, 255, 255, 0.15) 0%,
-            rgba(200, 225, 255, 0.07) 22%,
+            rgba(255, 255, 255, 0.08) 0%,
+            rgba(200, 225, 255, 0.04) 22%,
             transparent 45%,
             transparent 62%,
             rgba(110, 184, 255, 0.06) 80%,
-            rgba(80, 140, 230, 0.10) 100%
+            rgba(120, 100, 230, 0.10) 100%
         );
     /* Sem transition para seguir o rato em tempo real */
     transition: none;

@@ -716,6 +716,65 @@ nav button:hover:not(.ativo) {
     border-radius: 4px;
 }
 
+/* ── Vidro espacial dos três painéis do painel lateral ─────────────────────
+   O vidro deles é mais transparente que o do resto da app: o céu tem de os
+   atravessar. Por cima do transparente ficam duas nébulas — azul no topo,
+   violeta em baixo —, a poeira de estrelas do glass.css, e um halo subtil.
+   O que se tirou foi o véu branco: era ele que os deixava esbranquiçados. */
+.observatorio-pesquisa,
+.observatorio-controlos,
+#observatorio-detalhes {
+    background:
+        radial-gradient(ellipse 130% 90% at 50% -12%, rgba(110, 184, 255, 0.13), transparent 62%),
+        radial-gradient(ellipse 110% 80% at 105% 108%, rgba(150, 110, 255, 0.12), transparent 58%),
+        var(--glass-stars, none),
+        rgba(8, 12, 30, 0.22);
+    border-color: rgba(120, 170, 255, 0.18);
+    border-top-color: rgba(165, 205, 255, 0.32);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.11),
+        inset 0 -1px 0 rgba(130, 110, 255, 0.14),
+        0 14px 40px rgba(0, 0, 0, 0.42),
+        0 0 26px rgba(110, 140, 255, 0.08);
+}
+
+.observatorio-pesquisa:hover,
+.observatorio-controlos:hover,
+#observatorio-detalhes:hover {
+    background:
+        radial-gradient(ellipse 130% 90% at 50% -12%, rgba(110, 184, 255, 0.17), transparent 62%),
+        radial-gradient(ellipse 110% 80% at 105% 108%, rgba(150, 110, 255, 0.15), transparent 58%),
+        var(--glass-stars, none),
+        rgba(10, 15, 36, 0.28);
+}
+
+/* Títulos dos três painéis — a voz do painel: claro, com halo azul-violeta,
+   e uma linha de luz por baixo que se apaga para a direita. A cor vem daqui e
+   não do style inline do HTML: era lá que "Pesquisa" e "Controles" estavam
+   pintados de dourado, o que não fazia par com o "Detalhes" azul. */
+.observatorio-pesquisa .card-titulo,
+.observatorio-controlos .card-titulo,
+#observatorio-detalhes .detalhe-titulo {
+    position: relative;
+    letter-spacing: 0.05em;
+    padding-bottom: 10px;
+    color: #cfe8ff;
+    text-shadow: 0 0 14px rgba(110, 184, 255, 0.45), 0 0 30px rgba(150, 110, 255, 0.25);
+}
+
+.observatorio-pesquisa .card-titulo::after,
+.observatorio-controlos .card-titulo::after,
+#observatorio-detalhes .detalhe-titulo::after {
+    content: "";
+    position: absolute;
+    left: 2px;
+    bottom: 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(140, 195, 255, 0.8), rgba(170, 130, 255, 0.45) 55%, transparent 100%);
+    box-shadow: 0 0 8px rgba(110, 184, 255, 0.35);
+}
+
 /* ── Pesquisa do Observatório ──────────────────────────────────────────────
    Primeiro bloco do painel lateral. O flex-shrink: 0 é o que garante que ele
    não é comprimido quando o painel tem de rolar para caber no ecrã — sem isto
@@ -1528,10 +1587,55 @@ body.observatorio-ativo header.glass-header {
     top: 20px;
     padding: 12px 24px;
     display: flex;
+    /* Localização na ponta da esquerda, as horas na da direita — as duas
+       vestidas de cápsula (ver abaixo), na mesma linha e ao mesmo tamanho.
+       O padding-left de 110px que havia aqui afastava a localização da ponta
+       por causa do botão ◀ Menu; mas ele só se sobrepõe à barra quando a
+       janela é estreita, e para isso já existe a regra dos 1450px mais
+       abaixo. Nas janelas largas a localização encosta mesmo à ponta. */
     justify-content: space-between;
     align-items: center;
-    padding-left: 110px;
-    /* Espaço para o botão Voltar integrado */
+}
+
+/* As duas cápsulas do topo — localização e horas. Mesma altura, mesmo corpo de
+   letra e alinhadas na mesma linha (o "mais direitas"), cada uma com o seu
+   halo: a localização em azul, as horas em violeta, que é a cor do tempo em
+   todo o Observatório (o lilás do ↺ Tempo Real é do mesmo violeta).
+   São estas cápsulas que vão para as pontas — a da localização à esquerda, a
+   das horas à direita — porque o flex do cabeçalho as empurra para lá. */
+body.observatorio-ativo header .subtitulo,
+body.observatorio-ativo #relogio {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+body.observatorio-ativo header .subtitulo {
+    color: #cfe4ff;
+    letter-spacing: 0.03em;
+    background: rgba(110, 184, 255, 0.08);
+    border: 1px solid rgba(110, 184, 255, 0.22);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 0 16px rgba(110, 184, 255, 0.12);
+    text-shadow: 0 0 12px rgba(110, 184, 255, 0.30);
+}
+
+body.observatorio-ativo #relogio {
+    color: #d9e5ff;
+    letter-spacing: 0.05em;
+    background: rgba(150, 120, 255, 0.09);
+    border: 1px solid rgba(160, 130, 255, 0.25);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 0 16px rgba(150, 120, 255, 0.14);
+    text-shadow: 0 0 12px rgba(150, 120, 255, 0.35);
 }
 
 body.observatorio-ativo nav.glass-nav {
@@ -1653,11 +1757,32 @@ body.observatorio-ativo #btn-toggle-painel {
 }
 
 /* Responsividade adicional para fullscreen */
+
+/* Só quando a janela é tão estreita que a barra (que tem largura máxima de
+   1200px) chega por baixo do botão ◀ Menu é que a localização recua: o botão
+   flutua por cima da barra (z-index 101) e sem este recuo ficava-lhe por
+   cima. Acima disto a barra começa para lá do botão e não há nada a
+   sobrepor — por isso as pontas ficam livres. */
+@media (max-width: 1450px) {
+    body.observatorio-ativo header.glass-header {
+        padding-left: 120px;
+    }
+}
+
 @media (max-width: 900px) {
     body.observatorio-ativo header.glass-header {
-        padding-left: 24px;
+        padding: 12px 24px;
         flex-direction: column;
-        gap: 6px;
+        gap: 8px;
+    }
+
+    /* Empilhadas e sem nowrap: numa cidade de nome comprido as cápsulas não
+       podem fugir da largura do ecrã. */
+    body.observatorio-ativo header .subtitulo,
+    body.observatorio-ativo #relogio {
+        white-space: normal;
+        text-align: center;
+        max-width: 100%;
     }
 
     body.observatorio-ativo #btn-voltar {
@@ -1744,28 +1869,38 @@ body.observatorio-ativo #btn-toggle-painel {
     gap: 8px;
 }
 
-/* A forma que os dois partilham — o que os distingue é a cor. */
+/* A forma que os dois partilham — o que os distingue é a cor.
+   Fundo escuro de verdade, e não vidro claro: por cima da Via Láctea o blur
+   apanhava o brilho do céu e devolvia-o, e os dois botões saíam daqui
+   esbranquiçados no canto do mapa. Agora são peças escuras com borda de néon
+   e halo da sua cor — leem-se como instrumentos, e não como manchas claras. */
 .observatorio-botoes button {
     padding: 8px 14px;
     border-radius: 10px;
     font-size: 0.85rem;
     font-weight: 700;
     cursor: pointer;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(4, 8, 22, 0.66);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.07);
     transition: all 0.25s ease;
 }
 
 /* Botão flutuante "🥽 VR", à entrada do modo VR do Observatório. */
 #btn-entrar-vr {
-    background: rgba(206, 147, 216, 0.15);
-    border: 1px solid rgba(206, 147, 216, 0.4);
-    color: #ce93d8;
+    background: rgba(24, 10, 34, 0.66);
+    border: 1px solid rgba(206, 147, 216, 0.45);
+    color: #e2b7ea;
+    text-shadow: 0 0 10px rgba(206, 147, 216, 0.45);
 }
 
 #btn-entrar-vr:hover {
-    background: rgba(206, 147, 216, 0.3);
-    box-shadow: 0 0 16px rgba(206, 147, 216, 0.3);
+    background: rgba(60, 24, 78, 0.78);
+    border-color: rgba(226, 173, 238, 0.8);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45), 0 0 18px rgba(206, 147, 216, 0.35);
 }
 
 /* Botão flutuante "🛰 ISS". Abre o painel da ISS a qualquer momento — e é
@@ -1773,14 +1908,16 @@ body.observatorio-ativo #btn-toggle-painel {
    este botão o painel dela ficaria quase sempre inalcançável. (O canto inferior
    direito do ecrã é do botão ⚙️ das configurações, shared-ui-controls.css.) */
 #btn-iss {
-    background: rgba(110, 184, 255, 0.15);
-    border: 1px solid rgba(110, 184, 255, 0.4);
-    color: #9ed4ff;
+    background: rgba(6, 16, 34, 0.66);
+    border: 1px solid rgba(110, 184, 255, 0.45);
+    color: #b8e0ff;
+    text-shadow: 0 0 10px rgba(110, 184, 255, 0.45);
 }
 
 #btn-iss:hover {
-    background: rgba(110, 184, 255, 0.3);
-    box-shadow: 0 0 16px rgba(110, 184, 255, 0.3);
+    background: rgba(16, 42, 80, 0.78);
+    border-color: rgba(150, 205, 255, 0.8);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45), 0 0 18px rgba(110, 184, 255, 0.35);
 }
 
 /* ── Barra do Tour guiado ──────────────────────────────────────────────────
@@ -2020,294 +2157,6 @@ body.vr-sessao #btn-sair-vr {
         font-size: 0.9rem;
         padding: 12px 20px;
     }
-}
-
-/* ── Modo Noturno: Red Velvet (Astronomia) ────────────────────────── */
-body.red-velvet-mode #observatorio-canvas,
-body.red-velvet-mode #vr-canvas {
-    filter: grayscale(100%) brightness(0.95) sepia(100%) hue-rotate(315deg) saturate(900%) contrast(1.18);
-}
-
-body.red-velvet-mode .observatorio-mapa-wrapper {
-    border-color: rgba(255, 40, 65, 0.45) !important;
-    box-shadow: 0 0 35px rgba(220, 20, 50, 0.2), inset 0 0 25px rgba(255, 20, 50, 0.06) !important;
-}
-
-/* O botão da ISS, que é azul, seria a única coisa dessa cor a sobrar no modo
-   noturno — e é exatamente o azul que ele existe para não haver. Aqui herda o
-   vermelho, como o resto do modo. */
-body.red-velvet-mode #btn-iss {
-    background: rgba(30, 4, 8, 0.7);
-    border-color: rgba(255, 60, 80, 0.45);
-    color: #ff7085;
-}
-
-body.red-velvet-mode #btn-iss:hover {
-    background: rgba(255, 40, 60, 0.25);
-    border-color: rgba(255, 80, 100, 0.8);
-    color: #ffa8b5;
-    box-shadow: 0 0 16px rgba(255, 40, 60, 0.4);
-}
-
-body.red-velvet-mode .observatorio-controlos,
-body.red-velvet-mode #observatorio-detalhes,
-body.red-velvet-mode .observatorio-pesquisa,
-body.red-velvet-mode #tour-barra {
-    border-color: rgba(255, 40, 65, 0.35) !important;
-    background: rgba(22, 3, 7, 0.65) !important;
-    box-shadow: 0 8px 32px rgba(255, 15, 45, 0.15), inset 0 1px 0 rgba(255, 100, 120, 0.18) !important;
-}
-
-body.red-velvet-mode .observatorio-controlos .card-titulo,
-body.red-velvet-mode .observatorio-pesquisa .card-titulo,
-body.red-velvet-mode #observatorio-detalhes .detalhe-titulo,
-body.red-velvet-mode .obs-tempo-titulo {
-    color: #ff3355 !important;
-    text-shadow: 0 0 10px rgba(255, 51, 85, 0.65) !important;
-}
-
-body.red-velvet-mode .config-linha label,
-body.red-velvet-mode .config-linha-check label {
-    color: #ff8595 !important;
-}
-
-body.red-velvet-mode .glass-select,
-body.red-velvet-mode .obs-input,
-body.red-velvet-mode .obs-btn-agora,
-body.red-velvet-mode .obs-btn-descer,
-body.red-velvet-mode #btn-toggle-painel {
-    border-color: rgba(255, 60, 80, 0.45) !important;
-    color: #ffb8c3 !important;
-    background: rgba(35, 5, 10, 0.65) !important;
-}
-
-body.red-velvet-mode .obs-btn-agora:hover,
-body.red-velvet-mode .obs-btn-descer:hover:not(:disabled),
-body.red-velvet-mode #btn-toggle-painel:hover {
-    background: rgba(255, 40, 65, 0.3) !important;
-    color: #fff !important;
-    box-shadow: 0 0 14px rgba(255, 40, 65, 0.5) !important;
-}
-
-/* ── Pesquisa e Tour no modo noturno ────────────────────────────────
-   Estas regras são à mão, como todas as do Red Velvet: não há aqui nenhuma
-   regra genérica que apanhe o que se acrescente a seguir, e sem isto a
-   pesquisa e a barra do tour ficavam azuis no meio de um céu vermelho — que é
-   precisamente o que este modo existe para não acontecer. */
-body.red-velvet-mode .obs-btn-tour,
-body.red-velvet-mode .tour-btn {
-    background: rgba(255, 40, 65, 0.12) !important;
-    border-color: rgba(255, 60, 80, 0.4) !important;
-    color: #ff8a9c !important;
-}
-
-body.red-velvet-mode .obs-btn-tour:hover,
-body.red-velvet-mode .tour-btn:hover {
-    background: rgba(255, 40, 65, 0.3) !important;
-    border-color: rgba(255, 80, 100, 0.8) !important;
-    color: #fff !important;
-    box-shadow: 0 0 14px rgba(255, 40, 65, 0.5) !important;
-}
-
-/* O dourado do ★ é mais uma cor que não existe no Red Velvet. Aqui o
-   "guardado" passa a vermelho vivo, que é o que resta para dizer "está feito"
-   num céu que é todo vermelho. */
-body.red-velvet-mode .obs-btn-favorito {
-    background: rgba(255, 40, 65, 0.12) !important;
-    border-color: rgba(255, 60, 80, 0.4) !important;
-    color: #ff8a9c !important;
-}
-
-body.red-velvet-mode .obs-btn-favorito:hover {
-    background: rgba(255, 40, 65, 0.3) !important;
-    border-color: rgba(255, 80, 100, 0.8) !important;
-    color: #fff !important;
-    box-shadow: 0 0 14px rgba(255, 40, 65, 0.5) !important;
-}
-
-body.red-velvet-mode .obs-btn-favorito.guardado {
-    background: rgba(255, 40, 65, 0.32) !important;
-    border-color: rgba(255, 90, 110, 0.75) !important;
-    color: #ffd9de !important;
-}
-
-body.red-velvet-mode .obs-favorito-aviso {
-    color: #ffb8c3 !important;
-}
-
-body.red-velvet-mode .obs-resultado {
-    background: rgba(255, 40, 65, 0.07) !important;
-    border-color: rgba(255, 60, 80, 0.22) !important;
-    color: #ffd9de !important;
-}
-
-body.red-velvet-mode .obs-resultado:hover {
-    background: rgba(255, 40, 65, 0.18) !important;
-    border-color: rgba(255, 60, 80, 0.5) !important;
-}
-
-body.red-velvet-mode .obs-resultado.ativo {
-    background: rgba(255, 40, 65, 0.28) !important;
-    border-color: rgba(255, 90, 110, 0.8) !important;
-}
-
-body.red-velvet-mode .obs-resultado-tipo {
-    color: rgba(255, 122, 140, 0.85) !important;
-}
-
-body.red-velvet-mode .obs-resultado-vazio {
-    color: rgba(255, 168, 181, 0.6) !important;
-}
-
-/* O amarelo do aviso não existe em mais lado nenhum do Red Velvet — e o aviso
-   tem de se ler como um aviso, não como uma cor emprestada. */
-body.red-velvet-mode .obs-aviso-ir {
-    background: rgba(255, 40, 65, 0.1) !important;
-    border-left-color: rgba(255, 60, 80, 0.6) !important;
-    color: #ffb8c3 !important;
-}
-
-body.red-velvet-mode #obs-pesquisa::placeholder {
-    color: rgba(255, 168, 181, 0.4) !important;
-}
-
-body.red-velvet-mode .tour-estado {
-    color: #ffc9d1 !important;
-}
-
-body.red-velvet-mode .tour-btn-sair {
-    background: rgba(255, 40, 65, 0.2) !important;
-    border-color: rgba(255, 70, 90, 0.55) !important;
-    color: #ff9fb0 !important;
-}
-
-body.red-velvet-mode .iss-aviso {
-    background: rgba(35, 5, 10, 0.65) !important;
-    border-left-color: rgba(255, 60, 80, 0.6) !important;
-    color: #ffb8c3 !important;
-}
-
-/* A caixa da nota de um objeto de céu profundo. Leva !important porque o
-   fundo e a barra lateral vêm em estilo inline do index.js (é lá que a caixa
-   é montada, ao lado das outras linhas do painel) e um estilo inline só perde
-   para uma regra assim. A caixa da curiosidade das constelações, que é o
-   modelo desta, ficou de fora desta lista quando o Red Velvet foi feito e
-   ainda hoje aparece azul no meio de um céu vermelho. */
-body.red-velvet-mode .dso-nota {
-    background: rgba(255, 40, 65, 0.08) !important;
-    border-left-color: rgba(255, 60, 80, 0.55) !important;
-}
-
-body.red-velvet-mode input[type="range"] {
-    accent-color: #ff2a4a;
-}
-
-body.red-velvet-mode input[type="checkbox"] {
-    accent-color: #ff1e40;
-}
-
-body.red-velvet-mode #lbl-mag,
-body.red-velvet-mode #obs-hora-label {
-    color: #ff4760 !important;
-}
-
-/* O seletor de hora. O campo (.obs-input) já vem tratado lá em cima, com o
-   resto dos campos do Observatório; o que é novo é o painel, que vive no
-   <body> e por isso não apanha nenhuma dessas regras — sem estas linhas ele
-   ficava azul-lilás no meio de um céu vermelho, que é precisamente o que este
-   modo existe para não acontecer. */
-body.red-velvet-mode .obs-hora-seta {
-    color: rgba(255, 138, 156, 0.9) !important;
-}
-
-body.red-velvet-mode .obs-hora-picker {
-    background: rgba(26, 4, 9, 0.95) !important;
-    border-color: rgba(255, 60, 80, 0.4) !important;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.06),
-        0 18px 44px rgba(0, 0, 0, 0.6),
-        0 0 28px rgba(255, 40, 65, 0.14) !important;
-}
-
-body.red-velvet-mode .obs-hora-coluna-titulo {
-    color: rgba(255, 133, 149, 0.85) !important;
-    border-bottom-color: rgba(255, 60, 80, 0.22) !important;
-}
-
-body.red-velvet-mode .obs-hora-opcao {
-    color: #ffb8c3 !important;
-}
-
-body.red-velvet-mode .obs-hora-opcao:hover {
-    background: rgba(255, 40, 65, 0.18) !important;
-    color: #fff !important;
-}
-
-body.red-velvet-mode .obs-hora-opcao[aria-selected="true"] {
-    background: rgba(255, 40, 65, 0.3) !important;
-    border-color: rgba(255, 60, 80, 0.6) !important;
-    color: #fff !important;
-}
-
-body.red-velvet-mode .obs-hora-opcao.ativo {
-    box-shadow: inset 0 0 0 2px rgba(255, 60, 80, 0.7) !important;
-}
-
-body.red-velvet-mode .obs-hora-lista::-webkit-scrollbar-thumb {
-    background: rgba(255, 60, 80, 0.4);
-}
-
-/* O seletor da data, pela mesma razão do da hora: o painel vive no <body> e
-   não apanha nenhuma das regras do modo noturno que tratam o Observatório. */
-body.red-velvet-mode .obs-data-seta {
-    color: rgba(255, 138, 156, 0.9) !important;
-}
-
-body.red-velvet-mode .obs-data-picker {
-    background: rgba(26, 4, 9, 0.95) !important;
-    border-color: rgba(255, 60, 80, 0.4) !important;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.06),
-        0 18px 44px rgba(0, 0, 0, 0.6),
-        0 0 28px rgba(255, 40, 65, 0.14) !important;
-}
-
-body.red-velvet-mode .obs-data-nav {
-    color: rgba(255, 133, 149, 0.9) !important;
-    border-color: rgba(255, 60, 80, 0.35) !important;
-}
-
-body.red-velvet-mode .obs-data-nav:hover {
-    background: rgba(255, 40, 65, 0.18) !important;
-    border-color: rgba(255, 60, 80, 0.6) !important;
-    color: #fff !important;
-}
-
-body.red-velvet-mode .obs-data-titulo {
-    color: rgba(255, 133, 149, 0.85) !important;
-}
-
-body.red-velvet-mode .obs-data-semana span {
-    color: rgba(255, 133, 149, 0.6) !important;
-}
-
-body.red-velvet-mode .obs-data-dia {
-    color: #ffb8c3 !important;
-}
-
-body.red-velvet-mode .obs-data-dia:hover {
-    background: rgba(255, 40, 65, 0.18) !important;
-    color: #fff !important;
-}
-
-body.red-velvet-mode .obs-data-dia.hoje {
-    border-color: rgba(255, 60, 80, 0.5) !important;
-}
-
-body.red-velvet-mode .obs-data-dia.escolhido {
-    background: rgba(255, 40, 65, 0.3) !important;
-    border-color: rgba(255, 60, 80, 0.6) !important;
-    color: #fff !important;
 }
 
 @media (max-width: 600px) {

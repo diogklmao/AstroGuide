@@ -124,6 +124,9 @@ function atualizarRelogio() {
     const agora = horaEDataNoLocal();
     const [ano, mes, dia] = agora.data.split("-");   // AAAA-MM-DD -> partes
     alvo.textContent = `🕐 ${dia}/${mes}/${ano}  ${agora.hora}:${agora.segundo}`;
+    // Os campos do seletor dizem o mesmo que este relógio — e no mesmo tique,
+    // para as duas horas nunca divergirem (ver o atualizarCamposTempoReal).
+    atualizarCamposTempoReal(agora);
 }
 
 // ── Navegação: SPA (Single Page Application) ──────────────────────────────────
@@ -427,9 +430,14 @@ function urlApiObservatorio() {
 const CAMERA_AZ_INICIAL = 0;    // 0° = Norte
 const CAMERA_ALT_INICIAL = 15;  // 15° acima do horizonte
 
+// FOV com que a câmara abre, em graus. Serve também de referência ao parallax
+// do fundo panorâmico: o céu só começa a crescer a partir daqui (ver o bloco
+// de desenho, no modo 360°).
+const CAMERA_FOV_BASE = 80;
+
 let cameraAzimuth = CAMERA_AZ_INICIAL;   // 0° = Norte, 90° = Este, 180° = Sul, 270° = Oeste
 let cameraAltitude = CAMERA_ALT_INICIAL;  // Altitude em graus (-85° a 85°)
-let cameraFOV = 80;       // Campo de visão horizontal em graus
+let cameraFOV = CAMERA_FOV_BASE;       // Campo de visão horizontal em graus
 
 // O mínimo que o "Céu sob os pés" desce, em graus (ver
 // altitudeDoCeuEscondido). Existe por causa do equador, onde a conta dá zero.
@@ -529,33 +537,9 @@ window.addEventListener("resize", () => {
     }
 });
 
-// ── Modo Noturno (Red Velvet) ──────────────────────────────────────────
-let modoNightModeAtivo = false;
-
-function toggleNightMode(forcarEstado) {
-    if (typeof forcarEstado === "boolean") {
-        modoNightModeAtivo = forcarEstado;
-    } else {
-        modoNightModeAtivo = !modoNightModeAtivo;
-    }
-
-    const body = document.body;
-    const chkControlo = document.getElementById("chk-night-mode");
-
-    // A caixa dos Controlos é o único interruptor que existe (o botão que
-    // havia no mapa saiu): quem a carrega passa o estado novo, e é ele que
-    // manda. Isto escreve-lhe o mesmo estado de volta para o caso de a função
-    // ser chamada sem argumento — é o que a deixa continuar a servir sozinha.
-    if (modoNightModeAtivo) {
-        body.classList.add("red-velvet-mode");
-        if (chkControlo) chkControlo.checked = true;
-    } else {
-        body.classList.remove("red-velvet-mode");
-        if (chkControlo) chkControlo.checked = false;
-    }
-
-    desenharObservatorio();
-}
+// O Night Mode (Red Velvet) saiu da aplicação a pedido do utilizador — era um
+// filtro vermelho sobre o mapa todo, e não se quer mais nada disso. Se um dia
+// voltar, que volte como tema novo e não como filtro por cima do canvas.
 
 function alterarModoVisao() {
     const modoSelect = document.getElementById("sel-modo-visao");
@@ -1062,6 +1046,38 @@ function atualizarLabelTempoSimulado() {
 
     label.textContent = `⏱ ${dataLegivel} às ${tempoSimuladoObs.hora}`;
     label.classList.add("ativa");
+}
+
+// Os campos da data e da hora seguem o relógio de cima enquanto o céu está em
+// tempo real. Sem isto ficavam congelados na hora de entrada no Observatório:
+// o inicializarSeletorHora preenche-os uma vez e pronto, e a meio da sessão os
+// campos diziam 11:07 quando o relógio já ia em 11:08 — duas horas no mesmo
+// ecrã, uma parada e outra a andar. A fonte é a mesma das duas (o
+// horaEDataNoLocal), por isso nunca divergem.
+// Com uma hora simulada escolhida os campos ficam como estão: é essa a hora do
+// céu que se está a ver, e é o rótulo ⏱ que a anuncia.
+// E os seletores abertos mandam parar: a meio de uma escolha o valor não pode
+// saltar para trás das mãos de quem o está a fazer — apanha o tique seguinte,
+// quando o seletor fecha.
+function atualizarCamposTempoReal(agora) {
+    if (tempoSimuladoObs) return;
+
+    const inputData = document.getElementById("obs-data");
+    const inputHora = document.getElementById("obs-hora");
+    if (!inputData || !inputHora) return;
+
+    const painelHora = document.getElementById("obs-hora-picker");
+    const painelData = document.getElementById("obs-data-picker");
+    if ((painelHora && painelHora.classList.contains("aberto")) ||
+        (painelData && painelData.classList.contains("aberto"))) return;
+
+    const ref = agora || horaEDataNoLocal();
+    if (inputData.value === ref.data && inputHora.value === ref.hora) return;
+
+    inputData.value = ref.data;
+    inputHora.value = ref.hora;
+    sincronizarCampoHora();
+    sincronizarCampoData();
 }
 
 function atualizarObservatorioComHora() {
@@ -1980,23 +1996,38 @@ function agendarDesenhoObservatorio() {
     });
 }
 
+// ── Parallax do fundo panorâmico ───────────────────────────────────
+// O fundo acompanha o zoom da câmara, mas só uma fração dele — o porquê está
+// no bloco de desenho, no modo 360°.
+const FUNDO_FOLGA = 1.4;        // folga vertical: imagem a mais para olhar acima/abaixo
+const FUNDO_ZOOM_MAX = 1.35;    // o máximo que o fundo cresce com o zoom
+const FUNDO_PARALLAX = 0.3;     // expoente do zoom: <1 = o fundo cresce menos que as estrelas
+const FUNDO_ESCALA_MAX = FUNDO_FOLGA * FUNDO_ZOOM_MAX;
+
 // ── Cache do fundo do céu (fotografia da Via Láctea) ───────────────
 // Escalar a fotografia para o tamanho do canvas E passar-lhe o filtro de cor
 // são, de longe, as operações mais caras de cada frame — e eram feitas duas
 // vezes (a 2ª cópia tapa a costura). O resultado só depende da altura do
 // canvas, por isso prepara-se uma vez numa imagem à parte; depois cada frame
-// limita-se a copiá-la, que é praticamente só memória.
+// limita-se a desenhá-la, já sem filtro nenhum.
+//
+// O bitmap é preparado à escala do zoom MÁXIMO, não à do zoom atual: é isso
+// que permite ao fundo acompanhar o zoom sem voltar a passar pela escala e
+// pelo filtro a cada passo da roda. Com o zoom todo aberto desenha-se mais
+// pequeno do que ele é (nunca maior), por isso nunca perde nitidez.
 let fundoCeuCache = null; // { chave, imagem }
 
 function obterFundoCeuPreparado(alturaAlvo) {
     // A chave inclui as dimensões da fotografia (muda quando ela carrega) e a
-    // altura do canvas (muda quando a janela é redimensionada).
+    // altura do canvas (muda quando a janela é redimensionada). Não inclui o
+    // zoom de propósito: a imagem é sempre a mesma, só muda o tamanho com que
+    // é desenhada.
     const chave = `${imgCeuFundo.naturalWidth}x${imgCeuFundo.naturalHeight}@${alturaAlvo}`;
     if (fundoCeuCache && fundoCeuCache.chave === chave) return fundoCeuCache.imagem;
 
-    // Escala a imagem para cobrir a altura do canvas, com alguma folga extra
-    // (1.4x) para haver imagem suficiente quando o utilizador olha para cima/baixo.
-    const escala = (alturaAlvo / imgCeuFundo.naturalHeight) * 1.4;
+    // Escala a imagem para cobrir a altura do canvas, com a folga vertical e a
+    // margem do zoom lá dentro.
+    const escala = (alturaAlvo / imgCeuFundo.naturalHeight) * FUNDO_ESCALA_MAX;
     const largura = Math.round(imgCeuFundo.naturalWidth * escala);
     const altura = Math.round(imgCeuFundo.naturalHeight * escala);
 
@@ -2360,10 +2391,32 @@ function desenharObservatorio() {
 
         if (imgCeuFundo.complete && imgCeuFundo.naturalWidth > 0) {
             // Imagem já escalada e com o filtro aplicado (ver obterFundoCeuPreparado)
-            // — aqui é só uma cópia, sem reamostragem nem filtros de cor.
+            // — aqui é só um drawImage, sem reamostragem de cor nenhuma.
             const fundo = obterFundoCeuPreparado(height);
             const imgW = fundo.width;
             const imgH = fundo.height;
+
+            // Parallax do zoom: o fundo acompanha o zoom da câmara, mas
+            // amortecido. A 1:1 o céu cresceria tanto como as estrelas — e as
+            // estrelas são vetores, que aguentam qualquer ampliação, ao passo
+            // que isto é uma fotografia, com pixels finitos: ao chegar aos 3x
+            // o centro do ecrã, que é onde se está a olhar, desaparecia em
+            // papa. Amortecido, o fundo responde ao gesto e ainda ganha uma
+            // pista de profundidade — a Via Láctea lê-se atrás das estrelas em
+            // vez de pintada na mesma folha.
+            //
+            // Nunca abaixo de 1: encolher o fundo abria buracos em cima e em
+            // baixo, porque a folga vertical está contada à justa.
+            const razaoZoom = CAMERA_FOV_BASE / cameraFOV;
+            const escalaZoom = Math.min(FUNDO_ZOOM_MAX,
+                                        Math.max(1, Math.pow(razaoZoom, FUNDO_PARALLAX)));
+
+            // O bitmap está preparado à escala do zoom máximo; aqui desconta-se
+            // essa margem, para que com o zoom todo aberto ele apareça
+            // exatamente no tamanho de sempre.
+            const fator = escalaZoom / FUNDO_ZOOM_MAX;
+            const wrap = Math.round(imgW * fator);
+            const alt = Math.round(imgH * fator);
 
             // Desloca a imagem horizontalmente conforme o azimute da câmara — dá a
             // sensação de estar a rodar sobre uma cúpula panorâmica, como um céu real.
@@ -2372,17 +2425,22 @@ function desenharObservatorio() {
             // deslocamento fraccionário obriga o browser a reamostrar os milhões de
             // pixels da imagem, duas vezes por frame. O erro máximo é meio pixel,
             // invisível a arrastar.
-            let offsetX = -((cameraAzimuth / 360) * imgW) % imgW;
-            if (offsetX > 0) offsetX -= imgW;
+            //
+            // O tamanho é que já não dá para evitar: só no zoom máximo é que ele bate
+            // certo com o da imagem, e em todos os outros o browser reamostra. É o
+            // preço de o fundo acompanhar o zoom — mas é um drawImage sem filtro, e
+            // não as operações caras que aqui viviam antes.
+            let offsetX = -((cameraAzimuth / 360) * wrap) % wrap;
+            if (offsetX > 0) offsetX -= wrap;
             offsetX = Math.round(offsetX);
-            const offsetY = Math.round((height - imgH) / 2 - (cameraAltitude / 90) * (imgH * 0.15));
+            const offsetY = Math.round((height - alt) / 2 - (cameraAltitude / 90) * (alt * 0.15));
 
-            ctx.drawImage(fundo, offsetX, offsetY);
-            ctx.drawImage(fundo, offsetX + imgW, offsetY); // 2ª cópia: evita "buraco" ao dar a volta
+            ctx.drawImage(fundo, offsetX, offsetY, wrap, alt);
+            ctx.drawImage(fundo, offsetX + wrap, offsetY, wrap, alt); // 2ª cópia: evita "buraco" ao dar a volta
 
             // Dissolve a "costura" onde as duas cópias se encontram — a foto não é
             // um panorama 360° verdadeiro, por isso há um corte visível ali sem isto.
-            const seamX = offsetX + imgW;
+            const seamX = offsetX + wrap;
             if (seamX > -140 && seamX < width + 140) {
                 const gradCostura = ctx.createLinearGradient(seamX - 120, 0, seamX + 120, 0);
                 gradCostura.addColorStop(0, "rgba(4, 8, 16, 0)");
@@ -2431,33 +2489,60 @@ function desenharObservatorio() {
                 ctx.lineTo(0, height);
                 ctx.closePath();
 
+                // O chão é escuro de propósito — quase preto, com um fio de
+                // azul do tema só no bordo de cima —, e o único adorno é um
+                // toque mínimo de liquid glass: a luz a roçar o topo do chão,
+                // como o realce especular de 1px que o vidro da app tem no
+                // bordo superior (o inset 0 1px 0 do glass.css). A faixa é
+                // estreita e morre logo: o chão existe para dizer onde o céu
+                // acaba, não para ser visto.
                 const gradGround = ctx.createLinearGradient(0, horizY, 0, height);
-                gradGround.addColorStop(0, "rgba(9, 11, 17, 0.97)");
-                gradGround.addColorStop(0.3, "rgba(7, 9, 14, 0.98)");
-                gradGround.addColorStop(0.65, "rgba(5, 6, 10, 0.99)");
-                gradGround.addColorStop(1, "rgba(2, 2, 4, 1.00)");
+                gradGround.addColorStop(0, "rgba(9, 14, 30, 0.97)");
+                gradGround.addColorStop(0.22, "rgba(6, 10, 21, 0.98)");
+                gradGround.addColorStop(0.55, "rgba(3, 5, 13, 0.99)");
+                gradGround.addColorStop(1, "rgba(1, 2, 6, 1.00)");
                 ctx.fillStyle = gradGround;
+                ctx.fill();
+
+                // O realce de liquid glass, mínimo. Segunda passagem sobre o
+                // mesmo caminho — o fill() não limpa a path —, por isso a
+                // faixa acompanha a curva do horizonte em vez de ser um
+                // retângulo por cima dela.
+                const gradSheen = ctx.createLinearGradient(0, horizY, 0, horizY + 22);
+                gradSheen.addColorStop(0, "rgba(185, 210, 255, 0.08)");
+                gradSheen.addColorStop(0.4, "rgba(150, 185, 255, 0.028)");
+                gradSheen.addColorStop(1, "rgba(150, 185, 255, 0)");
+                ctx.fillStyle = gradSheen;
                 ctx.fill();
             }
 
             // Nota: não há silhueta de montanhas no horizonte — foi removida
             // a pedido do utilizador. Não voltar a adicionar sem perguntar.
 
-            // Névoa suave no horizonte — tom frio
+            // Névoa suave no horizonte — tom frio, do mesmo azul-violeta do
+            // chão e do céu, para a transição entre os dois ser um lugar e não
+            // uma fronteira.
             const gradFog = ctx.createLinearGradient(0, horizY - 20, 0, horizY + 35);
-            gradFog.addColorStop(0, "rgba(40, 55, 80, 0.0)");
-            gradFog.addColorStop(0.45, "rgba(50, 65, 95, 0.16)");
-            gradFog.addColorStop(1, "rgba(20, 25, 40, 0.0)");
+            gradFog.addColorStop(0, "rgba(45, 60, 100, 0.0)");
+            gradFog.addColorStop(0.45, "rgba(58, 78, 125, 0.17)");
+            gradFog.addColorStop(1, "rgba(24, 28, 52, 0.0)");
             ctx.fillStyle = gradFog;
             ctx.fillRect(0, horizY - 20, width, 55);
 
-            // Linha do horizonte
+            // Linha do horizonte — o mesmo azul do tema (#6eb8ff), com um halo
+            // mínimo: o fio de luz que diz onde o céu acaba, sem entrar em
+            // cena. O save/restore é para o halo não passar para os traços
+            // seguintes (os pontos cardeais, logo abaixo).
             ctx.beginPath();
             ctx.moveTo(horizonPoints[0].x, horizonPoints[0].y);
             for (let i = 1; i < horizonPoints.length; i++) ctx.lineTo(horizonPoints[i].x, horizonPoints[i].y);
-            ctx.strokeStyle = "rgba(110, 140, 185, 0.2)";
+            ctx.save();
+            ctx.strokeStyle = "rgba(110, 184, 255, 0.28)";
             ctx.lineWidth = 1.5;
+            ctx.shadowColor = "rgba(110, 184, 255, 0.35)";
+            ctx.shadowBlur = 6;
             ctx.stroke();
+            ctx.restore();
         }
 
         // Pontos Cardeais na linha do horizonte

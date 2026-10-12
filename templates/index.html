@@ -82,7 +82,7 @@
                     <!-- Pesquisa e Tour — no topo do painel de propósito: é o
                          controlo mais usado e assim fica alcançável sem scroll. -->
                     <div class="observatorio-pesquisa glass-panel">
-                        <div class="card-titulo" style="color:#ffcc02">🔎 Pesquisa</div>
+                        <div class="card-titulo">🔎 Pesquisa</div>
                         <input type="text" id="obs-pesquisa" class="obs-input" autocomplete="off"
                             placeholder="Procurar estrela, constelação, planeta…" oninput="aoEscreverPesquisa()"
                             onfocus="aoEscreverPesquisa()" onkeydown="tratarTeclaPesquisa(event)">
@@ -95,7 +95,7 @@
                     </div>
                     <!-- Controlos -->
                     <div class="observatorio-controlos glass-panel">
-                        <div class="card-titulo" style="color:#ffcc02">⚙️ Controles</div>
+                        <div class="card-titulo">⚙️ Controles</div>
                         <!-- Seletor de Data e Hora -->
                         <div class="obs-tempo-bloco">
                             <div class="obs-tempo-titulo">🕐 Simular Data/Hora</div>
@@ -197,12 +197,6 @@
                                 oninput="document.getElementById('lbl-mag').textContent = parseFloat(this.value).toFixed(1); desenharObservatorio()">
                             <span id="lbl-mag">5.0</span>
                         </div>
-                        <div class="config-linha-check"
-                            style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
-                            <input type="checkbox" id="chk-night-mode" onchange="toggleNightMode(this.checked)">
-                            <label for="chk-night-mode" style="color: #ff7085; font-weight: 600;">🔴 Night Mode (Red
-                                Velvet)</label>
-                        </div>
                     </div>
                     <!-- Painel de Detalhes -->
                     <div id="observatorio-detalhes" class="glass-panel">
@@ -214,11 +208,6 @@
                 </div>
                 <!-- Mapa Celeste -->
                 <div class="observatorio-mapa-wrapper glass-panel">
-                    <!-- O Night Mode (Red Velvet) governa-se no painel dos
-                         Controlos, com a caixa que lá está (ver o
-                         chk-night-mode). Aqui no mapa havia um segundo botão
-                         para a mesma coisa, a ocupar a esquina do céu — e era
-                         no mapa que o espaço faz falta. -->
                     <!-- Os dois botões do mapa, numa linha só. Vivem juntos
                          num contentor que se encosta ao canto (ver o
                          .observatorio-botoes, no index.css): o 🥽 VR fica na

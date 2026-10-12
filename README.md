@@ -354,7 +354,7 @@ astroguide/
     │   │                    APOD, e o Observatório interativo
     │   │                    (canvas 360°/2D) com estrelas,
     │   │                    constelações, planetas com imagem
-    │   │                    real, pesquisa, Night Mode, o ★ dos
+    │   │                    real, pesquisa, o ★ dos
     │   │                    favoritos e auto-refresh a cada 30s.
     │   │
     │   ├── ia.js          → O painel da AstroGuide AI: abrir e
@@ -417,8 +417,9 @@ astroguide/
     │   │
     │   └── space.jpg      → Panorâmica da Via Láctea, usada
     │                        como fundo do céu no Observatório
-    │                        360° (com efeito parallax) e como
-    │                        imagem do cartão da NASA no menu.
+    │                        360° (com parallax de rotação e de
+    │                        zoom) e como imagem do cartão da
+    │                        NASA no menu.
     │
     ├── audio/
     │   └── musica.mp3     → Música ambiente do Observatório e do VR
@@ -1368,6 +1369,17 @@ Projeção Perspetiva 3D (Vista 360°)
   é projetado no plano do ecrã com divisão pela
   profundidade (z), criando a ilusão de perspetiva real.
 
+  O fundo panorâmico da Via Láctea acompanha o zoom,
+  mas amortecido: cresce segundo uma potência do
+  rácio de FOV (expoente 0.3, teto de 1.35x), em vez
+  de 1:1 como as estrelas. A 1:1 o centro do ecrã
+  — que é onde se está a olhar — perdia nitidez, por
+  ser uma fotografia e não um vetor; amortecido, dá
+  uma pista de profundidade e lê-se atrás das
+  estrelas. A imagem é preparada uma só vez à escala
+  do zoom máximo (FUNDO_ESCALA_MAX) e depois é só
+  desenhada, sem voltar a passar pelo filtro de cor.
+
 WebGL / Three.js (Observatório VR)
   Ao contrário do Observatório 2D (Canvas achatado com
   matemática de projeção manual), o Observatório VR cria
@@ -1527,16 +1539,12 @@ Fuso horário IANA
       real (e por isso diferente de cada sítio), e um botão 🛰
       que a localiza agora
   [x] Fundo panorâmico real da Via Láctea, com parallax
+      ao rodar a câmara e ao dar zoom
   [x] Clique num astro/estrela/constelação para ver detalhes
   [x] Painel de filtros — constelações, nomes, magnitude
   [x] Pesquisa — procurar uma estrela, constelação ou planeta
       pelo nome, com a lista de resultados a aparecer enquanto
       se escreve (e navegável pelo teclado)
-  [x] Night Mode (Red Velvet) — o mapa todo em tons de
-      vermelho, para não estragar a visão noturna. Caixa no
-      painel dos Controlos, com as outras camadas — no mapa
-      era um segundo botão para o que já tinha um, a ocupar a
-      esquina do céu
   [x] "Ver abaixo do horizonte" — tira o chão e mostra as
       estrelas, constelações e planetas que estão debaixo do
       horizonte, desenhados mais apagados para se perceber
