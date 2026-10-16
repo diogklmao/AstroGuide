@@ -28,21 +28,29 @@ const CURIOSIDADES_CONSTELACOES = {
 };
 
 // ── Imagens das Constelações ────────────────────────────────────────
+// Os nomes da direita têm de ser os dos ficheiros no disco letra por letra —
+// não basta "serem o mesmo nome". No Windows isto não se nota: o sistema de
+// ficheiros não distingue maiúsculas de minúsculas, e um pedido a "aql.png"
+// abre na mesma o "AqL.png". Num servidor Linux dá 404, e como o painel não
+// mostra imagem partida, o que se via era o painel da constelação abrir sem
+// ilustração nenhuma e sem erro nenhum — o pior dos casos, porque parece que
+// a imagem não existe. A pasta tem os nomes como o catálogo os escreve
+// (ver o CONSTELACOES_BD, no py/ceu/estrelas.py), e é isso que aqui fica.
 const IMAGENS_CONSTELACOES = {
-    "UMi": "/static/images/constelacoes/umi.png",
-    "UMa": "/static/images/constelacoes/uma.png",
+    "UMi": "/static/images/constelacoes/UMi.png",
+    "UMa": "/static/images/constelacoes/UMa.png",
     "Ori": "/static/images/constelacoes/ori.png",
-    "Cas": "/static/images/constelacoes/cas.png",
-    "Leo": "/static/images/constelacoes/leo.png",
-    "Tau": "/static/images/constelacoes/tau.png",
-    "Gem": "/static/images/constelacoes/gem.png",
-    "Cyg": "/static/images/constelacoes/cyg.png",
-    "Lyr": "/static/images/constelacoes/lyr.png",
-    "Aql": "/static/images/constelacoes/aql.png",
-    "Boo": "/static/images/constelacoes/boo.png",
-    "Vir": "/static/images/constelacoes/vir.png",
-    "Sco": "/static/images/constelacoes/sco.png",
-    "Peg": "/static/images/constelacoes/peg.png",
+    "Cas": "/static/images/constelacoes/Cas.png",
+    "Leo": "/static/images/constelacoes/Leo.png",
+    "Tau": "/static/images/constelacoes/Tau.png",
+    "Gem": "/static/images/constelacoes/Gem.png",
+    "Cyg": "/static/images/constelacoes/Cyg.png",
+    "Lyr": "/static/images/constelacoes/Lyr.png",
+    "Aql": "/static/images/constelacoes/AqL.png",
+    "Boo": "/static/images/constelacoes/Boo.png",
+    "Vir": "/static/images/constelacoes/Vir.png",
+    "Sco": "/static/images/constelacoes/Sco.png",
+    "Peg": "/static/images/constelacoes/Peg.png",
 };
 
 // ── Estrelas ──────────────────────────────────────────────────────
@@ -3531,11 +3539,17 @@ function mostrarImagemConstelacao(const_id, nome) {
     if (badgeElem) badgeElem.textContent = "✦ CONSTELAÇÃO";
     if (nomeElem) nomeElem.textContent = nome || const_id;
 
-    // Obter imagem mapeada
-    const src = IMAGENS_CONSTELACOES[const_id] || `/static/images/constelacoes/${const_id.toLowerCase()}.png`;
+    // A imagem vem do mapa, e só dele. Havia aqui um palpite — juntar o id em
+    // minúsculas ao caminho — que no Windows acertava sempre por acidente (o
+    // sistema de ficheiros não distingue maiúsculas) e no Linux nunca acertava.
+    // Sem palpite, um id que não esteja no mapa não tem ilustração nenhuma, que
+    // é o que o painel já faz quando não há imagem: a <img> fica sem src, em
+    // vez de ficar com um pedido condenado a 404.
+    const src = IMAGENS_CONSTELACOES[const_id];
 
     if (imgElem) {
-        imgElem.src = src;
+        if (src) imgElem.src = src;
+        else imgElem.removeAttribute("src");
         imgElem.alt = `Ilustração da Constelação de ${nome || const_id}`;
     }
 

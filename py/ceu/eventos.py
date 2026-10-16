@@ -3,7 +3,7 @@
 #  Contém chuvas de meteoros e eclipses do ano.
 #  As chuvas de meteoros têm datas fixas todos os anos
 #  (são sempre os mesmos detritos de cometas).
-#  Os eclipses são específicos de 2026.
+#  Os eclipses são de anos concretos — de 2026 a 2028, aqui.
 # ============================================================
 
 EVENTOS = [
@@ -101,8 +101,10 @@ EVENTOS = [
         "descricao": "Chuva discreta de fim de ano. Até 10 meteoros/hora.",
     },
 
-    # ── Eclipses 2026/2027 ─────────────────────────────────────────────────────────
-    # Calculados com precisão — datas específicas de 2026/2027.
+    # ── Eclipses 2026 a 2028 ─────────────────────────────────────────────────────────
+    # Datas específicas, calculadas com precisão — 2026, 2027 e 2028. Cada um só
+    # aparece no calendário do seu ano: é o campo "ano" que o prende lá (ver o
+    # get_eventos_do_dia e o get_eventos_do_mes, aqui em baixo).
 
     {
         "nome":      "Eclipse Solar",
