@@ -241,6 +241,107 @@ function planetaHTML(p) {
 }
 
 // ── NASA - Imagem do Dia (APOD) ─────────────────────────────────────
+// Os textos e os links vêm da NASA e entram no HTML como atributos, por isso
+// passam todos por aqui: uma aspa no título de uma APOD chegava para partir o
+// resto da página.
+function escaparAtributo(valor) {
+    return String(valor ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+// Um ficheiro de vídeo (mp4, webm) toca-se num <video>; os vídeos do YouTube
+// e do Vimeo só tocam dentro de um <iframe>. Estes três padrões são o que
+// distingue um vídeo de tudo o resto — e "tudo o resto" acontece: a API de
+// reserva, nos dias de vídeo, só sabe dar a página do artigo da NASA.
+const EXTENSOES_DE_VIDEO = /\.(mp4|webm|ogv|ogg|mov|m4v)(\?|#|$)/i;
+const ID_YOUTUBE = /(?:youtube\.com\/(?:embed\/|watch\?v=|shorts\/)|youtu\.be\/)([\w-]+)/;
+const ID_VIMEO = /vimeo\.com\/(?:video\/)?(\d+)/;
+
+function ehVideoConhecido(url) {
+    return EXTENSOES_DE_VIDEO.test(url) || ID_YOUTUBE.test(url) || ID_VIMEO.test(url);
+}
+
+function urlDoPlayer(url) {
+    // Já vem na forma de incorporar: não se mexe, para não se perderem
+    // parâmetros como o minuto em que o vídeo começa.
+    if (/youtube\.com\/embed\/|player\.vimeo\.com\/video\//.test(url)) return url;
+
+    // Link normal de vídeo: converte-se para a forma que o iframe aceita.
+    const youtube = url.match(ID_YOUTUBE);
+    if (youtube) return `https://www.youtube.com/embed/${youtube[1]}`;
+
+    const vimeo = url.match(ID_VIMEO);
+    if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+
+    return url;
+}
+
+// O vídeo entra no lugar da miniatura, no mesmo sítio e com a mesma forma.
+function reproduzirVideoApod(botao) {
+    const url = botao.dataset.video;
+    const caixa = botao.parentElement;
+
+    // Isto não é um vídeo, é a página do artigo da NASA — e uma página não se
+    // toca aqui dentro, o site dela recusa-se a ser mostrado num iframe. Abre-se
+    // numa aba, que é o melhor que há para dar. Só acontece quando a API oficial
+    // não respondeu e foi a reserva a servir a APOD.
+    if (!ehVideoConhecido(url)) {
+        window.open(url, "_blank", "noopener");
+        return;
+    }
+
+    if (EXTENSOES_DE_VIDEO.test(url)) {
+        caixa.innerHTML = `<video class="apod-video" src="${escaparAtributo(url)}"
+            controls autoplay playsinline></video>`;
+        return;
+    }
+
+    const player = urlDoPlayer(url);
+    // O autoplay é para o clique no play valer por si: sem ele, o player
+    // abria-se e ficava à espera de um segundo clique.
+    const separador = player.includes("?") ? "&" : "?";
+    // O "referrerpolicy" vai sem referrer de propósito: há servidores de
+    // vídeo que recusam pedidos que cheguem com o Referer de outro site. Não
+    // custa nada e evita esse caso de uma vez.
+    caixa.innerHTML = `<iframe class="apod-video" src="${escaparAtributo(player + separador + "autoplay=1")}"
+        title="Vídeo da Imagem Astronómica do Dia" referrerpolicy="no-referrer"
+        allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe>`;
+}
+
+// A cara do dia: a imagem, ou — nos dias de vídeo — a miniatura com um botão
+// de play por cima. Nos dois casos é do mesmo tamanho e fica no mesmo lugar.
+function construirMediaApod(data) {
+    if (data.tipo_media !== "video") {
+        return `<img class="apod-imagem" src="${escaparAtributo(data.url_imagem)}"
+            alt="${escaparAtributo(data.titulo)}">`;
+    }
+
+    // Vídeo sem link nenhum: não há player que se monte, resta a página da NASA.
+    if (!data.url_video) {
+        return `<div class="apod-video-aviso">🎬 O conteúdo de hoje é um vídeo.
+                 <a href="${escaparAtributo(data.pagina_nasa)}" target="_blank" rel="noopener">Ver na NASA ↗</a></div>`;
+    }
+
+    // Sem miniatura (nem todos os vídeos trazem uma) fica o painel escuro do
+    // botão, que já se lê como um vídeo por causa do play no meio.
+    const miniatura = data.url_miniatura
+        ? `<img class="apod-miniatura" src="${escaparAtributo(data.url_miniatura)}" alt="">`
+        : "";
+
+    return `
+        <div class="apod-media-video">
+            <button type="button" class="apod-play" onclick="reproduzirVideoApod(this)"
+                data-video="${escaparAtributo(data.url_video)}"
+                aria-label="Reproduzir o vídeo de hoje">
+                ${miniatura}
+                <span class="apod-play-icone" aria-hidden="true"></span>
+            </button>
+        </div>`;
+}
+
 async function carregarApod() {
     const container = document.getElementById("apod-conteudo");
     try {
@@ -248,19 +349,16 @@ async function carregarApod() {
         if (!res.ok) throw new Error("Resposta não OK");
         const data = await res.json();
 
-        // A APOD por vezes é um vídeo em vez de uma imagem (ex: lançamentos, eclipses filmados)
-        const mediaHTML = data.tipo_media === "video"
-            ? `<div class="apod-video-aviso">🎬 O conteúdo de hoje é um vídeo.
-                 <a href="${data.url_imagem}" target="_blank" rel="noopener">Ver vídeo original ↗</a></div>`
-            : `<img class="apod-imagem" src="${data.url_imagem}" alt="${data.titulo}">`;
-
+        // A APOD por vezes é um vídeo em vez de uma imagem (ex: lançamentos, eclipses filmados).
+        // O vídeo aparece no mesmo sítio da imagem, e é o play que o traz para a
+        // página — sem mandar o utilizador para outra aba para o poder ver.
         container.innerHTML = `
             <div class="card glass-panel apod-card">
-                ${mediaHTML}
+                ${construirMediaApod(data)}
                 <div class="apod-titulo">${data.titulo}</div>
                 <div class="apod-data">${data.data}${data.autor ? " · © " + data.autor : ""}</div>
                 <p class="apod-explicacao">${data.explicacao}</p>
-                ${data.url_hd ? `<a class="apod-hd-link" href="${data.url_hd}" target="_blank" rel="noopener">Ver em alta resolução ↗</a>` : ""}
+                ${data.url_hd ? `<a class="apod-hd-link" href="${escaparAtributo(data.url_hd)}" target="_blank" rel="noopener">Ver em alta resolução ↗</a>` : ""}
             </div>`;
     } catch (err) {
         container.innerHTML = '<div class="loading glass-panel">❌ Não foi possível carregar a imagem do dia</div>';

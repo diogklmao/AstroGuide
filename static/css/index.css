@@ -1813,6 +1813,110 @@ body.observatorio-ativo #btn-toggle-painel {
     background: rgba(0, 0, 0, 0.3);
 }
 
+/* ── APOD em vídeo ───────────────────────────────────────────────────
+   Nos dias em que a APOD é um vídeo, ele ocupa o lugar da imagem: a
+   miniatura com um botão de play por cima, com a mesma largura, a mesma
+   altura máxima e os mesmos cantos redondos. O player só entra depois do
+   clique — assim quem passa pelo ecrã não arrasta o peso de um vídeo que
+   talvez não abra, e quem carrega no play vê-o ali mesmo, em vez de ser
+   mandado para outra aba. */
+.apod-media-video {
+    margin-bottom: 16px;
+}
+
+.apod-play {
+    position: relative;
+    display: block;
+    width: 100%;
+    max-height: 480px;
+    aspect-ratio: 16 / 9;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* A miniatura preenche o botão como a imagem preenchia o card — o
+   "contain" mantém a proporção e deixa o resto no escuro, tal e qual. */
+.apod-miniatura {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* O play: um círculo escuro com aro amarelo, a cor do título da APOD. O
+   triângulo é desenhado com uma borda em vez de ser o emoji ▶ — o emoji
+   muda de forma, de cor e de tamanho de sistema para sistema. */
+.apod-play-icone {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 74px;
+    height: 74px;
+    border-radius: 50%;
+    background: rgba(8, 14, 26, 0.62);
+    border: 2px solid rgba(255, 204, 2, 0.85);
+    box-shadow: 0 0 28px rgba(255, 204, 2, 0.32);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.apod-play-icone::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    /* O triângulo é centrado pela caixa que o desenha, mas a tinta dele
+       encosta toda à esquerda dessa caixa (a base está lá, a ponta fica à
+       direita) — daí o deslocamento para a direita, que é o que o põe no
+       meio do círculo. */
+    left: 54%;
+    transform: translate(-50%, -50%);
+    border-style: solid;
+    border-width: 14px 0 14px 23px;
+    border-color: transparent transparent transparent #ffcc02;
+}
+
+.apod-play:hover .apod-play-icone,
+.apod-play:focus-visible .apod-play-icone {
+    transform: translate(-50%, -50%) scale(1.08);
+    background: rgba(8, 14, 26, 0.78);
+    box-shadow: 0 0 36px rgba(255, 204, 2, 0.55);
+}
+
+.apod-play:focus-visible {
+    outline: 2px solid #6eb8ff;
+    outline-offset: 3px;
+}
+
+/* O player que substitui a miniatura — o iframe do YouTube/Vimeo ou o
+   <video>, quando o vídeo é um ficheiro. */
+.apod-video {
+    display: block;
+    width: 100%;
+    max-height: 480px;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: 10px;
+    background: #000;
+}
+
+/* Quem tem "menos movimento" no sistema fica com o play parado: o círculo
+   continua a acender no hover, mas não cresce. */
+@media (prefers-reduced-motion: reduce) {
+    .apod-play-icone {
+        transition: none;
+    }
+
+    .apod-play:hover .apod-play-icone,
+    .apod-play:focus-visible .apod-play-icone {
+        transform: translate(-50%, -50%);
+    }
+}
+
 .apod-video-aviso {
     padding: 40px 20px;
     text-align: center;
