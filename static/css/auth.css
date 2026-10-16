@@ -1,8 +1,34 @@
 /* ── AstroGuide — página de entrada / registo ───────────────────────────
    Só o que é exclusivo desta página. A moldura (fotografia de fundo,
-   vinheta, contentor centrado) vem do menu.css; o vidro vem do glass.css.
-   As cores e os raios são os mesmos tokens, para a página não parecer de
-   outro projeto. */
+   vinheta, contentor centrado) vem do menu.css; os tokens do vidro vêm do
+   glass.css.
+
+   O cartão é liquid glass à iOS, em camadas:
+     · o corpo do vidro, claro no alto e mais fundo em baixo, com a poeira
+       de estrelas do glass.css por dentro;
+     · uma aresta de luz a contornar o cartão, com um brilho que dá a volta
+       devagar — um satélite a orbitar o vidro;
+     · o reflexo da superfície, que segue o rato (o auth.js dá o --mx/--my);
+     · e, por trás de tudo, uma aura de nebulosa que o vidro refrata. */
+
+/* O ângulo do brilho que orbita a aresta. Registado para o browser saber
+   interpolá-lo como ângulo — sem isto, a animação saltava aos solavancos em
+   vez de rodar. */
+@property --auth-angulo {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
+/* O menu.css esconde o scroll, porque o menu cabe sempre num ecrã. Aqui o
+   formulário de registo pode passar a altura de um portátil pequeno, e sem
+   scroll o botão ficava cortado e inalcançável. Na horizontal continua
+   escondido: a aura sai de propósito para fora do cartão e não deve criar
+   uma barra. */
+body.page-auth {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
 
 /* Centra o cartão verticalmente. O .conteudo do menu alinha ao topo, porque
    lá em cima há o título grande; aqui só existe um cartão. */
@@ -15,69 +41,345 @@
    carrega. O ajuste para ecrãs pequenos fica cá em baixo, na media query,
    porque é um desvio só desta página. */
 
-
-/* ── Cartão ──────────────────────────────────────────────────────────── */
-.auth-cartao {
-    width: min(420px, 100%);
-    padding: 34px 32px 30px;
-    border-radius: 22px;
-    text-align: left;
+/* Os símbolos dos ícones — existem só para serem usados pelos <use>. */
+.auth-sprite {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
 }
 
+
+/* ── Palco e aura ────────────────────────────────────────────────────── */
+.auth-palco {
+    position: relative;
+    width: min(420px, 100%);
+}
+
+/* A nebulosa por trás do cartão: azul em cima à esquerda, violeta em baixo
+   à direita, um fio de ciano no topo. O vidro desfoca-a e é isso que lhe dá
+   cor; a parte que sobra para fora é o halo à volta do cartão. */
+.auth-aura {
+    position: absolute;
+    inset: -70px -90px;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(38% 32% at 22% 18%, rgba(80, 135, 255, 0.34), transparent 70%),
+        radial-gradient(36% 34% at 84% 80%, rgba(150, 90, 240, 0.30), transparent 70%),
+        radial-gradient(30% 24% at 72% 10%, rgba(90, 210, 255, 0.14), transparent 70%);
+    filter: blur(28px);
+    animation: auth-aura-derivar 16s ease-in-out infinite alternate;
+}
+
+@keyframes auth-aura-derivar {
+    from { transform: translate3d(-12px, 6px, 0) scale(1); }
+    to   { transform: translate3d(12px, -8px, 0) scale(1.06); }
+}
+
+
+/* ── Cartão ──────────────────────────────────────────────────────────── */
+/* Os seletores levam .glass-panel para ganharem ao glass.css: o hover
+   genérico de lá trocava o fundo por outro e apagava estas camadas. O fundo
+   e a sombra vivem em variáveis para o hover os repetir sem cópia. */
+.auth-cartao.glass-panel {
+    --auth-vidro:
+        radial-gradient(120% 55% at 50% -12%, rgba(160, 200, 255, 0.16), transparent 62%),
+        radial-gradient(80% 50% at 100% 108%, rgba(140, 95, 235, 0.16), transparent 65%),
+        var(--glass-stars),
+        linear-gradient(180deg, rgba(22, 30, 64, 0.40) 0%, rgba(8, 11, 28, 0.58) 100%);
+    --auth-sombra:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 -18px 40px rgba(110, 140, 255, 0.06),
+        0 30px 70px rgba(0, 0, 0, 0.55),
+        0 8px 22px rgba(0, 0, 0, 0.30),
+        0 0 80px rgba(90, 130, 255, 0.16);
+
+    z-index: 1;
+    width: 100%;
+    padding: 36px 32px 30px;
+    border-radius: 30px;
+    text-align: left;
+    /* A letra do sistema da Apple onde existir; no Windows fica o Segoe UI
+       de sempre. */
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    background: var(--auth-vidro);
+    border: 1px solid rgba(170, 200, 255, 0.10);
+    backdrop-filter: blur(34px) saturate(180%) brightness(1.05);
+    -webkit-backdrop-filter: blur(34px) saturate(180%) brightness(1.05);
+    box-shadow: var(--auth-sombra);
+    /* A animação é no próprio cartão e não no palco: opacidade ou filtro num
+       antepassado cortavam o backdrop-filter enquanto durasse a entrada, e o
+       vidro piscava ao acabar. */
+    animation: auth-surgir 0.8s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.auth-cartao.glass-panel:hover {
+    background: var(--auth-vidro);
+    border-color: rgba(170, 200, 255, 0.14);
+    box-shadow: var(--auth-sombra), 0 0 110px rgba(110, 150, 255, 0.12);
+}
+
+@keyframes auth-surgir {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* O conteúdo fica entre o reflexo (por baixo) e a aresta (por cima). */
+.auth-cartao > * {
+    position: relative;
+    z-index: 2;
+}
+
+/* A aresta de luz: o fundo inteiro recortado a um anel de 1.5px (o padding
+   dá a espessura e a máscara deixa só o que fica fora do miolo). Por baixo,
+   o filete fixo — branco no topo, azul em baixo; por cima, o brilho que
+   orbita, um cone de luz que dá a volta ao cartão em 10s. */
+.auth-cartao.glass-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    padding: 1.5px;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        conic-gradient(from var(--auth-angulo, 0deg),
+            transparent 0deg,
+            rgba(140, 190, 255, 0) 20deg,
+            rgba(195, 222, 255, 0.95) 52deg,
+            rgba(170, 130, 255, 0.55) 72deg,
+            transparent 110deg 360deg),
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.70) 0%,
+            rgba(205, 225, 255, 0.30) 18%,
+            rgba(120, 160, 255, 0.10) 50%,
+            rgba(150, 185, 255, 0.28) 82%,
+            rgba(200, 220, 255, 0.50) 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 1;
+    transition: none;
+    animation: auth-aresta-orbita 10s linear infinite;
+}
+
+@keyframes auth-aresta-orbita {
+    to { --auth-angulo: 360deg; }
+}
+
+/* O reflexo da superfície: o brilho que segue o rato, o especular parado na
+   diagonal e a aresta de topo a apagar-se para dentro. Fica por baixo do
+   texto — por cima, deixava os campos com um véu branco. */
+.auth-cartao.glass-panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    height: auto;
+    z-index: 1;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        radial-gradient(circle 240px at var(--mx, 30%) var(--my, 0%),
+            rgba(200, 225, 255, 0.13), transparent 70%),
+        linear-gradient(115deg,
+            transparent 30%,
+            rgba(255, 255, 255, 0.06) 42%,
+            rgba(255, 255, 255, 0.025) 50%,
+            transparent 60%),
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.10) 0%,
+            rgba(255, 255, 255, 0.02) 10%,
+            transparent 22%);
+    transition: none;
+}
+
+
+/* ── Emblema ─────────────────────────────────────────────────────────── */
+/* Uma bolha de vidro com o planeta lá dentro: o clarão em cima à esquerda
+   é a luz a bater na curva, e o azul em baixo é a que a atravessa. */
+.auth-emblema {
+    display: grid;
+    place-items: center;
+    width: 68px;
+    height: 68px;
+    margin: 4px auto 18px;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.04) 45%, rgba(110, 150, 255, 0.12) 100%),
+        rgba(8, 12, 32, 0.5);
+    border: 1px solid rgba(200, 220, 255, 0.22);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        inset 0 -6px 14px rgba(110, 140, 255, 0.18),
+        0 8px 22px rgba(0, 0, 0, 0.4),
+        0 0 30px rgba(110, 160, 255, 0.28);
+}
+
+.auth-emblema svg {
+    width: 46px;
+    height: 46px;
+    filter: drop-shadow(0 0 8px rgba(130, 180, 255, 0.55));
+}
+
+/* A órbita: um anel fino à volta da bolha, com o satélite a percorrê-lo. */
+.auth-orbita {
+    position: absolute;
+    inset: -9px;
+    border-radius: 50%;
+    border: 1px solid rgba(160, 195, 255, 0.16);
+    animation: auth-girar 16s linear infinite;
+}
+
+.auth-orbita::after {
+    content: "";
+    position: absolute;
+    top: -3px;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin-left: -3px;
+    border-radius: 50%;
+    background: #e2f1ff;
+    box-shadow: 0 0 8px 2px rgba(150, 200, 255, 0.8);
+}
+
+@keyframes auth-girar {
+    to { transform: rotate(360deg); }
+}
+
+
+/* ── Título ──────────────────────────────────────────────────────────── */
+/* As letras em vidro, como as do menu (ver .frosted-title): o corpo claro
+   nas pontas e azul no miolo, com um reflexo parado na diagonal. */
 .auth-titulo {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 2.6rem;
+    font-size: 2.55rem;
     font-weight: 300;
-    color: rgba(255, 255, 255, 0.92);
-    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.94);
+    letter-spacing: 0.14em;
+    /* O letter-spacing deixa um espaço depois da última letra; este recuo
+       igual à esquerda devolve o título ao centro. */
+    padding-left: 0.14em;
     line-height: 1;
     text-align: center;
-    text-shadow: 0 0 18px rgba(160, 210, 255, 0.45);
+    filter:
+        drop-shadow(0 2px 2px rgba(2, 6, 20, 0.5))
+        drop-shadow(0 0 18px rgba(140, 190, 255, 0.45));
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .auth-titulo {
+        color: transparent;
+        background:
+            linear-gradient(112deg,
+                transparent 26%,
+                rgba(255, 255, 255, 0.55) 36%,
+                rgba(255, 255, 255, 0.95) 41%,
+                rgba(255, 255, 255, 0.3) 47%,
+                transparent 56%),
+            linear-gradient(180deg,
+                #ffffff 0%,
+                #dcebff 22%,
+                #9ec0ff 52%,
+                #cfe2ff 78%,
+                #ffffff 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+    }
 }
 
 .auth-sub {
     text-align: center;
-    font-size: 0.82rem;
-    color: #7d8ba3;
-    letter-spacing: 0.06em;
-    margin: 8px 0 26px;
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 300;
+    letter-spacing: 0.36em;
+    padding-left: 0.36em;
+    text-transform: uppercase;
+    color: rgba(215, 228, 255, 0.55);
+    margin: 12px 0 26px;
 }
 
 
 /* ── Abas ────────────────────────────────────────────────────────────── */
+/* Um "segmented control" do iOS: uma calha funda e, dentro dela, uma pílula
+   de vidro que desliza para a aba escolhida — com o pequeno ressalto da
+   mola no fim. O lado vem do data-ativa, que o auth.js atualiza. */
 .auth-abas {
-    display: flex;
-    gap: 6px;
-    padding: 5px;
-    margin-bottom: 24px;
-    background: rgba(4, 6, 20, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 12px;
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 4px;
+    margin-bottom: 26px;
+    background: rgba(2, 4, 14, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    box-shadow:
+        inset 0 1px 3px rgba(0, 0, 0, 0.45),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* A largura (50% − 4px) é metade da calha por dentro do padding, por isso
+   o translateX(100%) leva-a exatamente para cima da segunda aba. O
+   border-box é preciso aqui: o "* { box-sizing }" global não chega aos
+   pseudo-elementos, e a borda deixava a pílula 2px mais larga que a aba. */
+.auth-abas::before {
+    content: "";
+    box-sizing: border-box;
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    border-radius: 999px;
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.22) 0%,
+            rgba(170, 200, 255, 0.08) 55%,
+            rgba(120, 150, 255, 0.14) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        inset 0 -1px 0 rgba(140, 180, 255, 0.18),
+        0 4px 14px rgba(0, 0, 0, 0.35),
+        0 0 18px rgba(110, 170, 255, 0.18);
+    transition: transform 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.auth-abas[data-ativa="registar"]::before {
+    transform: translateX(100%);
 }
 
 .auth-aba {
-    flex: 1;
+    position: relative;
+    z-index: 1;
     padding: 10px;
     border: none;
-    border-radius: 8px;
+    border-radius: 999px;
     background: transparent;
-    color: #556070;
+    color: rgba(200, 215, 240, 0.55);
     font-family: inherit;
-    font-size: 0.85rem;
+    font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.25s ease, color 0.25s ease;
+    transition: color 0.3s ease;
 }
 
 .auth-aba:hover {
-    color: #dce3f0;
+    color: rgba(232, 240, 255, 0.85);
 }
 
-/* A aba escolhida. O realce é o mesmo tom do restante realce da aplicação. */
 .auth-aba.ativa {
-    background: rgba(110, 184, 255, 0.14);
-    color: var(--accent, #6eb8ff);
-    box-shadow: inset 0 0 0 1px rgba(110, 184, 255, 0.3);
+    color: #fff;
+    text-shadow: 0 0 12px rgba(150, 195, 255, 0.45);
 }
 
 .auth-aba:focus-visible {
@@ -87,9 +389,19 @@
 
 
 /* ── Formulário ──────────────────────────────────────────────────────── */
+/* Ao trocar de aba, o formulário novo assenta com um fade curto — sabe-se
+   que mudou sem que nada salte. */
 .auth-form {
     display: flex;
     flex-direction: column;
+    animation: auth-form-aparecer 0.4s ease backwards;
+}
+
+@keyframes auth-form-aparecer {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
 }
 
 /* O form inativo sai da caixa (display:none) e não apenas da vista: se
@@ -100,25 +412,61 @@
 }
 
 .auth-form label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    color: #7d8ba3;
-    letter-spacing: 0.08em;
+    color: rgba(190, 206, 236, 0.62);
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    margin-bottom: 7px;
+    margin: 0 0 8px 6px;
 }
 
+/* O campo: o ícone à esquerda, pousado por cima do input. */
+.auth-campo {
+    position: relative;
+    margin-bottom: 18px;
+}
+
+.auth-campo-icone {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    transform: translateY(-50%);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: rgba(170, 190, 230, 0.5);
+    pointer-events: none;
+    transition: color 0.25s ease;
+}
+
+.auth-campo:focus-within .auth-campo-icone {
+    color: var(--accent, #6eb8ff);
+}
+
+/* Vidro afundado: mais escuro que o cartão, com a sombra por dentro em
+   cima — o campo lê-se como uma cavidade no vidro, e não como uma caixa
+   pousada nele. */
 .auth-form input {
     width: 100%;
-    padding: 12px 14px;
-    margin-bottom: 18px;
-    background: rgba(4, 6, 20, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 10px;
-    color: #e8eefc;
+    padding: 14px 16px 14px 44px;
+    background: rgba(2, 4, 14, 0.38);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 14px;
+    box-shadow:
+        inset 0 1px 3px rgba(0, 0, 0, 0.4),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+    color: #eef3ff;
     font-family: inherit;
     font-size: 0.95rem;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.auth-form input:hover {
+    border-color: rgba(255, 255, 255, 0.16);
 }
 
 .auth-form input::placeholder {
@@ -127,8 +475,12 @@
 
 .auth-form input:focus {
     outline: none;
-    border-color: var(--accent, #6eb8ff);
-    box-shadow: 0 0 0 3px rgba(110, 184, 255, 0.16);
+    background: rgba(10, 18, 44, 0.5);
+    border-color: rgba(110, 184, 255, 0.7);
+    box-shadow:
+        inset 0 1px 3px rgba(0, 0, 0, 0.4),
+        0 0 0 4px rgba(110, 184, 255, 0.14),
+        0 0 22px rgba(110, 184, 255, 0.18);
 }
 
 /* Os browsers pintam os campos preenchidos automaticamente (autofill) com
@@ -136,66 +488,166 @@
    vidro escuro. O "box-shadow inset" enorme é o truque habitual para pintar
    por cima dessa cor de fundo, que não pode ser alterada diretamente. */
 .auth-form input:-webkit-autofill,
-.auth-form input:-webkit-autofill:hover,
+.auth-form input:-webkit-autofill:hover {
+    -webkit-text-fill-color: #eef3ff;
+    -webkit-box-shadow: 0 0 0 1000px #080c20 inset;
+    caret-color: #eef3ff;
+}
+
+/* Com foco, o mesmo truque mais o anel azul por fora — senão o autofill
+   apagava o sinal de foco. */
 .auth-form input:-webkit-autofill:focus {
-    -webkit-text-fill-color: #e8eefc;
-    -webkit-box-shadow: 0 0 0 1000px #0a0e20 inset;
-    caret-color: #e8eefc;
+    -webkit-text-fill-color: #eef3ff;
+    -webkit-box-shadow:
+        0 0 0 1000px #0b1330 inset,
+        0 0 0 4px rgba(110, 184, 255, 0.14);
+    caret-color: #eef3ff;
 }
 
 .auth-dica {
     font-size: 0.72rem;
-    color: #556070;
-    margin: -10px 0 18px;
+    color: rgba(170, 186, 216, 0.5);
+    margin: -10px 0 18px 6px;
 }
 
 
 /* ── Botão principal ─────────────────────────────────────────────────── */
+/* Uma cápsula de vidro colorido: o gradiente azul → violeta da aura, um
+   pouco translúcido, e a luz a bater no topo. No hover, um brilho atravessa
+   a cápsula uma vez. */
 .auth-btn {
+    position: relative;
+    overflow: hidden;
     width: 100%;
-    padding: 13px;
-    margin-top: 4px;
-    border: 1px solid rgba(110, 184, 255, 0.45);
-    border-radius: 10px;
-    background: rgba(110, 184, 255, 0.16);
-    color: #dceaff;
+    padding: 15px;
+    margin-top: 8px;
+    border: 1px solid rgba(200, 222, 255, 0.34);
+    border-radius: 999px;
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.26) 0%,
+            rgba(255, 255, 255, 0.06) 50%,
+            rgba(255, 255, 255, 0) 100%),
+        linear-gradient(115deg,
+            rgba(74, 140, 255, 0.88) 0%,
+            rgba(104, 112, 255, 0.88) 50%,
+            rgba(150, 92, 245, 0.88) 100%);
+    color: #fff;
     font-family: inherit;
-    font-size: 0.92rem;
+    font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.04em;
+    text-shadow: 0 1px 2px rgba(20, 20, 80, 0.35);
     cursor: pointer;
-    transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        inset 0 -1px 0 rgba(60, 40, 160, 0.35),
+        0 10px 26px rgba(80, 110, 255, 0.32),
+        0 2px 6px rgba(0, 0, 0, 0.3);
+    transition:
+        transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 0.3s ease,
+        filter 0.3s ease;
+}
+
+.auth-btn::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -60%;
+    width: 40%;
+    background: linear-gradient(100deg,
+            transparent,
+            rgba(255, 255, 255, 0.35),
+            transparent);
+    transform: skewX(-20deg);
+    pointer-events: none;
+    transition: left 0.7s ease;
 }
 
 .auth-btn:hover {
-    background: rgba(110, 184, 255, 0.26);
-    border-color: var(--accent, #6eb8ff);
-    box-shadow: 0 0 18px rgba(110, 184, 255, 0.22);
+    transform: translateY(-1px);
+    filter: brightness(1.08) saturate(1.05);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(60, 40, 160, 0.35),
+        0 14px 34px rgba(90, 120, 255, 0.42),
+        0 0 24px rgba(140, 120, 255, 0.3),
+        0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.auth-btn:hover::after {
+    left: 130%;
+}
+
+/* O "afundar" do toque, como num botão do iOS. */
+.auth-btn:active {
+    transform: scale(0.98);
+    filter: brightness(0.96);
+    transition-duration: 0.1s;
 }
 
 .auth-btn:focus-visible {
-    outline: 2px solid var(--accent, #6eb8ff);
+    outline: 2px solid #cfe3ff;
     outline-offset: 3px;
 }
 
 /* Enquanto o pedido está a caminho. Um botão que não dá sinal nenhum faz
    carregar duas vezes — e a segunda cria um erro de "já existe". */
-.auth-btn:disabled {
-    opacity: 0.55;
+.auth-btn:disabled,
+.auth-btn:disabled:hover {
+    opacity: 0.6;
     cursor: progress;
+    transform: none;
+    filter: none;
+}
+
+.auth-btn:disabled::after {
+    display: none;
 }
 
 
 /* ── Mensagem de erro ────────────────────────────────────────────────── */
+/* Vidro tingido de vermelho, com um pequeno abanão ao aparecer — o "não" do
+   iOS. O abanão repete a cada erro novo porque o auth.js esvazia a caixa
+   antes de cada pedido, e o :empty esconde-a pelo meio. */
 .auth-erro {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
     margin-top: 16px;
-    padding: 11px 14px;
-    border: 1px solid rgba(255, 112, 133, 0.4);
-    border-radius: 10px;
-    background: rgba(255, 112, 133, 0.12);
-    color: #ffb3c1;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 120, 145, 0.30);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255, 112, 133, 0.16), rgba(255, 90, 120, 0.07));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 0 24px rgba(255, 90, 120, 0.10);
+    color: #ffc4ce;
     font-size: 0.82rem;
-    line-height: 1.4;
+    line-height: 1.45;
+    animation: auth-tremer 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* O "!" é decoração: o texto alternativo vazio ("/ ''") impede o leitor de
+   ecrã de o ler antes da mensagem. A primeira linha é a rede para browsers
+   que não conheçam essa sintaxe. */
+.auth-erro::before {
+    content: "!";
+    content: "!" / "";
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    border-radius: 50%;
+    background: rgba(255, 112, 133, 0.85);
+    color: #2a0610;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
 }
 
 /* Vazio = não ocupa espaço nenhum, por isso o cartão não tem sempre um
@@ -204,32 +656,105 @@
     display: none;
 }
 
+@keyframes auth-tremer {
+    10%, 90%      { transform: translateX(-1px); }
+    20%, 80%      { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60%      { transform: translateX(4px); }
+}
+
 
 /* ── Nota de rodapé ──────────────────────────────────────────────────── */
+/* Posicionada para ficar por cima da aura, que desce até aqui. */
 .auth-nota {
-    max-width: 420px;
-    margin-top: 22px;
+    position: relative;
+    z-index: 1;
+    max-width: 400px;
+    margin-top: 26px;
     font-size: 0.78rem;
-    line-height: 1.6;
-    color: #556070;
+    line-height: 1.65;
+    color: rgba(190, 205, 235, 0.5);
     text-align: center;
+}
+
+
+/* ── Ecrãs baixos ────────────────────────────────────────────────────── */
+/* Portáteis pequenos: o emblema encolhe e os vãos apertam, para o registo
+   caber sem scroll sempre que possível. */
+@media (max-height: 780px) {
+    .auth-cartao.glass-panel {
+        padding-top: 28px;
+        padding-bottom: 24px;
+    }
+
+    .auth-emblema {
+        width: 54px;
+        height: 54px;
+        margin-bottom: 14px;
+    }
+
+    .auth-emblema svg {
+        width: 36px;
+        height: 36px;
+    }
+
+    .auth-sub,
+    .auth-abas {
+        margin-bottom: 20px;
+    }
+
+    .auth-campo {
+        margin-bottom: 14px;
+    }
+
+    .auth-dica {
+        margin: -6px 0 14px 6px;
+    }
 }
 
 
 /* ── Ecrãs estreitos ─────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-    .auth-cartao {
-        padding: 26px 20px 22px;
-        border-radius: 18px;
+    .auth-cartao.glass-panel {
+        padding: 30px 20px 24px;
+        border-radius: 26px;
     }
 
     .auth-titulo {
         font-size: 2.1rem;
     }
 
+    .auth-aura {
+        inset: -50px -40px;
+    }
+
     #btn-voltar {
         top: 12px;
         left: 12px;
         padding: 8px 14px;
+    }
+}
+
+
+/* ── Menos movimento ─────────────────────────────────────────────────── */
+/* Quem pediu "menos movimento" ao sistema fica com o cartão parado: o
+   brilho da aresta fica no canto de cima, o satélite quieto e a aura sem
+   derivar. O abanão do erro também sai — abanar é precisamente o que
+   incomoda. A entrada do cartão e a troca de abas ficam: duram menos de um
+   segundo e acompanham uma ação, não são movimento em ciclo. */
+@media (prefers-reduced-motion: reduce) {
+    .auth-cartao.glass-panel::before,
+    .auth-orbita,
+    .auth-aura,
+    .auth-erro {
+        animation: none;
+    }
+
+    .auth-abas::before {
+        transition: transform 0.2s ease;
+    }
+
+    .auth-btn::after {
+        display: none;
     }
 }

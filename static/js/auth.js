@@ -43,6 +43,11 @@
     document.getElementById("aba-entrar").classList.toggle("ativa", entrar);
     document.getElementById("aba-registar").classList.toggle("ativa", !entrar);
 
+    // A pílula de vidro por trás das abas desliza para o lado escolhido —
+    // o CSS lê este atributo (ver .auth-abas no auth.css).
+    const abas = document.querySelector(".auth-abas");
+    if (abas) abas.dataset.ativa = entrar ? "entrar" : "registar";
+
     limparErro();
 
     // Põe o cursor no primeiro campo da aba que apareceu — quem acabou de
@@ -134,6 +139,23 @@
 
     if (dados) window.location.href = destinoDepoisDeEntrar();
   };
+
+  // ── Reflexo do vidro que segue o rato ───────────────────────────────
+  // O mesmo efeito do cartão do menu: o CSS desenha um brilho em
+  // (--mx, --my), e aqui só se diz onde está o ponteiro. Ao sair, as
+  // variáveis saem também e o brilho volta ao canto de cima.
+  const cartao = document.querySelector(".auth-cartao");
+  if (cartao) {
+    cartao.addEventListener("pointermove", function (evento) {
+      const caixa = cartao.getBoundingClientRect();
+      cartao.style.setProperty("--mx", ((evento.clientX - caixa.left) / caixa.width * 100).toFixed(1) + "%");
+      cartao.style.setProperty("--my", ((evento.clientY - caixa.top) / caixa.height * 100).toFixed(1) + "%");
+    }, { passive: true });
+    cartao.addEventListener("pointerleave", function () {
+      cartao.style.removeProperty("--mx");
+      cartao.style.removeProperty("--my");
+    });
+  }
 
   // ── Ecrã inicial ────────────────────────────────────────────────────
   window.criarEstrelas();   // o mesmo campo de estrelas do menu
