@@ -88,38 +88,39 @@ body.page-menu {
 }
 
 /* ── O cartão do título ──────────────────────────────────────────── */
-/* Uma laje de vidro suspensa sobre a nebulosa. O vidro é TODO daqui: o
-   .glass-panel do glass.css só entra como rede (o raio e o overflow), e o
-   que ele traz por baixo — o fundo, a poeira, o halo do liquid-interactive
-   — é substituído mais abaixo. Cada camada responde por uma coisa:
+/* Uma laje de vidro suspensa sobre a nebulosa. O cartão não emite luz — o
+   que se vê é a luz da página a atravessá-lo, e é por isso que o vidro
+   quase não tem cor: o blur faz o fundo, e o cartão só o inclina para o
+   azul onde tem de o inclinar. As duas tentativas anteriores falharam no
+   mesmo ponto: punham o cartão a ser uma FONTE de luz (pontos de estrela,
+   manchas radiais, um halo de 140px) e um vidro aceso por dentro nunca lê
+   como vidro — lê como um adesivo brilhante.
 
-     1. o corpo do vidro (background, na .frosted-card): o violeta que
-        entra pelo canto de cima à direita, o miolo azul-noite e o ciano
-        que volta pela base. É a refração — o que se vê ATRAVÉS do vidro.
-     2. o brilho de superfície e a aresta (.glass-panel::before): os dois
-        clarões dos cantos onde a luz de frente bate com mais força, a
-        faixa diagonal congelada, e o filete de 1,5px que contorna a forma
-        — branco no topo, azul-violeta em baixo. É o que se vê NA
-        superfície do vidro.
-     3. a luz de dentro (::after): um véu que assenta no miolo e desvanece
-        antes das arestas, para o vidro ter fundo e não ser uma lâmina
-        plana.
-
-   O cartão não se mexe um milímetro: sem transform, sem escala, sem
-   paralaxe. O único movimento é o halo exterior a acender-se e a apagar-se
-   devagar (cartao-respirar, 9 s de ida e volta). Nada acelera, nada pisca
-   — a página pede calma, e o que há é vidro a ser iluminado.
+   Ficam quatro marcas, que é o que o olho precisa para ler uma superfície
+   de vidro: a BORDA viva no topo (onde a laje apanha a luz de frente), a
+   FAIXA especular na diagonal, a TRINCHEIRA escura a contornar o interior
+   (a espessura da laje a apanhar o fundo) e o HALO da suspensão, que não
+   serve para brilhar mas para o cartão se descolar da foto.
 
    As ::before e ::after levam .glass-panel no seletor de propósito: as
    genéricas do glass.css têm a mesma especificidade (0-2-0) e são lidas
    antes, mas escrever a superfície que ganha com o mesmo peso — e não a
    contar com a ordem do ficheiro — é o que impede uma regra nova no
    glass.css de a apagar. Já aconteceu: um "all: unset" aqui zerou as duas
-   camadas (0×0, sem fundo) durante um tempo sem ninguém dar por isso. */
+   camadas (0×0, sem fundo) durante um tempo sem ninguém dar por isso, e um
+   ::before genérico do .liquid-interactive pintava por cima delas.
+
+   O cartão não se mexe um milímetro: sem transform, sem escala, sem
+   paralaxe. O único movimento é o reflexo a deslizar por dentro do vidro —
+   26 s por viagem, linear, e a luz atravessa a espessura da aresta como
+   atravessa a laje. Se o sistema pedir menos movimento, o reflexo para onde
+   está e o desenho fica completo, só imóvel. */
 .frosted-card.glass-panel {
-    /* O vidro que este cartão é. O raio grande e o blur forte são o que o
+    /* O vidro que este cartão é. O raio grande e o blur largo são o que o
        separam dos outros vidros da página: os cards e o pill da localização
-       ficam pelos 14px de blur, este é a peça de vidro polido. */
+       ficam pelos 14px, este é a peça de vidro polido. O raio é generoso de
+       propósito — um canto apertado lê-se como caixa, um canto largo lê-se
+       como material. */
     display: inline-block;
     position: relative;
     overflow: hidden;
@@ -129,69 +130,80 @@ body.page-menu {
     box-sizing: border-box;
     /* As medidas da referência, EM ESCALA: o cartão é ~35% da largura da
        janela em qualquer tamanho — 525px na janela de 1500 da foto, 675 numa
-       de 1920. O recuo interno acompanha: 56/24 é o da foto no mínimo. */
-    padding: clamp(26px, 1.7vw, 38px) clamp(56px, 3.73vw, 96px);
-    border-radius: clamp(24px, 1.6vw, 34px);
-    border: 1px solid rgba(150, 185, 255, 0.24);
+       de 1920. O recuo interno acompanha: 56/24 é o da foto no mínimo. A
+       base é mais folgada que o topo (1.05 contra 0.78): um bloco de texto
+       com a mesma folga em cima e em baixo parece que está a sair pela
+       base, e o subtítulo é a última coisa que lá está. */
+    padding: clamp(24px, 1.05vw, 34px) clamp(56px, 3.73vw, 96px) clamp(30px, 1.4vw, 44px);
+    border-radius: clamp(26px, 1.7vw, 36px);
+    /* A moldura: 1,5px, à medida do filete da ::before, para as duas lerem
+       como a mesma espessura de vidro. A alfa é baixa — a aresta a sério é
+       o gradiente da ::before, que muda de cor ao longo da forma, e esta
+       border só lhe dá a espessura e corta a foto no contorno. Com alfas
+       altas aqui viam-se DUAS linhas a contornar o cartão. */
+    border: 1.5px solid rgba(255, 255, 255, 0.07);
     /* A borda de cima é mais clara: a aresta que fica virada à luz é a
        primeira coisa que o olho lê como "vidro". */
-    border-top-color: rgba(214, 232, 255, 0.44);
-    /* O violeta do canto, a poeira de estrelas e a laje escura por baixo:
-       os gradientes são quase transparentes, e é a laje de 0.52 que segura
-       a leitura onde eles faltam. Um vidro "puro" (0.28) deixava as letras
-       a competir com a nebulosa do fundo. */
+    border-top-color: rgba(255, 255, 255, 0.15);
+    /* O que se vê ATRAVÉS do vidro: um véu leve, frio em cima e azul-noite
+       em baixo. Duas camadas e quatro valores, onde antes havia três
+       manchas radiais e cinco pontos de estrela para dizer o mesmo. O véu
+       não segura a leitura das letras — quem a segura é a laje de 0.44 e o
+       blur de 30px, e um véu mais carregado punha o cartão a competir com a
+       foto em vez de a mostrar. */
     background:
-        radial-gradient(ellipse 62% 52% at 92% 0%, rgba(126, 86, 224, 0.15), transparent 68%),
-        radial-gradient(ellipse 46% 40% at 100% 34%, rgba(90, 76, 210, 0.1), transparent 70%),
-        radial-gradient(ellipse 70% 34% at 4% 104%, rgba(72, 186, 224, 0.09), transparent 66%),
         linear-gradient(180deg,
-            rgba(216, 233, 255, 0.17) 0%,
-            rgba(150, 190, 255, 0.07) 14%,
-            rgba(7, 11, 28, 0.2) 42%,
-            rgba(8, 12, 30, 0.14) 66%,
-            rgba(150, 195, 255, 0.12) 100%),
-        radial-gradient(1.6px 1.6px at 14% 18%, rgba(255, 255, 255, 0.26), transparent 100%),
-        radial-gradient(1.2px 1.2px at 79% 26%, rgba(186, 205, 255, 0.22), transparent 100%),
-        radial-gradient(1px 1px at 42% 82%, rgba(206, 170, 255, 0.18), transparent 100%),
-        radial-gradient(1.1px 1.1px at 88% 68%, rgba(255, 255, 255, 0.16), transparent 100%),
-        radial-gradient(0.9px 0.9px at 63% 44%, rgba(255, 255, 255, 0.14), transparent 100%),
-        rgba(10, 14, 32, 0.52);
+            rgba(206, 226, 255, 0.07) 0%,
+            rgba(9, 13, 30, 0.06) 42%,
+            rgba(6, 9, 22, 0.2) 100%),
+        rgba(8, 12, 28, 0.44);
     /* O vidro a sério: o blur largo, a saturação que traz a cor da nebulosa
-       para dentro e o brilho a acordar a foto. A .frosted-card.glass-panel
-       tem a mesma especificidade do .glass-panel do glass.css, mas este
-       ficheiro é lido depois — é essa ordem que ganha. A classe
-       glass-panel fica no seletor para não depender de uma regra isolada
-       que um dia apareça no fim do outro ficheiro. */
-    backdrop-filter: blur(34px) saturate(165%) brightness(1.05);
-    -webkit-backdrop-filter: blur(34px) saturate(165%) brightness(1.05);
-    /* O halo e a sombra que o suspendem. São só dois níveis — o de agora e
-       o de baixo — e o cartão fica entre eles. */
+       para dentro e o brilho a acordar a foto. 30px e não 40: acima disto o
+       fundo deixa de ter forma nenhuma e a laje passa a tapar a nebulosa em
+       vez de a mostrar através dela. A .frosted-card.glass-panel tem a
+       mesma especificidade do .glass-panel do glass.css, mas este ficheiro
+       é lido depois — é essa ordem que ganha. */
+    backdrop-filter: blur(30px) saturate(150%) brightness(1.03);
+    -webkit-backdrop-filter: blur(30px) saturate(150%) brightness(1.03);
+    /* O halo e a sombra da suspensão, no mesmo vector — o halo é uma sombra
+       com cor. O de 140px da versão anterior não iluminava nada a 140px de
+       distância: só sujava a foto em volta. Aqui o alcance é 42px e a
+       segunda camada é escura, que é o que faz o cartão PAIRAR em vez de
+       flutuar no vazio. */
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.2),
-        inset 0 -1px 0 rgba(150, 195, 255, 0.14),
-        inset 0 0 46px rgba(120, 165, 255, 0.08),
-        inset 0 -18px 40px rgba(70, 110, 235, 0.05),
-        0 24px 60px rgba(0, 0, 0, 0.5),
-        0 0 60px rgba(95, 140, 255, 0.28),
-        0 0 140px rgba(70, 110, 235, 0.16);
-    /* A respiração do halo: 9 s entre dois níveis de brilho, de ida e volta.
-       Só a luz varia — o cartão não se move. */
-    animation: cartao-respirar 9s ease-in-out infinite alternate;
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        inset 0 -1px 0 rgba(150, 195, 255, 0.1),
+        0 20px 52px rgba(2, 4, 14, 0.5),
+        0 0 42px rgba(94, 138, 255, 0.16);
+    /* Sem transform. O cartão é uma superfície de vidro, não um objeto a
+       pairar: um translateY em ciclo faz três coisas más de uma vez —
+       levanta a ::before do fundo desfocado, obriga a um novo backdrop por
+       fotograma (é caro) e dá à página o ritmo de uma app, não o de uma
+       janela para o céu. */
 }
 
-/* O hover do glass.css anula-se: a superfície é desta. Fica só a aresta um
-   pouco mais acesa, que é o cartão a responder ao rato sem se mexer. */
+/* O hover do glass.css anula-se: a superfície é desta, e o :hover de lá
+   (fundo mais claro, sombra de 62px, halo de 32px) punha o cartão a pulsar
+   com o rato. Aqui a resposta é só a aresta: o filete fica mais vivo, como
+   o vidro faz quando a luz se deita sobre ele. O cartão não se mexe, não
+   cresce e não muda de opacidade — não é clicável, e nada aqui pode
+   prometer que é. */
 .frosted-card.glass-panel:hover {
-    border-color: rgba(160, 195, 255, 0.3);
-    border-top-color: rgba(224, 238, 255, 0.54);
+    border-color: rgba(255, 255, 255, 0.16);
+    border-top-color: rgba(255, 255, 255, 0.32);
 }
 
-/* Superfície e aresta: os clarões dos cantos (o vidro é liso e a luz bate
-   nos dois altos), a faixa diagonal congelada na mesma inclinação das
-   letras (112deg — é o que faz a superfície e o título parecerem um só
-   pedaço de vidro) e o filete que contorna a forma. O filete faz-se com uma
-   máscara de 1,5px e não com um border: a border não pode ser um gradiente
-   que muda de cor de cima para baixo. */
+/* A superfície: os dois reflexos especulares — o claro que corre a laje e o
+   frio que fica parado no canto oposto, para o vidro não ter só uma fonte
+   de luz — e a aresta que contorna a forma. O filete faz-se com uma máscara
+   e não com um border: a border não pode ser um gradiente que muda de cor
+   de cima para baixo, e um border de 1px arredondado fica sempre esborratado
+   ao lado da máscara.
+
+   Esta camada é a LUZ DO CARTÃO, não um contorno: o gradiente corre por
+   dentro de um anel de 1,5px, e é essa luz a atravessar a espessura do vidro
+   que faz a aresta. É também por isso que o reflexo que anda é a primeira
+   das três camadas daqui e não um elemento à parte. */
 .frosted-card.glass-panel::before {
     content: "";
     position: absolute;
@@ -207,58 +219,89 @@ body.page-menu {
     box-sizing: content-box;
     padding: 1.5px;
     pointer-events: none;
-    z-index: 1;
+    z-index: 2;
     background:
-        /* 1. os dois clarões dos cantos de cima */
-        radial-gradient(circle at 3% 1%, rgba(255, 255, 255, 0.34), transparent 15%),
-        radial-gradient(circle at 97% 1%, rgba(255, 255, 255, 0.28), transparent 15%),
-        /* 2. a faixa diagonal, na inclinação das letras */
-        linear-gradient(112deg,
-            transparent 30%,
-            rgba(255, 255, 255, 0.1) 41%,
-            rgba(255, 255, 255, 0.04) 51%,
-            transparent 63%),
-        /* 3. a aresta de topo a apagar-se para dentro */
-        linear-gradient(180deg,
-            rgba(255, 255, 255, 0.17) 0%,
-            rgba(255, 255, 255, 0.04) 9%,
-            transparent 23%),
-        /* 4. e o ciano a devolver da base */
-        linear-gradient(0deg,
-            rgba(130, 175, 255, 0.12) 0%,
+        /* 1. o reflexo que corre pela laje. A caixa é 240% do cartão: a
+           faixa tem de ser bem mais larga que o vidro para a viagem não
+           mostrar a emenda a passar, que é o que denuncia uma animação de
+           fundo. A inclinação é de 116deg, contra os 112 das letras: a
+           mesma luz, e 4 graus de diferença para os dois não se lerem como
+           um padrão desenhado. */
+        linear-gradient(116deg,
+            transparent 39%,
+            rgba(255, 255, 255, 0.26) 48%,
+            transparent 59%),
+        /* 2. o reflexo frio e parado, no canto oposto ao da luz, e inclinado
+           ao contrário: num vidro real quem devolve a luz do canto de cima à
+           direita é o canto de baixo à esquerda. */
+        linear-gradient(-72deg,
+            rgba(196, 214, 255, 0.22),
             transparent 22%),
-        /* 5. o filete: claro no topo, violeta-azul nas laterais, azul na
-           base — é a aresta a apanhar a luz em ângulo */
+        /* 3. e o filete: claro no topo, quase apagado a meio, azul-violeta
+           em baixo. Um anel de espessura certa e opacidade baixa lê-se como
+           bevel; o mesmo anel mais grosso e mais branco lê-se como contorno
+           desenhado. */
         linear-gradient(180deg,
-            rgba(255, 255, 255, 0.92) 0%,
-            rgba(206, 226, 255, 0.58) 20%,
-            rgba(130, 162, 255, 0.2) 48%,
-            rgba(140, 118, 228, 0.32) 74%,
-            rgba(156, 196, 255, 0.6) 100%);
+            rgba(255, 255, 255, 0.78) 0%,
+            rgba(203, 220, 255, 0.34) 14%,
+            rgba(148, 170, 255, 0.14) 50%,
+            rgba(148, 124, 226, 0.24) 84%,
+            rgba(170, 205, 255, 0.4) 100%);
+    /* Só a primeira camada tem caixa própria; as duas paradas ficam com a
+       caixa natural, que é o que as põe a cobrir o anel todo. O 18% é a
+       posição de repouso — a faixa pousada perto da aresta esquerda, que é
+       onde ela fica quando o sistema pede menos movimento (ver o @media). */
+    background-size: 240% 100%, auto, auto;
+    background-position: 18% 0, 0 0, 0 0;
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
-    transition: opacity 0.5s ease;
+    /* 26 s: a viagem fica rara de mais para se seguir com os olhos (é o que
+       se quer) e o custo de repintura desta camada — tem máscara, e a
+       máscara obriga a redesenhar — dilui-se no tempo. Em 12 s, além de ser
+       um movimento que se vê, era um repaint a cada dois segundos. */
+    animation: halo-correr 26s linear infinite;
 }
 
-/* O reflexo a mudar de sítio quando a luz se move — leia-se: o rato por
-   cima. O que muda é só a força das camadas de superfície (o clarão desce
-   um pouco, a luz de dentro sobe), e não a posição de nada: um reflexo a
-   correr pelo vidro era o brilho que daqui se tirou. A transição fica na
-   regra de repouso, que é a que governa os dois sentidos — no :hover, a
-   volta atrás seria instantânea. */
-.frosted-card.glass-panel:hover::before {
-    opacity: 0.82;
+/* O reflexo a deslizar pelo vidro — de fora para dentro e de fora para
+   dentro outra vez, sem paragens. Linear e não ease-in-out: num ciclo de
+   26 s um ease-in-out deixa a luz parada nas pontas durante segundos, e o
+   cartão parece avariado a meio da viagem.
+
+   A posição da luz dentro da faixa é 48%, e a caixa tem 240% da largura do
+   cartão; a viagem começa a -70% (a faixa ainda toda por fora, à esquerda) e
+   acaba a 170% (toda por fora, à direita). Como a caixa é mais larga do que
+   o percurso, o que sai por um lado volta a entrar pelo outro e o ciclo não
+   tem salto.
+
+   Mover background-position e não um transform é deliberado: esta camada
+   tem uma máscara em anel, e a faixa tem de ficar recortada a 1,5px como as
+   outras duas — a luz atravessa a ESPESSURA do vidro. Uma camada à parte
+   com transform (mais barata) punha a faixa por cima do anel, e lia-se como
+   um bloco a passar em frente ao cartão em vez de por dentro dele.
+
+   O percurso é medido em tantos por cento do CARTÃO e não da caixa de fundo
+   (que é 2,4 vezes maior): é essa conversão — os 70% e os 170% — que põe a
+   faixa a entrar e a sair exatamente pelas arestas. */
+@keyframes halo-correr {
+    from {
+        background-position: -70% 0, 0 0, 0 0;
+    }
+
+    to {
+        background-position: 170% 0, 0 0, 0 0;
+    }
 }
 
-.frosted-card.glass-panel:hover::after {
-    opacity: 0.68;
-}
+/* A luz de dentro: a trincheira escura que contorna o interior (a espessura
+   da laje a apanhar o fundo) e o brilho que desce do bordo de cima. Nada
+   disto se move — o vidro já tem o seu movimento na ::before.
 
-/* A luz de dentro: um véu pousado no miolo que desvanece antes das arestas
-   (o radial leva o transparente a 88%). É o que dá espessura — sem isto o
-   vidro lia-se como uma lâmina plana com um contorno por cima. */
+   A trincheira faz-se com um radial elíptico largo: no meio não tem efeito
+   nenhum, nas pontas fecha a 66% do seu próprio raio, e é isso que desenha
+   a escuridão nas quatro arestas ao mesmo tempo, o que um inset box-shadow
+   faria com quatro valores e muito mais peso. */
 .frosted-card.glass-panel::after {
     content: "";
     position: absolute;
@@ -267,58 +310,26 @@ body.page-menu {
     pointer-events: none;
     z-index: 1;
     background:
-        radial-gradient(ellipse 58% 46% at 30% 26%, rgba(190, 214, 255, 0.07), transparent 88%),
-        radial-gradient(ellipse 62% 52% at 76% 88%, rgba(112, 92, 224, 0.07), transparent 88%);
-    transition: opacity 0.5s ease;
+        radial-gradient(ellipse 78% 70% at 50% 50%,
+            transparent 46%,
+            rgba(3, 6, 20, 0.2) 82%,
+            rgba(3, 6, 20, 0.34) 100%),
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.07) 0%,
+            transparent 16%);
 }
 
-/* Ao rato por cima a superfície acende um pouco — é o reflexo que o vidro
-   devolve quando a luz muda de posição. Sem transform e sem zoom. */
-.frosted-card:hover .frosted-title {
-    filter:
-        drop-shadow(0 3px 3px rgba(1, 4, 14, 0.6))
-        drop-shadow(0 0 26px rgba(140, 190, 255, 0.55))
-        drop-shadow(0 0 64px rgba(120, 175, 255, 0.2));
-}
-
-/* O halo a respirar. Só o brilho de fora varia (+/-18% e um véu de luz
-   interna), e as sombras ambientais ficam iguais nas duas pontas — um halo
-   que mexe também na sombra escura lê-se como o cartão a pulsar. */
-@keyframes cartao-respirar {
-    from {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.16),
-            inset 0 -1px 0 rgba(150, 195, 255, 0.11),
-            inset 0 0 46px rgba(120, 165, 255, 0.07),
-            inset 0 -18px 40px rgba(70, 110, 235, 0.04),
-            0 24px 60px rgba(0, 0, 0, 0.5),
-            0 0 32px rgba(95, 140, 255, 0.17),
-            0 0 78px rgba(70, 110, 235, 0.09);
-    }
-
-    to {
-        box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.24),
-            inset 0 -1px 0 rgba(150, 195, 255, 0.18),
-            inset 0 0 52px rgba(120, 165, 255, 0.11),
-            inset 0 -18px 40px rgba(70, 110, 235, 0.07),
-            0 24px 60px rgba(0, 0, 0, 0.5),
-            0 0 60px rgba(95, 140, 255, 0.3),
-            0 0 140px rgba(70, 110, 235, 0.2);
-    }
-}
-
-/* Quem pediu "menos movimento" no sistema ganha o cartão parado: a
-   respiração desliga e fica o brilho fixo — o mesmo desenho, só que imóvel.
-   A entrada e o hover continuam: não são movimento em ciclo. O transition
-   das camadas também sai: um véu a acender-se em 0,45 s ao passar o rato é
-   movimento, ainda que curto. */
+/* Quem pediu "menos movimento" no sistema ganha o cartão parado: o reflexo
+   para onde está e o desenho fica completo — só não se mexe. A pausa do
+   animation-play-state e não o animation: none de propósito: o none apagaria
+   também o background-position de repouso, a faixa ia para a posição
+   inicial (fora do vidro, à esquerda) e o cartão ficava sem reflexo nenhum
+   — não é o mesmo desenho, é metade dele. Pausado, fica onde o keyframe o
+   põe. As entradas e as transições de hover continuam: não são movimento em
+   ciclo, e o projeto já decide assim no glass.css. */
 @media (prefers-reduced-motion: reduce) {
-    .frosted-card,
-    .frosted-card.glass-panel::before,
-    .frosted-card.glass-panel::after {
-        animation: none;
-        transition: none;
+    .frosted-card.glass-panel::before {
+        animation-play-state: paused;
     }
 }
 
@@ -326,142 +337,164 @@ body.page-menu {
    cada lado deixavam o título com pouco mais de 200px para respirar dentro
    de um cartão quase à largura toda. A página não faz scroll (ver o
    body.page-menu), por isso o que não couber não se lê. O raio desce com
-   ele — 34px de canto num cartão de 320px é um comprimido, não uma laje de
-   vidro. */
+   ele — 36px de canto num cartão de 320px é um comprimido, não uma laje de
+   vidro — e o blur também: 30px é caro num GPU de telemóvel, e sobre uma
+   foto já desfocada a 1,5px a diferença não se vê. O que se vê é o cartão a
+   arrastar-se. */
 @media (max-width: 640px) {
     .frosted-card.glass-panel {
-        padding: clamp(20px, 5.5vw, 30px) clamp(24px, 7vw, 44px);
-        border-radius: clamp(20px, 6vw, 28px);
-        /* O blur desce um pouco: 34px é caro num GPU de telemóvel, e sobre
-           uma foto já desfocada a 1,5px a diferença não se vê — o que se vê
-           é o cartão a arrastar-se. */
-        backdrop-filter: blur(22px) saturate(155%) brightness(1.05);
-        -webkit-backdrop-filter: blur(22px) saturate(155%) brightness(1.05);
-        /* O halo de 140px alarga-se para fora do ecrã sem nada mostrar.
-           Fica um de 44px, que é o que se lê num ecrã pequeno. */
+        padding: clamp(20px, 5.5vw, 30px) clamp(24px, 7vw, 44px) clamp(24px, 7vw, 36px);
+        border-radius: clamp(22px, 6.5vw, 30px);
+        backdrop-filter: blur(20px) saturate(145%) brightness(1.03);
+        -webkit-backdrop-filter: blur(20px) saturate(145%) brightness(1.03);
         box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.2),
-            inset 0 -1px 0 rgba(150, 195, 255, 0.14),
-            inset 0 0 46px rgba(120, 165, 255, 0.08),
-            inset 0 -18px 40px rgba(70, 110, 235, 0.05),
-            0 18px 44px rgba(0, 0, 0, 0.52),
-            0 0 44px rgba(95, 140, 255, 0.26);
+            inset 0 1px 0 rgba(255, 255, 255, 0.16),
+            inset 0 -1px 0 rgba(150, 195, 255, 0.1),
+            0 16px 40px rgba(2, 4, 14, 0.52),
+            0 0 30px rgba(94, 138, 255, 0.15);
     }
 
-    @keyframes cartao-respirar {
-        from {
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.16),
-                inset 0 -1px 0 rgba(150, 195, 255, 0.11),
-                inset 0 0 46px rgba(120, 165, 255, 0.07),
-                inset 0 -18px 40px rgba(70, 110, 235, 0.04),
-                0 18px 44px rgba(0, 0, 0, 0.52),
-                0 0 26px rgba(95, 140, 255, 0.16);
-        }
+    /* Aqui está o problema que as medidas da referência não previam: o
+       título tem 4.67vw no clamp, e a 360px daria 58px de corpo. "AstroGuide"
+       a 58px são ~340px de texto, e com 24px de recuo de cada lado o cartão
+       pedia 388px num ecrã de 360. Como a página não faz scroll, o que
+       sobrava não se lia: a última letra ficava fora do ecrã.
 
-        to {
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.24),
-                inset 0 -1px 0 rgba(150, 195, 255, 0.18),
-                inset 0 0 52px rgba(120, 165, 255, 0.11),
-                inset 0 -18px 40px rgba(70, 110, 235, 0.07),
-                0 18px 44px rgba(0, 0, 0, 0.52),
-                0 0 44px rgba(95, 140, 255, 0.28);
-        }
+       A solução não é encolher o título até caber numa linha — a 360px isso
+       dava um corpo de 20px, que não é um logótipo, é uma legenda. É deixá-lo
+       PARTIR em duas linhas, com um corpo que ainda seja de título: 40px a
+       360, 44 a 400, 52 a 640. "AstroGuide" corta em "Astro" / "Guide", que
+       é até uma leitura melhor do nome do que uma linha comprimida. O
+       line-height sobe para as duas linhas não se tocarem, e o
+       margin-bottom desce porque o divisor do subtítulo já faz a separação. */
+    .frosted-title {
+        font-size: clamp(2.5rem, 8.1vw, 3.25rem);
+        line-height: 1.12;
+        margin-bottom: 0.04em;
+    }
+
+    .frosted-sub {
+        padding-top: clamp(12px, 3.4vw, 18px);
+        font-size: clamp(0.72rem, 2.6vw, 0.88rem);
+    }
+
+    /* O divisor é uma linha de 150px de largura mínima num cartão que a
+       360px tem ~296px úteis: fica com 15px de folga de cada lado, e num
+       cartão comprimido encosta às arestas. Encolhe com ele. */
+    .frosted-sub::before {
+        width: clamp(120px, 42vw, 200px);
     }
 }
 
-/* Título principal dentro do cartão — em "liquid glass": as letras são o
-   material, e não texto branco por cima dele. O vidro faz-se em camadas,
-   todas presas à forma das letras (o background-clip: text):
+/* Título principal dentro do cartão. As letras são o material, e não texto
+   branco por cima dele: o vidro das letras faz-se em duas camadas presas à
+   forma delas (o background-clip: text).
 
-     1. o corpo do vidro, claro no alto e na base e mais fundo a meio — a
-        luz que atravessa uma laje de vidro assenta nas arestas e deixa o
-        miolo mais escuro;
-     2. um brilho especular parado a atravessá-las na diagonal, como um
-        reflexo congelado no meio do vidro;
-     3. e, por baixo de tudo, uma sombra curta e um halo azul — a
-        profundidade que faz o vidro pairar sobre o cartão em vez de estar
-        colado a ele.
-
-   Nada disto se mexe: esta página pede calma (ver o frosted-card), e um
-   reflexo a passar de lado a lado era justamente o brilho que daqui se
-   tirou. O "color: transparent" só entra onde o background-clip é apoiado
-   (ver o @supports, no fim): onde não for, o título continua a ser o texto
-   claro de sempre — invisível nunca. */
+   A tipografia é metade do que separa isto de um cartão genérico. O
+   Cormorant fica — é a voz da casa e o nome do produto não se muda para
+   agradar a uma moda —, mas o TRACKING desce de 0.15em para 0.06em. Em
+   tamanho grande, letra aberta é o que a Apple não faz: um título de
+   interface respira pelo tamanho, não pelos vãos, e os 0.15em liam-se como
+   uma capa de revista ao lado do resto da app. O mesmo raciocínio no
+   subtítulo, e por isso as versaletes vão de 0.5em para 0.26em: as duas
+   linhas passam a pertencer ao mesmo sistema. */
 .frosted-title {
     font-family: 'Cormorant Garamond', serif;
     /* O título da referência: ~70px na janela de 1500 (4.67vw), ~90 numa
        de 1920, até 118 numa de 2560 — é ele que dá a largura ao cartão
-       inteiro, e por isso a foto fica igual em qualquer ecrã. */
+       inteiro, e por isso a foto fica igual em qualquer ecrã. Com o tracking
+       fechado, o cartão encolhe ~8% de largura; o clamp das laterais é que
+       a devolve, e é por isso que ele não mudou. */
     font-size: clamp(3.6rem, 4.67vw, 7.4rem);
     font-weight: 300;
     color: rgba(255, 255, 255, 0.95);
-    letter-spacing: 0.15em;
-    line-height: 1;
+    letter-spacing: 0.06em;
+    /* Rede de segurança: o título não pode ser mais largo do que o cartão,
+       seja qual for a janela. Sem isto, um "AstroGuide" que não caiba
+       empurra a laje para fora do ecrã — e como a página não faz scroll, o
+       que sai não se lê. Onde a linha aperta, é o navegador que decide
+       onde partir; abaixo dos 640px o corpo já desce sozinho (ver o
+       @media). */
+    max-width: 100%;
+    overflow-wrap: break-word;
+    /* 1.05 e não 1: com 0.06em de tracking o acento da letra colide com a
+       linha de cima, e num "AstroGuide" isso não se vê; em qualquer outra
+       palavra, vê-se. */
+    line-height: 1.05;
     /* O vão para o divisor do subtítulo, que é o que os separa. */
     margin-bottom: 0.12em;
-    /* A profundidade do vidro: uma sombra curta que o descola do cartão e o
-       halo azul de sempre. São drop-shadows e não text-shadows porque, com
-       o preenchimento transparente, o text-shadow aparecia por dentro das
-       letras e sujava o vidro. */
+    /* A profundidade: a sombra curta que descola as letras do vidro e o halo
+       azul que as liga ao fundo. Os três drop-shadows de antes (24px e 60px
+       de brilho) faziam o título iluminar-se a si mesmo, e um título aceso
+       não combina com um vidro que é atravessado pela luz da página: ficam
+       o halo colado à letra e nada mais. São drop-shadows e não
+       text-shadows porque, com o preenchimento transparente, o text-shadow
+       aparecia por dentro das letras e sujava o vidro. */
     filter:
-        drop-shadow(0 2px 2px rgba(2, 6, 20, 0.55))
-        drop-shadow(0 0 24px rgba(140, 190, 255, 0.5))
-        drop-shadow(0 0 60px rgba(120, 175, 255, 0.18));
+        drop-shadow(0 1px 1px rgba(2, 6, 20, 0.45))
+        drop-shadow(0 0 14px rgba(150, 195, 255, 0.22));
 }
 
 /* O vidro das letras, em duas camadas presas a elas. O corpo é quase opaco
-   (0.97 e não 0.82 no ponto mais fundo): o cartão ganhou violeta e ciano por
-   dentro, e um título translúcido sobre cor lia-se mal — as letras são a
-   coisa que o cartão existe para mostrar. */
+   (0.93 no ponto mais fundo): o cartão tem o fundo a atravessá-lo, e um
+   título translúcido sobre a foto lia-se mal — as letras são a coisa que o
+   cartão existe para mostrar, e a leitura delas não é negociável. */
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
     .frosted-title {
         color: transparent;
         background:
-            /* 2. o reflexo especular, parado: uma faixa diagonal a
-               atravessar as letras, clara no ponto alto e a desaparecer
-               para os lados. */
+            /* 2. o reflexo especular, parado: uma faixa a atravessar as
+               letras, clara no ponto alto e a desaparecer para os lados. A
+               112deg é a mesma inclinação da superfície do cartão (116), com
+               os 4 graus de diferença que fazem os dois lerem como a mesma
+               luz e não como um padrão. */
             linear-gradient(112deg,
-                transparent 24%,
-                rgba(255, 255, 255, 0.55) 33%,
-                rgba(255, 255, 255, 1) 38%,
-                rgba(255, 255, 255, 0.32) 44%,
-                transparent 54%),
-            /* 1. o corpo do vidro: a aresta de topo iluminada, o miolo mais
-               fundo (o azul que a luz deixa no meio do vidro) e a base a
+                transparent 26%,
+                rgba(255, 255, 255, 0.6) 37%,
+                rgba(255, 255, 255, 0.95) 41%,
+                rgba(255, 255, 255, 0.28) 47%,
+                transparent 58%),
+            /* 1. o corpo: a aresta de topo iluminada, o miolo mais fundo (o
+               azul que a luz deixa no meio de uma laje de vidro) e a base a
                voltar a apanhar luz. */
             linear-gradient(180deg,
                 rgba(255, 255, 255, 1) 0%,
-                rgba(232, 242, 255, 0.97) 16%,
-                rgba(186, 212, 255, 0.93) 44%,
-                rgba(214, 233, 255, 0.96) 72%,
+                rgba(234, 243, 255, 0.97) 18%,
+                rgba(192, 216, 255, 0.93) 46%,
+                rgba(219, 236, 255, 0.96) 74%,
                 rgba(255, 255, 255, 1) 92%,
-                rgba(200, 222, 255, 0.95) 100%);
+                rgba(206, 226, 255, 0.95) 100%);
         -webkit-background-clip: text;
         background-clip: text;
     }
 }
 
-/* Subtítulo decorativo. Por cima dele, o divisor: uma linha fina que nasce
-   e morre nas pontas, atravessada ao meio por um losango — a mesma estrela
-   de quatro pontas que assina o botão da AstroGuide AI, em ponto pequeno.
-   É o que amarra o nome ao que ele é, e cabe tudo em dois pseudo-elementos:
-   mais um elemento no HTML para um traço seria caro. */
+/* Subtítulo. O tracking cai de 0.5em para 0.26em e o corpo sobe um pouco
+   (0.78rem no mínimo em vez de 0.7): em versaletes, 0.5em de vão a este
+   tamanho lê-se como legenda de cartaz, e o subtítulo passa a ser o que a
+   linha de baixo do nome deve ser. O contraste também sobe — 0.58 e não
+   0.5 — porque é texto pequeno sobre vidro, e texto pequeno com pouco
+   contraste é o primeiro que se perde. */
 .frosted-sub {
     position: relative;
-    padding-top: clamp(18px, 1.2vw, 26px);
+    padding-top: clamp(16px, 1.05vw, 23px);
     font-family: 'Raleway', sans-serif;
-    font-size: clamp(0.7rem, 0.75vw, 1.05rem);
+    font-size: clamp(0.78rem, 0.78vw, 1.05rem);
     font-weight: 300;
-    letter-spacing: 0.5em;
-    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.26em;
+    /* As versaletes do Raleway têm a mesma caixa ótica dos maiúsculos de
+       verdade, e o tracking à direita da última letra desequilibra o
+       centramento: a margem negativa devolve-a à linha. */
+    margin-right: -0.26em;
+    color: rgba(233, 242, 255, 0.58);
     text-transform: uppercase;
 }
 
 /* O divisor: uma linha com um vão ao meio, onde assenta o símbolo. O vão
    faz-se com o gradiente (transparente a meio) e não com mais um elemento —
-   é a linha que abre a porta ao ✦, e não dois traços soltos. */
+   é a linha que abre a porta ao ✦, e não dois traços soltos. A linha desce
+   de 0.45 para 0.3 de alfa: um traço a 45% ao lado de um subtítulo a 58%
+   pesa mais do que o texto que está a servir. */
 .frosted-sub::before {
     content: "";
     position: absolute;
@@ -472,17 +505,19 @@ body.page-menu {
     height: 1px;
     background: linear-gradient(90deg,
             transparent,
-            rgba(140, 180, 255, 0.45) 30%,
-            rgba(140, 180, 255, 0.45) 42%,
+            rgba(150, 185, 255, 0.3) 30%,
+            rgba(150, 185, 255, 0.3) 42%,
             transparent 42%,
             transparent 58%,
-            rgba(140, 180, 255, 0.45) 58%,
-            rgba(140, 180, 255, 0.45) 70%,
+            rgba(150, 185, 255, 0.3) 58%,
+            rgba(150, 185, 255, 0.3) 70%,
             transparent);
 }
 
 /* O pequeno símbolo central: a mesma estrela ✦ da identidade, em azul do
-   acento e com brilho — a mesma que assina o botão da AstroGuide AI. */
+   acento. Sem o text-shadow de 10px — a esta distância o halo lia-se como um
+   borrão à volta da estrela, e a estrela tem 10 a 17px. A cor do acento já a
+   destaca do subtítulo; não precisa de se iluminar. */
 .frosted-sub::after {
     content: "✦";
     position: absolute;
@@ -492,7 +527,6 @@ body.page-menu {
     color: var(--accent);
     font-size: clamp(10px, 0.67vw, 17px);
     line-height: 1;
-    text-shadow: 0 0 10px var(--accent-glow);
 }
 
 /* A localização do utilizador, em pill: vidro escuro, borda fina, o pino da
