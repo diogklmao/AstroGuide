@@ -2304,8 +2304,21 @@ function alternarCeusSobOsPes() {
     const modoSelect = document.getElementById("sel-modo-visao");
     if (!modoSelect || modoSelect.value !== "360") return;
 
+    const caixa = document.getElementById("chk-ver-abaixo");
+
     // Já se está lá em baixo: o que falta é voltar.
     if (cameraAltitude < ALT_DE_ESTAR_ABAIXO) {
+        // E voltar é desfazer o que a descida fez — caixa incluída. A descida
+        // liga-a (ver abaixo), por isso a subida desliga-a: sem isto, voltar ao
+        // céu de cima deixava o chão levantado e os astros de baixo desenhados,
+        // que era o estado de baixo. O botão parecia ter deixado a opção
+        // pendurada, ligada a uma vista que já não é a dele.
+        //
+        // Isto vale para quem andou no botão, que é o dono dos dois estados
+        // enquanto anda nele. Quem tique a caixa à mão, sem lhe tocar, fica com
+        // ela como a deixou — o botão não lha mexe.
+        if (caixa) caixa.checked = false;
+
         animarCameraPara(cameraAzimuth, CAMERA_ALT_INICIAL);
         return;
     }
@@ -2313,7 +2326,6 @@ function alternarCeusSobOsPes() {
     // A caixa é ligada aqui, e não se espera que o utilizador a tenha ligado
     // antes: descer a câmara com a caixa desligada era mergulhar dentro de um
     // chão opaco. O botão parecia avariado e não estava.
-    const caixa = document.getElementById("chk-ver-abaixo");
     if (caixa) caixa.checked = true;
 
     animarCameraPara(cameraAzimuth, altitudeDoCeuEscondido());
