@@ -34,6 +34,19 @@ let vrOlharAlvo = null;
 // Delta de tempo do ciclo de animação (rotação visual das esferas)
 let vrUltimoTempoMs = 0;
 
+// Controladores ativos (laser + ponta) e estado do gatilho — um pulso do
+// gatilho dispara UMA ação (ao puxar, não à soltar: mais responsivo e não
+// se desvia do alvo se a mão se mexer durante o clique).
+let vrControladoresInfo = [];
+let vrGatilhoPuxado = false;
+
+// Cache dos alvos de seleção (invalidado quando os grupos mudam) e temporários
+// para o raycast do laser SEM alocações no ciclo de renderização.
+let vrAlvosCache = null;
+let vrTempOrigem = null;
+let vrTempDirecao = null;
+let vrTempQuat = null;
+
 // Garante que o THREE está disponível, independentemente de outros scripts
 // o terem carregado ou não. Se já existir globalmente, usa-o; senão, carrega o CDN.
 function garantirTHREE(callback) {
@@ -104,6 +117,9 @@ function iniciarCenaVR() {
     vrRaycaster = new THREE.Raycaster();
     vrPosCameraAlvo = new THREE.Vector3(0, 0, 0);
     vrOlharAlvo = new THREE.Vector3(0, 0, -1);
+    vrTempOrigem = new THREE.Vector3();
+    vrTempDirecao = new THREE.Vector3();
+    vrTempQuat = new THREE.Quaternion();
 
     // Iluminação proveniente do Sol + luz ambiente ténue (para as esferas)
     criarIluminacaoVR();
@@ -800,6 +816,9 @@ function reconstruirAstrosVR() {
     });
 
     vrScene.add(grupo);
+    // Os alvos de seleção mudaram (astros novos/removidos): o cache do raio
+    // tem de ser reconstruído, senão o gatilho continua a apontar à lista velha.
+    vrAlvosCache = null;
 }
 
 // Geometrias reutilizadas por todos os astros (nunca descartadas no rebuild)
@@ -940,6 +959,8 @@ function criarHaloSolarVR(raio) {
         blending: THREE.AdditiveBlending
     }));
     halo.scale.setScalar(raio * 5);
+    // Decorativo — nunca pode roubar o raio de seleção ao disco do Sol
+    halo.raycast = () => {};
     return halo;
 }
 
@@ -952,26 +973,42 @@ function criarControladoresVR() {
         const laser = criarLaser(0x6eb8ff);
         controlador.add(laser);
 
-        // Ponta da mira no fim do laser
+        // Ponta da mira. A posição em Z é atualizada todos os frames para a
+        // DISTÂNCIA real do alvo (ver atualizarMiradoresVR) — sem isto, a
+        // ponta ficava a 120m e não havia referência nenhuma para acertar nos
+        // botões do painel, que estão a ~2m.
         const ponta = new THREE.Mesh(
             new THREE.SphereGeometry(0.5, 8, 8),
             new THREE.MeshBasicMaterial({ color: 0x9ed4ff, transparent: true, opacity: 0.9 })
         );
-        ponta.position.z = -120;
+        ponta.position.z = -2.1;
         controlador.add(ponta);
 
-        // "Clique" (gatilho) acende o laser a branco — feedback de interação
+        vrControladoresInfo.push({ controlador, laser, ponta, hover: null });
+
+        // Puxar o gatilho acende o laser E dispara a ação IMEDIATAMENTE sobre
+        // o alvo apontado: astro (abre os detalhes) ou botão 3D do painel
+        // («SAIR DO VR», «VISTA GERAL»). Um pulso = uma ação (debounce).
+        // Fora de alvo nenhum, nada acontece — a navegação nunca é bloqueada.
         controlador.addEventListener("selectstart", () => {
             laser.material.color.setHex(0xffffff);
             ponta.material.color.setHex(0xffcc02);
+            if (!vrGatilhoPuxado) {
+                vrGatilhoPuxado = true;
+                selecionarComRaycastVR(controlador);
+            }
         });
-        // Soltar o gatilho com o laser sobre um alvo seleciona-o: astro
-        // (abre os detalhes) ou botão 3D do painel («SAIR DO VR», «VISTA GERAL»).
-        // Fora de alvo nenhum, nada acontece — a navegação nunca é bloqueada.
         controlador.addEventListener("selectend", () => {
             laser.material.color.setHex(0x6eb8ff);
             ponta.material.color.setHex(0x9ed4ff);
-            selecionarComRaycastVR(controlador);
+            vrGatilhoPuxado = false;
+        });
+
+        // Grip (botão de aperto) em qualquer controlador = SAIR DO VR na hora,
+        // sem mirar em nada — redundância de segurança que garante que o
+        // utilizador nunca fica preso na sessão imersiva.
+        controlador.addEventListener("squeezestart", () => {
+            sairSessaoVR();
         });
 
         vrScene.add(controlador);
@@ -1194,6 +1231,9 @@ function vrAnimar() {
         }
     }
 
+    // Em sessão: ponta do laser à distância do alvo + destaque do botão
+    if (vrSessaoAtiva) atualizarMiradoresVR();
+
     vrRenderer.render(vrScene, vrCamera);
 }
 
@@ -1239,22 +1279,34 @@ vrAutoRefresh();
 // controladores. Só age sobre alvos da lista — nunca interfere com a
 // navegação quando não há nada apontado.
 function alvosDeSelecaoVR() {
-    const alvos = [];
-    if (vrGrupoAstros) alvos.push(...vrGrupoAstros.children);
-    if (vrPainelUI3D) alvos.push(vrPainelUI3D);
-    return alvos;
+    // Cache: reconstruído só quando os grupos mudam (astros novos, painel
+    // criado/removido) — o raycast do laser corre todos os frames em sessão e
+    // não deve andar a construir listas novas a cada tique.
+    if (!vrAlvosCache) {
+        const alvos = [];
+        if (vrGrupoAstros) alvos.push(...vrGrupoAstros.children);
+        if (vrPainelUI3D) alvos.push(vrPainelUI3D);
+        vrAlvosCache = alvos;
+    }
+    return vrAlvosCache;
 }
 
 function raycastVR(origem) {
     if (!vrRaycaster || !origem) return [];
+    // O Raycaster.camera é obrigatório para o raycast de SPRITES (etiquetas,
+    // ISS, marcador) — sem ele, o three ignora-os todos e regista erros.
+    vrRaycaster.camera = vrCamera;
     if (origem === vrCamera) {
         if (!vrUltimoRatoNDC) return [];
         vrRaycaster.setFromCamera(vrUltimoRatoNDC, origem);
     } else {
         // Controlador XR: o raio vai ao longo do seu -Z (como o laser desenhado)
-        const inicio = new THREE.Vector3().setFromMatrixPosition(origem.matrixWorld);
-        const direcao = new THREE.Vector3(0, 0, -1)
-            .applyQuaternion(origem.getWorldQuaternion(new THREE.Quaternion()));
+        const inicio = vrTempOrigem || new THREE.Vector3();
+        const direcao = vrTempDirecao || new THREE.Vector3();
+        const quat = vrTempQuat || new THREE.Quaternion();
+        inicio.setFromMatrixPosition(origem.matrixWorld);
+        origem.getWorldQuaternion(quat);
+        direcao.set(0, 0, -1).applyQuaternion(quat);
         vrRaycaster.ray.set(inicio, direcao);
     }
     return vrRaycaster.intersectObjects(alvosDeSelecaoVR(), true);
@@ -1358,6 +1410,8 @@ function criarMarcadorSelecaoVR(posicao, raio) {
     }));
     sprite.position.copy(posicao);
     sprite.scale.setScalar(Math.max(raio * 3.2, 20));
+    // Decorativo — o alvo de seleção é o astro, não o marcador
+    sprite.raycast = () => {};
     return sprite;
 }
 
@@ -1410,6 +1464,8 @@ function criarPainelInfo3DVR(astro) {
         map: textura, transparent: true, depthWrite: false
     }));
     sprite.renderOrder = 6;
+    // Decorativo — não deve roubar o raio ao planeta selecionado
+    sprite.raycast = () => {};
 
     // Fica entre o observador e o astro, ligeiramente abaixo, para não tapar
     // o planeta selecionado.
@@ -1513,12 +1569,26 @@ function criarBotao3DVR(texto, corFundo, corTexto, acao) {
 
     const textura = new THREE.CanvasTexture(canvas);
     textura.colorSpace = THREE.SRGBColorSpace;
-    const mesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.15, 0.36),
+
+    // Grupo = botão VISUAL + área de clique invisível MUITO maior. A mira de
+    // um controlador não tem a precisão de um rato; sem uma hitbox generosa,
+    // acertar num botão pequeno a 2m era uma lotaria.
+    const grupo = new THREE.Group();
+    grupo.userData.acao = acao;
+
+    const visual = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.35, 0.42),
         new THREE.MeshBasicMaterial({ map: textura, transparent: true, side: THREE.DoubleSide })
     );
-    mesh.userData.acao = acao;
-    return mesh;
+    grupo.add(visual);
+
+    const areaClique = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.95, 0.52),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide })
+    );
+    grupo.add(areaClique);
+
+    return grupo;
 }
 
 function criarEtiquetaBotaoVR(texto) {
@@ -1538,31 +1608,47 @@ function criarEtiquetaBotaoVR(texto) {
         map: textura, transparent: true, depthWrite: false
     }));
     sprite.scale.set(1.4, 0.26, 1);
+    // Decorativa — não pode roubar cliques aos botões por cima dos quais está
+    sprite.raycast = () => {};
     return sprite;
 }
 
 function criarPainelUI3D() {
     if (!vrScene || vrPainelUI3D) return; // idempotente — nunca duplicado
     vrPainelUI3D = new THREE.Group();
-    vrPainelUI3D.position.set(0, 1.45, -2.6);
+
+    // O painel é filho da CÂMARA (a cabeça, em XR): fica sempre à frente e
+    // ao alcance das mãos, quer onde quer que o utilizador esteja ou olhe.
+    // Antes ficava fixo no mundo e podia ficar atrás do utilizador ou fora
+    // de alcance depois de andar — e os botões de saída não podem falhar.
+    // Posição baixa (y -0.60 a 2,1m): fora da linha de visão principal.
+    vrPainelUI3D.position.set(0, -0.60, -2.1);
 
     const botaoSair = criarBotao3DVR("⛔ SAIR DO VR", "rgba(150, 30, 50, 0.92)", "#ffe0e6", "sair-vr");
-    botaoSair.position.set(0, 0.28, 0);
+    botaoSair.position.set(0, 0.34, 0);
     vrPainelUI3D.add(botaoSair);
 
     const botaoVista = criarBotao3DVR("◀ VISTA GERAL", "rgba(20, 40, 80, 0.92)", "#cfe4ff", "vista-geral");
-    botaoVista.position.set(0, -0.14, 0);
+    botaoVista.position.set(0, -0.24, 0);
     vrPainelUI3D.add(botaoVista);
 
-    const legenda = criarEtiquetaBotaoVR("Aponta e carrega no gatilho");
-    legenda.position.set(0, -0.52, 0);
+    const legenda = criarEtiquetaBotaoVR("Gatilho: selecionar • Grip: sair do VR");
+    legenda.position.set(0, -0.80, 0);
     vrPainelUI3D.add(legenda);
 
-    vrScene.add(vrPainelUI3D);
+    vrCamera.add(vrPainelUI3D);
+    vrAlvosCache = null; // os alvos de seleção mudaram
 }
 
 function removerPainelUI3D() {
     if (!vrPainelUI3D) return;
+    // Limpa destaques de hover que possam apontar para botões já removidos
+    vrControladoresInfo.forEach(info => {
+        if (info.hover) {
+            info.hover.scale.setScalar(1);
+            info.hover = null;
+        }
+    });
     if (vrPainelUI3D.parent) vrPainelUI3D.parent.remove(vrPainelUI3D);
     vrPainelUI3D.traverse(o => {
         if (o.material) {
@@ -1573,4 +1659,39 @@ function removerPainelUI3D() {
         if (o.geometry && !geometriaPartilhadaVR(o.geometry)) o.geometry.dispose();
     });
     vrPainelUI3D = null;
+    vrAlvosCache = null;
+}
+
+// ── Mira dos controladores: ponta à distância do alvo + destaque do botão ──
+// Corre em sessão, dentro do ciclo de animação, SEM alocações (temporários
+// partilhados e cache de alvos). Sem a ponta à distância certa, não há
+// referência visual para acertar num botão a 2m — era este o principal
+// motivo de o gatilho "não reconhecer" os botões.
+function atualizarMiradoresVR() {
+    if (!vrRaycaster || !vrTempOrigem) return;
+
+    for (const info of vrControladoresInfo) {
+        vrRaycaster.camera = vrCamera;
+        vrTempOrigem.setFromMatrixPosition(info.controlador.matrixWorld);
+        info.controlador.getWorldQuaternion(vrTempQuat);
+        vrTempDirecao.set(0, 0, -1).applyQuaternion(vrTempQuat);
+        vrRaycaster.ray.set(vrTempOrigem, vrTempDirecao);
+
+        const intersecoes = vrRaycaster.intersectObjects(alvosDeSelecaoVR(), true);
+
+        // Ponta do laser à distância REAL do primeiro alvo (limitada para não
+        // saltar para o infinito); sem alvo, fica a 3m — confortável de seguir.
+        const distancia = intersecoes.length
+            ? Math.min(Math.max(intersecoes[0].distance, 0.6), 120)
+            : 3;
+        info.ponta.position.z = -distancia;
+
+        // Destaque do botão apontado (feedback de que está "em cima" dele)
+        const alvo = intersecoes.length ? portadorDeDadosVR(intersecoes[0].object, "acao") : null;
+        if (info.hover !== alvo) {
+            if (info.hover) info.hover.scale.setScalar(1);
+            if (alvo) alvo.scale.setScalar(1.08);
+            info.hover = alvo;
+        }
+    }
 }
