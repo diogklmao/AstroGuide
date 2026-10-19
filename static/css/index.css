@@ -2243,8 +2243,122 @@ body.vr-ativo #btn-voltar {
     font-weight: 600;
 }
 
-/* Durante uma sessão de headset, esconde a interface flutuante — só o céu */
+/* ── Painel de detalhes do astro selecionado (modo PC do VR) ─────────── */
+#vr-info {
+    display: none;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 52;
+    width: 280px;
+    max-width: calc(100vw - 40px);
+    padding: 18px;
+    background: rgba(2, 4, 8, 0.65);
+    border: 1px solid rgba(206, 147, 216, 0.35);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #cfe4ff;
+}
+
+#vr-info.visivel {
+    display: block;
+}
+
+.vr-info-titulo {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+}
+
+.vr-info-estado {
+    font-size: 0.82rem;
+    color: rgba(200, 220, 255, 0.85);
+    margin-bottom: 10px;
+}
+
+.vr-info-linha {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.82rem;
+    padding: 3px 0;
+    color: rgba(200, 220, 255, 0.75);
+}
+
+.vr-info-linha b {
+    color: #fff;
+    font-weight: 600;
+}
+
+.vr-info-botoes {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.vr-info-botoes button {
+    flex: 1;
+    min-width: 80px;
+    background: rgba(206, 147, 216, 0.18);
+    border: 1px solid rgba(206, 147, 216, 0.45);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.vr-info-botoes button:hover {
+    background: rgba(206, 147, 216, 0.38);
+}
+
+/* ── DOM Overlay (Quest Browser): «SAIR DO VR» dentro dos óculos ────── */
+/* pointer-events: none fora de sessão — o contentor cobre o ecrã mas nunca
+   bloqueia o arrasto do rato no canvas. */
+#vr-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 32px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+body.vr-sessao #vr-overlay {
+    opacity: 1;
+}
+
+#btn-sair-sessao-vr {
+    pointer-events: auto;
+    background: rgba(150, 30, 50, 0.85);
+    border: 1px solid rgba(255, 160, 180, 0.6);
+    color: #ffe0e6;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 14px 28px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+#btn-sair-sessao-vr:hover {
+    background: rgba(180, 40, 65, 0.95);
+}
+
+/* Durante uma sessão de headset, esconde a interface flutuante — só o céu.
+   (O #vr-overlay faz o caminho inverso: é ele que aparece na sessão.) */
 body.vr-sessao .vr-menu,
+body.vr-sessao .vr-info,
 body.vr-sessao #btn-sair-vr {
     opacity: 0;
     pointer-events: none;

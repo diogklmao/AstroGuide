@@ -1,0 +1,19 @@
+Texturas planetárias do Observatório VR (AstroGuide)
+====================================================
+
+Ficheiros:
+  2k_sun.jpg, 2k_moon.jpg, 2k_mercury.jpg, 2k_venus_atmosphere.jpg,
+  2k_mars.jpg, 2k_jupiter.jpg, 2k_saturn.jpg, 2k_uranus.jpg,
+  2k_neptune.jpg, 2k_saturn_ring_alpha.png
+
+Fonte: Solar System Scope (https://www.solarsystemscope.com/textures/)
+Licença: Creative Commons Attribution 4.0 International (CC BY 4.0)
+Baseadas em dados da NASA / JPL.
+
+Utilização: mapeamento esférico dos planetas e anéis de Saturno no
+modo Observatório VR (static/js/vr-observatorio.js). Os caminhos são
+locais — o Observatório não depende de servidores externos em execução.
+
+Atribuição exigida pela licença CC BY 4.0: "Textures by Solar System
+Scope (https://www.solarsystemscope.com/), based on NASA/JPL data,
+CC BY 4.0".

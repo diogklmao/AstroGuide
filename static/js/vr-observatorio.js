@@ -15,6 +15,25 @@ let vrGrupoAstros = null;
 // É descartado e recriado em cada atualização para não acumular duplicados.
 let vrGrupoCeu = null;
 
+// ── Estado da exploração (seleção, aproximação e UI dentro do VR) ───────────
+// Tudo criado sob procura (o THREE só existe depois do garantirTHREE), por isso
+// aqui só há referências a null.
+let vrRaycaster = null;          // raycaster único (rato + controladores)
+let vrUltimoRatoNDC = null;      // posição do último clique do rato (NDC)
+let vrUltimaSelecao = null;      // astro selecionado (objeto vindo da API)
+let vrMarcadorSelecao = null;    // anel luminoso à volta do astro escolhido
+let vrPainelInfo3D = null;       // sprite com os dados do astro (dentro do VR)
+let vrPainelUI3D = null;         // painel de botões 3D («SAIR DO VR», etc.)
+
+// Aproximação suave da câmara — SÓ no modo PC; no headset quem manda é a
+// cabeça do utilizador e a câmara nunca se move por código.
+let vrZoomAtivo = false;
+let vrPosCameraAlvo = null;
+let vrOlharAlvo = null;
+
+// Delta de tempo do ciclo de animação (rotação visual das esferas)
+let vrUltimoTempoMs = 0;
+
 // Garante que o THREE está disponível, independentemente de outros scripts
 // o terem carregado ou não. Se já existir globalmente, usa-o; senão, carrega o CDN.
 function garantirTHREE(callback) {
@@ -39,6 +58,7 @@ let vrPitch = 0;
 
 // Estado do arrasto do rato
 let vrArrastando = false;
+let vrArrastou = false; // distingue um clique (seleciona) de um arrasto (olha à volta)
 let vrStartX = 0, vrStartY = 0;
 let vrStartYaw = 0, vrStartPitch = 0;
 
@@ -79,8 +99,21 @@ function iniciarCenaVR() {
 
     redimensionarCanvasVR();
 
+    // Estado de exploração — criado aqui (e não no topo do ficheiro) porque o
+    // THREE só existe depois do garantirTHREE ter carregado a biblioteca.
+    vrRaycaster = new THREE.Raycaster();
+    vrPosCameraAlvo = new THREE.Vector3(0, 0, 0);
+    vrOlharAlvo = new THREE.Vector3(0, 0, -1);
+
+    // Iluminação proveniente do Sol + luz ambiente ténue (para as esferas)
+    criarIluminacaoVR();
+
     // Fundo panorâmico da Via Láctea (space.jpg já usado no Observatório 2D)
     adicionarFundoViaLactea();
+
+    // Texturas planetárias reais (locais, em static/images/texturas) para as
+    // esferas. Se alguma falhar, o astro fica no sprite antigo (fallback).
+    carregarTexturasPlanetasVR();
 
     // Estrelas, constelações e astros reais, vindos do mesmo /api/observatorio
     carregarDadosVR();
@@ -92,18 +125,31 @@ function iniciarCenaVR() {
     canvas.addEventListener("mousedown", vrIniciarArrasto);
     window.addEventListener("mousemove", vrMoverArrasto);
     window.addEventListener("mouseup", vrTerminarArrasto);
+    // Clique sem arrastar = selecionar o astro apontado (modo PC)
+    canvas.addEventListener("click", vrCliqueRato);
+    // Escape = fecha os detalhes e regressa à vista geral
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && document.body.classList.contains("vr-ativo")) {
+            limparSelecaoVR();
+            vistaGeralVR();
+        }
+    });
     window.addEventListener("resize", () => {
         if (document.body.classList.contains("vr-ativo")) redimensionarCanvasVR();
     });
 
-    // Estado da sessão XR — esconde/mostra a interface e a rotação por rato
+    // Estado da sessão XR — esconde/mostra a interface e a rotação por rato.
+    // O "sessionend" cobre TODOS os caminhos de saída: botão «SAIR DO VR» da
+    // cena 3D, DOM Overlay, terminação pelo sistema do Quest ou erro da sessão.
     vrRenderer.xr.addEventListener("sessionstart", () => {
         vrSessaoAtiva = true;
         document.body.classList.add("vr-sessao");
+        // O painel de botões 3D só vive dentro da sessão (no PC há o painel HTML)
+        criarPainelUI3D();
     });
     vrRenderer.xr.addEventListener("sessionend", () => {
         vrSessaoAtiva = false;
-        document.body.classList.remove("vr-sessao");
+        restaurarInterfaceAposSessao();
     });
 
     configurarBotaoVR();
@@ -501,6 +547,65 @@ const RES_IMAGEM_VR = 8;
 // a versão anterior e ~8x maior do que a v1, em que os astros eram pontos.
 const FATOR_ESCALA_VR = 72 / (37 * 2);
 
+// ── Texturas planetárias reais (mapas equiretangulares 2k, locais) ──────────
+// Guardadas em static/images/texturas/ (ver ATTRIBUTION.txt — Solar System
+// Scope, CC BY 4.0, baseadas em dados NASA/JPL). Mapeadas numa THREE.SphereGeometry:
+// a textura acompanha a superfície quando a perspetiva muda, ao contrário dos
+// sprites planos. Caminhos locais estáveis — o Observatório não depende de
+// servidores externos em execução. Se uma textura falhar, o astro correspondente
+// é desenhado com o sprite antigo (fallback) — ver reconstruirAstrosVR.
+const TEXTURAS_PLANETAS_VR = {
+    "Sol": "/static/images/texturas/2k_sun.jpg",
+    "Lua": "/static/images/texturas/2k_moon.jpg",
+    "Mercúrio": "/static/images/texturas/2k_mercury.jpg",
+    "Vénus": "/static/images/texturas/2k_venus_atmosphere.jpg",
+    "Marte": "/static/images/texturas/2k_mars.jpg",
+    "Júpiter": "/static/images/texturas/2k_jupiter.jpg",
+    "Saturno": "/static/images/texturas/2k_saturn.jpg",
+    "Úrano": "/static/images/texturas/2k_uranus.jpg",
+    "Neptuno": "/static/images/texturas/2k_neptune.jpg"
+};
+const TEXTURA_ANEIS_SATURNO = "/static/images/texturas/2k_saturn_ring_alpha.png";
+
+// Texturas já carregadas (nome → THREE.Texture) — carregadas uma vez e
+// partilhadas por todos os rebuilds, para não ocupar memória repetida.
+const texturasPlanetasVR = {};
+let texturaAneisSaturnoVR = null;
+let vrGeometriaEsfera = null;         // esfera unitária única, reutilizada por todos
+let vrGeometriaAneisSaturno = null;   // anéis de Saturno, criados uma vez
+let vrLuzSol = null;                  // luz pontual colocada na posição do Sol
+
+function prepararTexturaPlaneta(textura) {
+    textura.colorSpace = THREE.SRGBColorSpace;
+    textura.minFilter = THREE.LinearMipmapLinearFilter;
+    textura.anisotropy = vrRenderer.capabilities.getMaxAnisotropy();
+    return textura;
+}
+
+function carregarTexturasPlanetasVR() {
+    const loader = new THREE.TextureLoader();
+    Object.entries(TEXTURAS_PLANETAS_VR).forEach(([nome, url]) => {
+        loader.load(url,
+            textura => {
+                texturasPlanetasVR[nome] = prepararTexturaPlaneta(textura);
+                if (dadosVRAtuais) reconstruirAstrosVR();
+            },
+            undefined,
+            err => console.error("VR: falha ao carregar textura do astro:", url, err)
+        );
+    });
+    loader.load(TEXTURA_ANEIS_SATURNO,
+        textura => {
+            // Faixa radial (2048x125) com alfa (divisão de Cassini incluída)
+            textura.wrapS = THREE.ClampToEdgeWrapping;
+            texturaAneisSaturnoVR = prepararTexturaPlaneta(textura);
+            if (dadosVRAtuais) reconstruirAstrosVR();
+        },
+        undefined,
+        err => console.error("VR: falha ao carregar textura dos anéis de Saturno:", err)
+    );
+}
+
 function astroCfg(nome) {
     const semAcento = (nome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return IMAGENS_ASTROS_VR[nome] || IMAGENS_ASTROS_VR[semAcento];
@@ -593,16 +698,30 @@ function desenharAstrosVR(dados) {
 }
 
 function reconstruirAstrosVR() {
-    // Remove o grupo anterior (se existir) para não acumular sprites duplicados
-    // sempre que uma imagem termina de carregar.
+    if (!vrScene || !dadosVRAtuais) return;
+
+    // Remove o grupo anterior (se existir) para não acumular objetos duplicados
+    // sempre que uma textura ou imagem termina de carregar.
     if (vrGrupoAstros) {
         vrScene.remove(vrGrupoAstros);
         vrGrupoAstros.traverse(obj => {
+            // As geometrias de esfera/anéis são partilhadas por todos os astros
+            // e ficam vivas; só se descartam as criadas para este grupo.
+            if (obj.geometry && !geometriaPartilhadaVR(obj.geometry)) obj.geometry.dispose();
             if (obj.material) {
-                if (obj.material.map) obj.material.map.dispose();
+                // As texturas planetárias ficam em cache e são reutilizadas em
+                // cada reconstrução — só se descartam as de canvas geradas aqui.
+                if (obj.material.map && obj.material.map.isCanvasTexture) obj.material.map.dispose();
                 obj.material.dispose();
             }
         });
+        vrGrupoAstros = null;
+    }
+
+    // A luz do Sol acompanha a posição astronómica do Sol (vinda da API)
+    const sol = dadosVRAtuais.astros.find(a => a.tipo === "sol");
+    if (vrLuzSol && sol) {
+        vrLuzSol.position.copy(altAzParaXYZ(sol.altitude, sol.azimute, RAIO_CEU_VR));
     }
 
     const grupo = new THREE.Group();
@@ -616,6 +735,23 @@ function reconstruirAstrosVR() {
         const cfg = astroCfg(astro.nome);
         if (!cfg) return;
 
+        // Opacidade do astro: cheia acima do horizonte, ALFA_ABAIXO_VR abaixo.
+        // O Sol leva um extra de brilho (0,95), sobre o qual o fator se aplica.
+        const opacidadeBase = (astro.tipo === "sol") ? 0.95 : 1;
+        const opacidade = astro.visivel ? opacidadeBase : opacidadeBase * ALFA_ABAIXO_VR;
+
+        // ── 1) Esfera real com textura planetária (caso principal) ──────────
+        // Volume, iluminação e profundidade reais; a textura acompanha a
+        // superfície quando a perspetiva muda.
+        const textura = texturaPlanetaVR(astro.nome);
+        if (textura && astro.nome !== "ISS") {
+            grupo.add(criarEsferaAstroVR(astro, cfg, textura, opacidade));
+            return;
+        }
+
+        // ── 2) Fallback: sprite plano (comportamento anterior) ──────────────
+        // Usado pela ISS (não é um planeta) e por qualquer astro cuja textura
+        // ainda não chegou ou falhou — o observatório continua utilizável.
         // Só desenha quando a imagem já está pronta; senão aguarda o onload do
         // pré-carregamento, que voltará a chamar esta função.
         const img = imagemAstroVR(astro.nome);
@@ -623,24 +759,19 @@ function reconstruirAstrosVR() {
 
         const ehSaturno = astroCfg(astro.nome) === IMAGENS_ASTROS_VR["Saturno"];
         const ehISS = astroCfg(astro.nome) === IMAGENS_ASTROS_VR["ISS"];
-        const textura = ehSaturno
+        const texturaSprite = ehSaturno
             ? texturaAstroCompleta(img, cfg.size)
             : ehISS
                 ? texturaAstroISS(img, cfg.size)
                 : texturaAstroCircular(img, cfg.size);
 
         const material = new THREE.SpriteMaterial({
-            map: textura,
+            map: texturaSprite,
             transparent: true,
             depthWrite: false,
             depthTest: true
         });
-        // Opacidade do astro: cheia acima do horizonte, ALFA_ABAIXO_VR abaixo.
-        // O Sol leva um extra de brilho (é o único com blending aditivo), e é
-        // sobre esse 0,95 que o fator se aplica — senão, abaixo do horizonte,
-        // o Sol ficaria com a opacidade toda das estrelas de baixo.
-        const opacidadeBase = (astro.tipo === "sol") ? 0.95 : 1;
-        material.opacity = astro.visivel ? opacidadeBase : opacidadeBase * ALFA_ABAIXO_VR;
+        material.opacity = opacidade;
         if (astro.tipo === "sol") {
             // Sol com brilho forte — mistura aditiva
             material.blending = THREE.AdditiveBlending;
@@ -648,6 +779,7 @@ function reconstruirAstrosVR() {
 
         const sprite = new THREE.Sprite(material);
         sprite.position.copy(altAzParaXYZ(astro.altitude, astro.azimute, RAIO_CEU_VR));
+        sprite.userData.astro = astro;
 
         // Largura do sprite = diâmetro do disco no mundo. Saturno conta com
         // os anéis (size*2.2, tal como no 2D); a ISS é larga e baixa, 3:2
@@ -663,6 +795,145 @@ function reconstruirAstrosVR() {
     });
 
     vrScene.add(grupo);
+}
+
+// Geometrias reutilizadas por todos os astros (nunca descartadas no rebuild)
+function geometriaPartilhadaVR(geometria) {
+    return !!geometria && (geometria === vrGeometriaEsfera || geometria === vrGeometriaAneisSaturno);
+}
+
+function texturaPlanetaVR(nome) {
+    if (!nome) return null;
+    const semAcento = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return texturasPlanetasVR[nome] || texturasPlanetasVR[semAcento] || null;
+}
+
+// ── Iluminação: luz proveniente do Sol + ambiente ténue ─────────────────────
+// A luz pontual fica NA posição astronómica do Sol (atualizada em cada
+// reconstrução), por isso os planetas são iluminados do lado do Sol — as fases
+// da Lua e dos planetas inferiores aparecem naturalmente. Sem atenuação com a
+// distância (decay 0): a cúpula vive a ~500 unidades e a intensidade física
+// cairia para perto de zero. O ambiente ténue mantém o lado não iluminado
+// legível sem matar o efeito de fase.
+function criarIluminacaoVR() {
+    if (!vrScene) return;
+    vrScene.add(new THREE.AmbientLight(0x8899bb, 0.5));
+    vrLuzSol = new THREE.PointLight(0xfff2dd, 1.6, 0, 0);
+    vrScene.add(vrLuzSol);
+}
+
+// Esfera real do astro: a textura equiretangular acompanha a superfície quando
+// a perspetiva muda, e o mesh tem volume, luz e profundidade. O raio mantém o
+// MESMO tamanho visual que o sprite antigo (metade da sua largura) — a escala
+// do Observatório (astros ampliados na cúpula, não à escala real) não foi
+// alterada, por decisão: preserva o comportamento existente.
+function criarEsferaAstroVR(astro, cfg, textura, opacidade) {
+    if (!vrGeometriaEsfera) vrGeometriaEsfera = new THREE.SphereGeometry(1, 48, 32);
+
+    const grupo = new THREE.Group();
+    grupo.position.copy(altAzParaXYZ(astro.altitude, astro.azimute, RAIO_CEU_VR));
+    grupo.userData.astro = astro;
+
+    const ehSol = astro.tipo === "sol";
+    const ehSaturno = astroCfg(astro.nome) === IMAGENS_ASTROS_VR["Saturno"];
+
+    // Raio do disco. Para Saturno, o sprite antigo media size*2.2*FATOR com os
+    // anéis: o planeta fica com a proporção real planeta/anéis (raio exterior
+    // dos anéis = 2,27 raios do planeta) para o conjunto ter exatamente a mesma
+    // largura de antes.
+    const raio = ehSaturno
+        ? (cfg.size * 1.1 * FATOR_ESCALA_VR) / 2.27
+        : cfg.size * FATOR_ESCALA_VR;
+
+    const material = ehSol
+        // Sol autoiluminado: não recebe luz da cena, tal como o sprite antigo
+        ? new THREE.MeshBasicMaterial({ map: textura, transparent: true, opacity: opacidade })
+        : new THREE.MeshPhongMaterial({
+            map: textura,
+            transparent: true,
+            opacity: opacidade,
+            shininess: 6,
+            specular: 0x11131c
+        });
+
+    const esfera = new THREE.Mesh(vrGeometriaEsfera, material);
+    esfera.scale.setScalar(raio);
+    grupo.add(esfera);
+
+    if (ehSaturno && texturaAneisSaturnoVR) {
+        grupo.add(criarAneisSaturnoVR(raio, opacidade));
+        // Inclinação axial de Saturno (~26,7°): planeta e anéis inclinam-se juntos
+        grupo.rotation.z = 26.7 * Math.PI / 180;
+    }
+
+    if (ehSol) grupo.add(criarHaloSolarVR(raio));
+
+    // Rotação VISUAL suave da textura — não toca nas posições astronómicas,
+    // que continuam a vir todas do /api/observatorio. A Lua não gira (fica
+    // sempre com a mesma face virada para a Terra).
+    grupo.userData.esfera = esfera;
+    grupo.userData.rotacaoVel = ehSol ? 0.005 : (astro.tipo === "lua" ? 0 : 0.02);
+
+    return grupo;
+}
+
+// Anéis de Saturno: geometria própria (RingGeometry) com uma faixa de UV
+// radial, para a textura dos anéis se mapear do interior para o exterior —
+// incluindo a divisão de Cassini, que vem no próprio PNG (com alfa).
+function criarAneisSaturnoVR(raio, opacidade) {
+    if (!vrGeometriaAneisSaturno) {
+        const interior = raio * 1.24;
+        const exterior = raio * 2.27;
+        const geometria = new THREE.RingGeometry(interior, exterior, 96, 1);
+        // O RingGeometry mapeia as UVs num quadrado; aqui remapeiam-se para
+        // u = posição radial (0 no interior, 1 no exterior) e v fixo.
+        const pos = geometria.getAttribute("position");
+        const uvs = [];
+        const v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+            v.fromBufferAttribute(pos, i);
+            uvs.push((v.length() - interior) / (exterior - interior), 0.5);
+        }
+        geometria.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+        vrGeometriaAneisSaturno = geometria;
+    }
+
+    const aneis = new THREE.Mesh(vrGeometriaAneisSaturno, new THREE.MeshBasicMaterial({
+        map: texturaAneisSaturnoVR,
+        transparent: true,
+        opacity: opacidade,
+        side: THREE.DoubleSide,
+        depthWrite: false
+    }));
+    // Deita o anel no plano do equador do planeta (o eixo local é o Y)
+    aneis.rotation.x = Math.PI / 2;
+    return aneis;
+}
+
+// Halo do Sol: gradiente radial gerado em canvas (sem imagem extra), com
+// mistura aditiva — dá o brilho forte que o sprite antigo tinha, sem efeitos
+// pesados (sem bloom nem shaders à medida: custo mínimo no Quest 3).
+function criarHaloSolarVR(raio) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createRadialGradient(128, 128, 20, 128, 128, 128);
+    grad.addColorStop(0, "rgba(255, 240, 200, 0.55)");
+    grad.addColorStop(0.35, "rgba(255, 200, 120, 0.18)");
+    grad.addColorStop(1, "rgba(255, 180, 90, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 256);
+
+    const textura = new THREE.CanvasTexture(canvas);
+    textura.colorSpace = THREE.SRGBColorSpace;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: textura,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+    }));
+    halo.scale.setScalar(raio * 5);
+    return halo;
 }
 
 // ── Controladores VR (Meta Quest Touch) com laser pointer ───────────────────
@@ -687,9 +958,13 @@ function criarControladoresVR() {
             laser.material.color.setHex(0xffffff);
             ponta.material.color.setHex(0xffcc02);
         });
+        // Soltar o gatilho com o laser sobre um alvo seleciona-o: astro
+        // (abre os detalhes) ou botão 3D do painel («SAIR DO VR», «VISTA GERAL»).
+        // Fora de alvo nenhum, nada acontece — a navegação nunca é bloqueada.
         controlador.addEventListener("selectend", () => {
             laser.material.color.setHex(0x6eb8ff);
             ponta.material.color.setHex(0x9ed4ff);
+            selecionarComRaycastVR(controlador);
         });
 
         vrScene.add(controlador);
@@ -742,15 +1017,46 @@ function mostrarVRIndisponivel(botao, ajuda, mensagem) {
 let vrSessaoXR = null; // referência da sessão XR ativa (para a poder terminar)
 async function iniciarSessaoVR() {
     if (!vrRenderer || !navigator.xr) return;
+
+    // Proteção contra sessões duplicadas: se já existe uma ativa (nossa ou do
+    // próprio renderer), não se pede outra.
+    const sessaoExistente = vrSessaoXR || (vrRenderer.xr.getSession && vrRenderer.xr.getSession());
+    if (sessaoExistente) {
+        console.warn("VR: já existe uma sessão ativa — não é possível abrir outra.");
+        return;
+    }
+
     const botao = document.getElementById("btn-iniciar-vr");
     if (botao) botao.disabled = true;
 
+    // DOM Overlay: se o navegador o suportar (o Quest Browser suporta), o botão
+    // HTML «SAIR DO VR» também aparece dentro dos óculos. É uma funcionalidade
+    // OPCIONAL: se não for suportada, é ignorada e a saída faz-se pelo botão 3D
+    // da cena ou pelos controlos do sistema do headset.
+    const overlay = document.getElementById("vr-overlay");
+    const opcoes = {
+        optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking", "dom-overlay"]
+    };
+    if (overlay) opcoes.domOverlay = { root: overlay };
+
     try {
-        const sessao = await navigator.xr.requestSession("immersive-vr", {
-            optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"]
-        });
-        await vrRenderer.xr.setSession(sessao);
+        const sessao = await navigator.xr.requestSession("immersive-vr", opcoes);
+        try {
+            await vrRenderer.xr.setSession(sessao);
+        } catch (errLigacao) {
+            // A sessão foi pedida mas não pôde ser ligada ao renderer — termina-
+            // se já, para não deixar uma sessão "órfã" aberta no headset.
+            sessao.end().catch(() => {});
+            throw errLigacao;
+        }
         vrSessaoXR = sessao;
+
+        // Qualquer que seja o caminho de saída (botão 3D, DOM Overlay, sistema
+        // do Quest), o evento "end" da sessão garante a recuperação da interface.
+        sessao.addEventListener("end", () => {
+            if (vrSessaoXR === sessao) vrSessaoXR = null;
+            restaurarInterfaceAposSessao();
+        }, { once: true });
     } catch (err) {
         console.error("Falha ao iniciar sessão VR:", err);
         if (botao) {
@@ -761,19 +1067,42 @@ async function iniciarSessaoVR() {
     }
 }
 
-// Termina a sessão XR, se houver uma ativa (chamado ao sair do ecrã VR)
+// Termina a sessão XR, se houver uma ativa (chamado pelo «SAIR DO VR» e ao
+// sair do ecrã VR). Se não há sessão nenhuma (clique duplo, ou saída já feita
+// pelo sistema), não faz nada — nunca lança erro por terminar algo inexistente.
 function sairSessaoVR() {
-    if (vrSessaoXR) {
-        const sessao = vrSessaoXR;
-        vrSessaoXR = null;
-        sessao.end().catch(err => console.error("Erro ao terminar sessão VR:", err));
+    const sessao = vrSessaoXR
+        || (vrRenderer && vrRenderer.xr.getSession && vrRenderer.xr.getSession());
+    if (!sessao) {
+        restaurarInterfaceAposSessao();
+        return;
     }
+    vrSessaoXR = null;
+    sessao.end().catch(err => {
+        // InvalidStateError = a sessão já tinha terminado; não é falha nossa.
+        console.warn("VR: ao terminar a sessão (pode já ter terminado):", err && err.message);
+        restaurarInterfaceAposSessao();
+    });
+}
+
+// Restaura a interface normal quando a sessão termina — por QUALQUER caminho
+// (botão «SAIR DO VR», DOM Overlay, sistema do Quest, erro). Idempotente:
+// pode ser chamada várias vezes sem efeitos laterais.
+function restaurarInterfaceAposSessao() {
+    vrSessaoAtiva = false;
+    vrSessaoXR = null;
+    document.body.classList.remove("vr-sessao");
+    removerPainelUI3D();
+
+    const botao = document.getElementById("btn-iniciar-vr");
+    if (botao && !botao.classList.contains("indisponivel")) botao.disabled = false;
 }
 
 // ── Arrasto do rato (modo PC) ───────────────────────────────────────────────
 function vrIniciarArrasto(e) {
     if (vrSessaoAtiva) return;
     vrArrastando = true;
+    vrArrastou = false;
     vrStartX = e.clientX;
     vrStartY = e.clientY;
     vrStartYaw = vrYaw;
@@ -784,6 +1113,11 @@ function vrMoverArrasto(e) {
     if (!vrArrastando || vrSessaoAtiva) return;
     const dx = e.clientX - vrStartX;
     const dy = e.clientY - vrStartY;
+    if (Math.abs(dx) + Math.abs(dy) > 4) vrArrastou = true;
+
+    // Durante uma aproximação suave a orientação é da câmara; o arrasto espera.
+    if (vrZoomAtivo) return;
+
     const sensibilidade = 0.005;
 
     vrYaw = vrStartYaw - dx * sensibilidade;
@@ -794,14 +1128,59 @@ function vrTerminarArrasto() {
     vrArrastando = false;
 }
 
+// Clique do rato sem arrastar = selecionar o astro apontado (modo PC)
+function vrCliqueRato(e) {
+    if (vrSessaoAtiva || vrArrastou) return;
+    const alvo = e.target;
+    if (!alvo || !alvo.getBoundingClientRect || !vrCamera) return;
+    const rect = alvo.getBoundingClientRect();
+    if (!vrUltimoRatoNDC) vrUltimoRatoNDC = new THREE.Vector2();
+    vrUltimoRatoNDC.set(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    selecionarComRaycastVR(vrCamera);
+}
+
 // ── Ciclo de animação (normal e XR) ─────────────────────────────────────────
 function vrAnimar() {
     if (!vrRenderer) return;
 
-    // Fora de uma sessão XR, a câmara é controlada pelo rato
+    // Delta de tempo limitado: mantém a rotação visual estável mesmo quando o
+    // browser faz pausas (troca de separador, carregamento de recursos, etc.)
+    const agoraMs = (typeof performance !== "undefined") ? performance.now() : Date.now();
+    const dt = Math.min((agoraMs - (vrUltimoTempoMs || agoraMs)) / 1000, 0.1);
+    vrUltimoTempoMs = agoraMs;
+
+    // Rotação VISUAL suave das esferas — só a textura gira à volta do próprio
+    // eixo. Não confundir com cálculo astronómico: as posições vêm todas do
+    // /api/observatorio e não são tocadas.
+    if (vrGrupoAstros) {
+        for (const obj of vrGrupoAstros.children) {
+            if (obj.userData.esfera && obj.userData.rotacaoVel) {
+                obj.userData.esfera.rotation.y += obj.userData.rotacaoVel * dt;
+            }
+        }
+    }
+
+    // Fora de uma sessão XR, a câmara é controlada pelo rato — ou pela
+    // aproximação suave, enquanto esta estiver ativa
     if (!vrSessaoAtiva) {
-        vrCamera.rotation.y = vrYaw;
-        vrCamera.rotation.x = vrPitch;
+        if (vrZoomAtivo && vrPosCameraAlvo) {
+            vrCamera.position.lerp(vrPosCameraAlvo, 0.08);
+            vrCamera.lookAt(vrOlharAlvo);
+            // Mantém o yaw/pitch do rato alinhados com a câmara, para quando a
+            // aproximação terminar a orientação não saltar.
+            vrYaw = vrCamera.rotation.y;
+            vrPitch = vrCamera.rotation.x;
+            if (vrCamera.position.distanceTo(vrPosCameraAlvo) < 0.6
+                && vrPosCameraAlvo.lengthSq() < 1) {
+                vrZoomAtivo = false; // chegou à vista geral
+            }
+        } else {
+            vrCamera.rotation.y = vrYaw;
+            vrCamera.rotation.x = vrPitch;
+        }
     }
 
     vrRenderer.render(vrScene, vrCamera);
@@ -843,3 +1222,344 @@ function vrAutoRefresh() {
     }, 30000);
 }
 vrAutoRefresh();
+
+// ── Seleção de astros e botões (raycasting) ─────────────────────────────────
+// Um só raio, reutilizado: cliques do rato (modo PC) e gatilho dos
+// controladores. Só age sobre alvos da lista — nunca interfere com a
+// navegação quando não há nada apontado.
+function alvosDeSelecaoVR() {
+    const alvos = [];
+    if (vrGrupoAstros) alvos.push(...vrGrupoAstros.children);
+    if (vrPainelUI3D) alvos.push(vrPainelUI3D);
+    return alvos;
+}
+
+function raycastVR(origem) {
+    if (!vrRaycaster || !origem) return [];
+    if (origem === vrCamera) {
+        if (!vrUltimoRatoNDC) return [];
+        vrRaycaster.setFromCamera(vrUltimoRatoNDC, origem);
+    } else {
+        // Controlador XR: o raio vai ao longo do seu -Z (como o laser desenhado)
+        const inicio = new THREE.Vector3().setFromMatrixPosition(origem.matrixWorld);
+        const direcao = new THREE.Vector3(0, 0, -1)
+            .applyQuaternion(origem.getWorldQuaternion(new THREE.Quaternion()));
+        vrRaycaster.ray.set(inicio, direcao);
+    }
+    return vrRaycaster.intersectObjects(alvosDeSelecaoVR(), true);
+}
+
+// Sobe na hierarquia até encontrar o objeto que carrega a propriedade pedida
+// (o mesh do botão tem "acao"; o grupo do astro tem "astro").
+function portadorDeDadosVR(objeto, chave) {
+    let atual = objeto;
+    while (atual) {
+        if (atual.userData && atual.userData[chave] !== undefined) return atual;
+        atual = atual.parent;
+    }
+    return null;
+}
+
+function selecionarComRaycastVR(origem) {
+    const intersecoes = raycastVR(origem);
+    if (!intersecoes.length) return;
+    const alvo = intersecoes[0].object;
+
+    const botao = portadorDeDadosVR(alvo, "acao");
+    if (botao) {
+        executarAcaoVR(botao.userData.acao);
+        return;
+    }
+    const portador = portadorDeDadosVR(alvo, "astro");
+    if (portador) selecionarAstroVR(portador.userData.astro);
+}
+
+function executarAcaoVR(acao) {
+    if (acao === "sair-vr") {
+        sairSessaoVR(); // termina a sessão imersiva e restaura a interface
+    } else if (acao === "vista-geral") {
+        limparSelecaoVR();
+        vistaGeralVR();
+    } else if (acao === "fechar-info") {
+        limparSelecaoVR();
+    }
+}
+
+// ── Seleção de um astro ────────────────────────────────────────────────────
+function selecionarAstroVR(astro) {
+    if (!astro || !vrScene) return;
+    limparSelecaoVR();
+    vrUltimaSelecao = astro;
+
+    const posicao = altAzParaXYZ(astro.altitude, astro.azimute, RAIO_CEU_VR);
+    const cfg = astroCfg(astro.nome);
+    const raio = cfg ? cfg.size * FATOR_ESCALA_VR : 20;
+
+    vrMarcadorSelecao = criarMarcadorSelecaoVR(posicao, raio);
+    vrScene.add(vrMarcadorSelecao);
+
+    vrPainelInfo3D = criarPainelInfo3DVR(astro);
+    vrScene.add(vrPainelInfo3D);
+
+    mostrarInfoAstroVR(astro); // painel HTML (espelho no PC)
+
+    // No headset a câmara é do utilizador — não se mexe nela. No modo PC a
+    // aproximação é suave e o regresso faz-se pelo botão «Vista geral».
+    if (!vrSessaoAtiva) aproximarCameraVR(astro);
+}
+
+function limparSelecaoVR() {
+    vrUltimaSelecao = null;
+    [vrMarcadorSelecao, vrPainelInfo3D].forEach(obj => {
+        if (!obj) return;
+        if (obj.parent) obj.parent.remove(obj);
+        obj.traverse(o => {
+            if (o.material) {
+                if (o.material.map && o.material.map.isCanvasTexture) o.material.map.dispose();
+                o.material.dispose();
+            }
+        });
+    });
+    vrMarcadorSelecao = null;
+    vrPainelInfo3D = null;
+    const painel = document.getElementById("vr-info");
+    if (painel) painel.classList.remove("visivel");
+}
+
+// Anel luminoso à volta do astro escolhido (sprite com canvas, sempre de
+// frente para a câmara — funciona no PC e no headset).
+function criarMarcadorSelecaoVR(posicao, raio) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    ctx.beginPath();
+    ctx.arc(128, 128, 96, 0, 2 * Math.PI);
+    ctx.strokeStyle = "rgba(170, 220, 255, 0.95)";
+    ctx.lineWidth = 10;
+    ctx.shadowColor = "rgba(110, 200, 255, 0.9)";
+    ctx.shadowBlur = 24;
+    ctx.stroke();
+
+    const textura = new THREE.CanvasTexture(canvas);
+    textura.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: textura, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+    }));
+    sprite.position.copy(posicao);
+    sprite.scale.setScalar(Math.max(raio * 3.2, 20));
+    return sprite;
+}
+
+function formatarGrausVR(valor) {
+    return (typeof valor === "number" && isFinite(valor)) ? valor.toFixed(1) + "°" : "—";
+}
+
+// Painel de detalhes dentro da cena VR (sprite com canvas): nome do astro,
+// posição e visibilidade — a mesma informação do painel HTML do modo PC.
+function criarPainelInfo3DVR(astro) {
+    const largura = 1024, altura = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = largura;
+    canvas.height = altura;
+    const ctx = canvas.getContext("2d");
+
+    // Fundo "vidro" escuro com borda suave (identidade visual do AstroGuide)
+    ctx.fillStyle = "rgba(6, 10, 26, 0.82)";
+    ctx.strokeStyle = "rgba(110, 180, 255, 0.45)";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+        ctx.roundRect(12, 12, largura - 24, altura - 24, 36);
+        ctx.fill();
+        ctx.stroke();
+    } else {
+        ctx.fillRect(12, 12, largura - 24, altura - 24);
+        ctx.strokeRect(12, 12, largura - 24, altura - 24);
+    }
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 84px sans-serif";
+    ctx.fillText(astro.nome, largura / 2, 150);
+
+    ctx.font = "48px sans-serif";
+    ctx.fillStyle = astro.visivel ? "#9fe8b0" : "#8aa0c8";
+    ctx.fillText(astro.visivel ? "Acima do horizonte" : "Abaixo do horizonte", largura / 2, 235);
+
+    ctx.fillStyle = "#bcd7ff";
+    ctx.fillText(`Altitude: ${formatarGrausVR(astro.altitude)}   Azimute: ${formatarGrausVR(astro.azimute)}`,
+        largura / 2, 330);
+    if (astro.tipo === "lua" && astro.fase_nome) {
+        ctx.fillText(`${astro.emoji || "🌙"} ${astro.fase_nome}`, largura / 2, 425);
+    }
+
+    const textura = new THREE.CanvasTexture(canvas);
+    textura.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: textura, transparent: true, depthWrite: false
+    }));
+    sprite.renderOrder = 6;
+
+    // Fica entre o observador e o astro, ligeiramente abaixo, para não tapar
+    // o planeta selecionado.
+    const pos = altAzParaXYZ(astro.altitude, astro.azimute, RAIO_CEU_VR);
+    sprite.position.copy(pos).multiplyScalar(0.88);
+    sprite.position.y -= 30;
+    sprite.scale.set(150, 75, 1);
+    return sprite;
+}
+
+// ── Painel de detalhes HTML (espelho do PC) ─────────────────────────────────
+function linhaInfoVR(rotulo, valor) {
+    return `<div class="vr-info-linha"><span>${rotulo}</span><b>${valor}</b></div>`;
+}
+
+function mostrarInfoAstroVR(astro) {
+    const painel = document.getElementById("vr-info");
+    if (!painel) return;
+
+    const linhas = [];
+    linhas.push(linhaInfoVR("Altitude", formatarGrausVR(astro.altitude)));
+    linhas.push(linhaInfoVR("Azimute", formatarGrausVR(astro.azimute)));
+    if (typeof astro.ra_aparente === "number") {
+        linhas.push(linhaInfoVR("RA (aparente)", astro.ra_aparente.toFixed(3) + " h"));
+    }
+    if (typeof astro.dec_aparente === "number") {
+        linhas.push(linhaInfoVR("Dec (aparente)", formatarGrausVR(astro.dec_aparente)));
+    }
+    if (astro.tipo === "lua" && astro.fase_nome) {
+        const iluminacao = (typeof astro.iluminacao === "number") ? ` (${astro.iluminacao}%)` : "";
+        linhas.push(linhaInfoVR("Fase", `${astro.emoji || "🌙"} ${astro.fase_nome}${iluminacao}`));
+    }
+
+    painel.innerHTML = `
+        <div class="vr-info-titulo">✦ ${astro.nome}</div>
+        <div class="vr-info-estado">${astro.visivel ? "✅ Acima do horizonte — observável" : "🌙 Abaixo do horizonte"}</div>
+        ${linhas.join("")}
+        <div class="vr-info-botoes">
+            <button type="button" onclick="aproximarCameraSelecionadaVR()" title="Aproximar a câmara do astro">🔍 Aproximar</button>
+            <button type="button" onclick="vistaGeralVR()" title="Voltar à vista geral">◀ Vista geral</button>
+            <button type="button" onclick="limparSelecaoVR()" title="Fechar detalhes">✕</button>
+        </div>`;
+    painel.classList.add("visivel");
+}
+
+// Chamado pelo botão do painel HTML (modo PC) — aproxima o astro selecionado.
+function aproximarCameraSelecionadaVR() {
+    if (vrUltimaSelecao) aproximarCameraVR(vrUltimaSelecao);
+}
+
+// ── Aproximação suave da câmara (modo PC) ───────────────────────────────────
+// No headset a câmara segue a cabeça do utilizador e NUNCA se move por código —
+// a aproximação faz-se fisicamente, andando.
+function aproximarCameraVR(astro) {
+    if (!vrCamera || vrSessaoAtiva || vrPosCameraAlvo === null || !astro) return;
+    const alvo = altAzParaXYZ(astro.altitude, astro.azimute, RAIO_CEU_VR);
+    const cfg = astroCfg(astro.nome);
+    const raio = cfg ? cfg.size * FATOR_ESCALA_VR : 20;
+    const distancia = Math.max(raio * 4, 45); // nunca "entra" dentro do astro
+    vrPosCameraAlvo.copy(alvo).normalize().multiplyScalar(RAIO_CEU_VR - distancia);
+    vrOlharAlvo.copy(alvo);
+    vrZoomAtivo = true;
+}
+
+function vistaGeralVR() {
+    if (!vrCamera || vrPosCameraAlvo === null) return;
+    vrPosCameraAlvo.set(0, 0, 0);
+    vrZoomAtivo = true;
+}
+
+// ── Painel de botões 3D dentro da cena VR ───────────────────────────────────
+// Vive no mundo, à frente do ponto de partida (referência local-floor), e é
+// acionado com o laser + gatilho dos controladores. O botão «SAIR DO VR» é a
+// saída principal dentro do headset; o DOM Overlay (botão HTML) e os controlos
+// do sistema do Quest são as redundâncias — ver iniciarSessaoVR.
+function criarBotao3DVR(texto, corFundo, corTexto, acao) {
+    const larguraCv = 512, alturaCv = 160;
+    const canvas = document.createElement("canvas");
+    canvas.width = larguraCv;
+    canvas.height = alturaCv;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = corFundo;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+        ctx.roundRect(10, 10, larguraCv - 20, alturaCv - 20, 36);
+        ctx.fill();
+        ctx.stroke();
+    } else {
+        ctx.fillRect(10, 10, larguraCv - 20, alturaCv - 20);
+        ctx.strokeRect(10, 10, larguraCv - 20, alturaCv - 20);
+    }
+
+    ctx.fillStyle = corTexto;
+    ctx.font = "bold 58px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(texto, larguraCv / 2, alturaCv / 2);
+
+    const textura = new THREE.CanvasTexture(canvas);
+    textura.colorSpace = THREE.SRGBColorSpace;
+    const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.15, 0.36),
+        new THREE.MeshBasicMaterial({ map: textura, transparent: true, side: THREE.DoubleSide })
+    );
+    mesh.userData.acao = acao;
+    return mesh;
+}
+
+function criarEtiquetaBotaoVR(texto) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 96;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "rgba(200, 225, 255, 0.9)";
+    ctx.font = "40px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(texto, 256, 48);
+
+    const textura = new THREE.CanvasTexture(canvas);
+    textura.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: textura, transparent: true, depthWrite: false
+    }));
+    sprite.scale.set(1.4, 0.26, 1);
+    return sprite;
+}
+
+function criarPainelUI3D() {
+    if (!vrScene || vrPainelUI3D) return; // idempotente — nunca duplicado
+    vrPainelUI3D = new THREE.Group();
+    vrPainelUI3D.position.set(0, 1.45, -2.6);
+
+    const botaoSair = criarBotao3DVR("⛔ SAIR DO VR", "rgba(150, 30, 50, 0.92)", "#ffe0e6", "sair-vr");
+    botaoSair.position.set(0, 0.28, 0);
+    vrPainelUI3D.add(botaoSair);
+
+    const botaoVista = criarBotao3DVR("◀ VISTA GERAL", "rgba(20, 40, 80, 0.92)", "#cfe4ff", "vista-geral");
+    botaoVista.position.set(0, -0.14, 0);
+    vrPainelUI3D.add(botaoVista);
+
+    const legenda = criarEtiquetaBotaoVR("Aponta e carrega no gatilho");
+    legenda.position.set(0, -0.52, 0);
+    vrPainelUI3D.add(legenda);
+
+    vrScene.add(vrPainelUI3D);
+}
+
+function removerPainelUI3D() {
+    if (!vrPainelUI3D) return;
+    if (vrPainelUI3D.parent) vrPainelUI3D.parent.remove(vrPainelUI3D);
+    vrPainelUI3D.traverse(o => {
+        if (o.material) {
+            if (o.material.map && o.material.map.isCanvasTexture) o.material.map.dispose();
+            o.material.dispose();
+        }
+        // Geometrias dos botões — não são partilhadas, descartam-se já
+        if (o.geometry && !geometriaPartilhadaVR(o.geometry)) o.geometry.dispose();
+    });
+    vrPainelUI3D = null;
+}

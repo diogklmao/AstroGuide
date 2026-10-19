@@ -272,14 +272,26 @@
         </div>
 
         <div id="ecra-vr" class="ecra">
-            <button id="btn-sair-vr" onclick="mudarEcra('observatorio')" title="Voltar ao Observatório">◀
-                Observatório</button>
+            <!-- Saída do modo VR (também visível no modo normal/PC),
+                 claramente identificada como «SAIR DO VR». Dentro da sessão
+                 imersiva a saída faz-se pelo botão 3D da cena, pelo DOM
+                 Overlay ou pelos controlos do sistema do Quest. -->
+            <button id="btn-sair-vr" onclick="mudarEcra('observatorio')" title="Sair do Observatório VR e voltar ao Observatório normal">◀
+                SAIR DO VR</button>
             <div id="vr-menu" class="vr-menu">
                 <button id="btn-iniciar-vr" onclick="iniciarSessaoVR()" title="Entrar em VR com o Meta Quest 3">
                     🥽 Entrar no Meta Quest VR
                 </button>
                 <p id="vr-ajuda">A verificar suporte WebXR...</p>
                 <p id="vr-tempo">🕐 Céu em tempo real</p>
+            </div>
+            <!-- Painel de detalhes do astro selecionado (espelho do PC) -->
+            <div id="vr-info" class="vr-info glass-panel"></div>
+            <!-- Raiz do DOM Overlay (Quest Browser): durante a sessão, o botão
+                 «SAIR DO VR» também aparece dentro dos óculos. Fora de sessão
+                 fica invisível e sem eventos, para não tapar o canvas. -->
+            <div id="vr-overlay">
+                <button id="btn-sair-sessao-vr" onclick="sairSessaoVR()">⛔ SAIR DO VR</button>
             </div>
             <canvas id="vr-canvas"></canvas>
         </div>
