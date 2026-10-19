@@ -570,6 +570,11 @@ const TEXTURA_ANEIS_SATURNO = "/static/images/texturas/2k_saturn_ring_alpha.png"
 // Texturas já carregadas (nome → THREE.Texture) — carregadas uma vez e
 // partilhadas por todos os rebuilds, para não ocupar memória repetida.
 const texturasPlanetasVR = {};
+
+// Ângulo de rotação visual acumulado por astro. Os rebuilds do grupo (novos
+// dados a cada 30s, texturas a chegar) recriam as esferas — sem este mapa, a
+// rotação de cada astro voltava a zero e a superfície "saltava" para trás.
+const vrRotacoesVisuais = {};
 let texturaAneisSaturnoVR = null;
 let vrGeometriaEsfera = null;         // esfera unitária única, reutilizada por todos
 let vrGeometriaAneisSaturno = null;   // anéis de Saturno, criados uma vez
@@ -870,9 +875,11 @@ function criarEsferaAstroVR(astro, cfg, textura, opacidade) {
 
     // Rotação VISUAL suave da textura — não toca nas posições astronómicas,
     // que continuam a vir todas do /api/observatorio. A Lua não gira (fica
-    // sempre com a mesma face virada para a Terra).
+    // sempre com a mesma face virada para a Terra). O ângulo reinicia no valor
+    // acumulado (vrRotacoesVisuais) para a rotação continuar de onde ia.
     grupo.userData.esfera = esfera;
     grupo.userData.rotacaoVel = ehSol ? 0.005 : (astro.tipo === "lua" ? 0 : 0.02);
+    esfera.rotation.y = vrRotacoesVisuais[astro.nome] || 0;
 
     return grupo;
 }
@@ -1154,11 +1161,15 @@ function vrAnimar() {
 
     // Rotação VISUAL suave das esferas — só a textura gira à volta do próprio
     // eixo. Não confundir com cálculo astronómico: as posições vêm todas do
-    // /api/observatorio e não são tocadas.
+    // /api/observatorio e não são tocadas. O ângulo acumula-se por astro (ver
+    // vrRotacoesVisuais) para sobreviver aos rebuilds do grupo.
     if (vrGrupoAstros) {
         for (const obj of vrGrupoAstros.children) {
-            if (obj.userData.esfera && obj.userData.rotacaoVel) {
-                obj.userData.esfera.rotation.y += obj.userData.rotacaoVel * dt;
+            if (obj.userData.esfera && obj.userData.rotacaoVel && obj.userData.astro) {
+                const nome = obj.userData.astro.nome;
+                const angulo = (vrRotacoesVisuais[nome] || 0) + obj.userData.rotacaoVel * dt;
+                vrRotacoesVisuais[nome] = angulo;
+                obj.userData.esfera.rotation.y = angulo;
             }
         }
     }
