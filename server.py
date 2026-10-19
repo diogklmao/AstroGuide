@@ -289,31 +289,50 @@ def api_apod():
         app.logger.warning(f"Erro ao obter APOD: {e}")
         return jsonify({"erro": "Não foi possível carregar a imagem do dia. Tenta novamente mais tarde."}), 503
 
+
 # ── Iniciar servidor ──────────────────────────────────────────────────────────
 
-if __name__ == "__main__":                          # só executa se correr diretamente com "py server.py"
-    import threading                                # permite correr código em paralelo
-    import webbrowser                               # módulo do Python para abrir o browser
+if __name__ == "__main__":
+    import threading
+    import time
+    import urllib.request
+    import webbrowser
+
+    # O Railway define a porta através da variável PORT.
+    # Localmente, continuamos a utilizar a porta 5000.
+    port = int(os.environ.get("PORT", 5000))
+
+    # Deteta se a aplicação está a correr no Railway.
+    em_producao = bool(
+        os.environ.get("RAILWAY_ENVIRONMENT")
+        or os.environ.get("RAILWAY_SERVICE_ID")
+    )
 
     def abrir_browser():
-        # Em vez de esperar um tempo fixo (que falha se o Flask ainda estiver a carregar
-        # o de421.bsp na 1ª execução), tenta ligar-se ao servidor até responder,
-        # até 15 segundos. Só então abre o browser — mais fiável em máquinas lentas.
-        import time
-        import urllib.request
+        """Abre o browser apenas durante a execução local."""
+        url = f"http://127.0.0.1:{port}"
 
         for _ in range(30):
             try:
-                urllib.request.urlopen("http://localhost:5000", timeout=1)
+                urllib.request.urlopen(url, timeout=1)
                 break
             except Exception:
                 time.sleep(0.5)
-        webbrowser.open("http://localhost:5000")    # abre o browser automaticamente
 
-    t = threading.Thread(target=abrir_browser)      # cria uma thread separada para abrir o browser
-    t.daemon = True                                 # fecha automaticamente quando o servidor fechar
-    t.start()                                       # inicia a thread
+        webbrowser.open(url)
 
-    print("AstroGuide a iniciar em http://localhost:5000")
-    app.run(port=5000, debug=False)                 # inicia o servidor na porta 5000
-                                                    # debug=False para não abrir o browser duas vezes
+    if not em_producao:
+        threading.Thread(
+            target=abrir_browser,
+            daemon=True
+        ).start()
+
+    # 0.0.0.0 permite receber ligações externas no Railway.
+    # O debug permanece desligado.
+    print(f"AstroGuide a iniciar na porta {port}")
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
