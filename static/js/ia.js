@@ -42,23 +42,54 @@
   // um cartão de visita, e "Olá, Diogo 👋" lê-se melhor do que o nome todo.
   let nomeUtilizador = null;
 
-  // O que se mostra quando não há nada para mostrar. É também onde se explica
-  // o que a IA faz: quem abre isto pela primeira vez não tem como adivinhar
-  // que lhe pode perguntar pelo céu de agora e não só por conceitos.
-  //
-  // É função e não constante porque a saudação leva o nome — e o nome só se
-  // sabe depois de o /api/me responder. Sem sessão (que é quando o painel
-  // está indisponível) não chega a ser usado: quem não tem conta recebe o
-  // aviso com a porta para o /entrar.
-  function textoInicial() {
-    const saudacao = nomeUtilizador
-      ? "Olá, " + nomeUtilizador + " 👋"
-      : "Olá 👋";
-    return saudacao + "\n\n" +
-      "Sou o AstroGuide AI. Posso ajudar-te a explorar o céu, explicar " +
-      "eventos astronómicos, encontrar objetos para observar ou esclarecer " +
-      "qualquer dúvida sobre o universo.\n\n" +
-      "O que gostarias de descobrir hoje?";
+  // O fuso da localização escolhida, para a hora do cabeçalho ser a de lá e
+  // não a do computador de quem está a ver. Vem do window.LOCALIZACAO (o
+  // index.html escreve-o) ou, nas páginas que não o têm, do /api/me — que
+  // responde com a localização da conta em todas.
+  let fusoHorario = (window.LOCALIZACAO && window.LOCALIZACAO.timezone) || null;
+
+  const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+    "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+  // A hora e a data da localização: "21:30 - 24 Out 2024", como na
+  // referência. O formatToParts é o que permite montar a data à nossa maneira
+  // sem depender do formato (mais comprido) do locale.
+  function partesDaHora(agora, fuso) {
+    const opcoes = {
+      day: "2-digit",
+      month: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    };
+    if (fuso) opcoes.timeZone = fuso;
+
+    const partes = new Intl.DateTimeFormat("pt-PT", opcoes).formatToParts(agora);
+    const mapa = {};
+    partes.forEach(function (parte) { mapa[parte.type] = parte.value; });
+    return mapa;
+  }
+
+  function atualizarHoraIA() {
+    const alvo = document.getElementById("ia-hora");
+    if (!alvo) return;
+
+    let p;
+    try {
+      p = partesDaHora(new Date(), fusoHorario);
+    } catch (_) {
+      // Um fuso inválido (ou um browser sem Intl a sério) não pode deixar o
+      // relógio em branco: cai-se para a hora do computador.
+      try {
+        p = partesDaHora(new Date(), null);
+      } catch (__) {
+        return;
+      }
+    }
+
+    const mes = MESES_CURTOS[Number(p.month) - 1] || p.month;
+    alvo.textContent = p.hour + ":" + p.minute + " - " + p.day + " " + mes + " " + p.year;
   }
 
   // A conversa: uma lista de {papel, texto}. O papel é "user", "assistant" ou
@@ -96,6 +127,9 @@
       return;
     }
 
+    // Um painel que estava a fechar e é reaberto depressa volta a abrir em
+    // vez de ficar com as duas classes a competir.
+    p.classList.remove("a-fechar");
     p.classList.add("aberto");
     const b = botao();
     if (b) b.setAttribute("aria-expanded", "true");
@@ -120,15 +154,34 @@
     // princípio obrigava a rolar até à última mensagem sempre que se voltava
     // a abrir o painel.
     const l = lista();
-    if (l) l.scrollTop = l.scrollHeight;
+    if (l) l.scrollTop = historico.length ? l.scrollHeight : 0;
   };
 
   window.fecharIA = function fecharIA() {
     const p = painel();
     if (!p) return;
-    p.classList.remove("aberto");
     const b = botao();
     if (b) b.setAttribute("aria-expanded", "false");
+
+    // Já fechado: não há nada para animar. Sem esta guarda, um Escape
+    // repetido voltava a pôr a classe do fecho num painel escondido e deixava-o
+    // montado por cima do ecrã.
+    if (!p.classList.contains("aberto")) return;
+
+    // O fecho é o contrário da abertura: o painel desvanece e afunda-se uns
+    // píxeis antes de sair do ecrã. Tirar só o "aberto" punha display:none e
+    // o fecho não se via, por isso fica a classe "a-fechar" (animada no
+    // ia.css) e é o fim da animação que o desmonta. O relógio é a rede de
+    // segurança para quando a animação não corre (menos movimento, separador
+    // em segundo plano).
+    p.classList.remove("aberto");
+    p.classList.add("a-fechar");
+
+    const desmontar = function () {
+      p.classList.remove("a-fechar");
+    };
+    p.addEventListener("animationend", desmontar, { once: true });
+    setTimeout(desmontar, 400);
   };
 
   // ── Maximizar ────────────────────────────────────────────────────────
@@ -178,20 +231,17 @@
     if (!l) return;
 
     l.textContent = "";   // limpa sem innerHTML — nada disto é HTML
+    atualizarBotaoNova();
 
     if (!historico.length) {
-      // O estado vazio. Vive todo dentro de um só elemento com a classe
-      // ia-boas-vindas, para que a primeira mensagem verdadeira o deite fora
-      // de uma vez — a apresentação e os atalhos vão juntos.
-      const vazio = document.createElement("div");
-      vazio.className = "ia-boas-vindas";
-
-      // A apresentação não é do modelo: é nossa, e por isso vai como texto e
-      // não como histórico. Se fosse para o histórico, aparecia ao modelo
-      // como algo que ele próprio disse.
-      vazio.appendChild(criarLinha("assistant", textoInicial()));
-      vazio.appendChild(criarSugestoes());
-      l.appendChild(vazio);
+      // O ecrã inicial. É uma peça só (ver o criarBoasVindas), e é a primeira
+      // mensagem verdadeira que o deita fora de uma vez — a apresentação e os
+      // atalhos vão juntos.
+      //
+      // A apresentação não é do modelo: é nossa, e por isso não vai como
+      // histórico. Se fosse, aparecia ao modelo como algo que ele próprio
+      // disse.
+      l.appendChild(criarBoasVindas());
       return;
     }
 
@@ -202,45 +252,135 @@
     l.scrollTop = l.scrollHeight;
   }
 
-  // As perguntas de partida. Tocar numa escreve-a na caixa e envia-a: não há
-  // caminho nenhum especial, é o mesmo enviarMensagemIA que o botão usa.
+  // ── O ecrã inicial ────────────────────────────────────────────────────
+  // Sem conversa, o painel mostra o cartão de boas-vindas da referência: a
+  // saudação e a apresentação dentro de um cartão com a borda em gradiente,
+  // o avatar encostado ao canto de baixo e, por baixo, as quatro perguntas.
   //
-  // São quatro, e de quatro maneiras diferentes de usar isto: o que se vê
-  // hoje (o que a aplicação tem de seu), o calendário de eventos, a posição
-  // de um astro e um conceito. Quem nunca cá veio não tem como saber que
-  // estas coisas se podem pedir. A ordem não é ao acaso — a que mostra o que
-  // a aplicação tem de seu vai à frente.
-  //
-  // O ícone é emoji (🔭 ☄️ 🪐 ✨), como os botões de configurações e de
-  // conta: são símbolos que já se leem sem legenda. A seta à direita não é
-  // conteúdo, é a promessa de que tocar aqui segue para algum lado.
-  const SUGESTOES = [
-    { icone: "🔭", texto: "O que consigo ver hoje?" },
-    { icone: "☄️", texto: "Próximos eventos astronómicos" },
-    { icone: "🪐", texto: "Onde está Saturno agora?" },
-    { icone: "✨", texto: "Explica-me uma constelação" }
-  ];
+  // A saudação leva o primeiro nome, e só ele: uma saudação não é um cartão
+  // de visita. O nome só se sabe depois de o /api/me responder, e é por isso
+  // que este ecrã só é desenhado no fim das duas perguntas ao servidor.
+  function criarBoasVindas() {
+    const vazio = document.createElement("div");
+    vazio.className = "ia-boas-vindas";
+
+    const linha = document.createElement("div");
+    linha.className = "ia-boas-linha";
+
+    // O símbolo da AstroGuide, encostado ao fundo do cartão: quem fala
+    // primeiro é o assistente, e é a orbe que assina as respostas a
+    // apresentar-se — não a silhueta de quem chegou, que ainda não disse
+    // nada. É o mesmo emblema do cabeçalho, maior.
+    linha.appendChild(criarAvatar("ia"));
+
+    const cartao = document.createElement("div");
+    cartao.className = "ia-boas-cartao";
+
+    const saudacao = document.createElement("p");
+    saudacao.className = "ia-boas-saudacao";
+    saudacao.appendChild(document.createTextNode(
+      (nomeUtilizador ? "Olá, " + nomeUtilizador : "Olá") + " 👋"
+    ));
+
+    const corpo = document.createElement("p");
+    corpo.className = "ia-boas-texto";
+    corpo.appendChild(document.createTextNode(
+      "Sou o AstroGuide AI. Posso ajudar-te a explorar o céu, explicar " +
+      "eventos astronómicos, encontrar objetos para observar ou esclarecer " +
+      "qualquer dúvida sobre o universo."
+    ));
+
+    const pergunta = document.createElement("p");
+    pergunta.className = "ia-boas-texto ia-boas-pergunta";
+    pergunta.appendChild(document.createTextNode("O que gostarias de descobrir hoje?"));
+
+    cartao.appendChild(saudacao);
+    cartao.appendChild(corpo);
+    cartao.appendChild(pergunta);
+
+    linha.appendChild(cartao);
+    vazio.appendChild(linha);
+    vazio.appendChild(criarSugestoes());
+    return vazio;
+  }
+
+  // A constelação da quarta sugestão, em SVG: é o único dos quatro símbolos
+  // que não existe como emoji. Traço fino e pontos redondos, da cor do
+  // acento. Os SVG são criados com createElementNS — não há innerHTML.
+  function criarIconeConstelacao() {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+
+    const estrelas = [[3.5, 17.5], [8.5, 9], [14.5, 12.5], [21, 5.5], [18, 19]];
+    const ligacoes = [[0, 1], [1, 2], [2, 3], [2, 4]];
+
+    ligacoes.forEach(function (par) {
+      const a = estrelas[par[0]];
+      const b = estrelas[par[1]];
+      const linha = document.createElementNS(NS, "line");
+      linha.setAttribute("x1", a[0]);
+      linha.setAttribute("y1", a[1]);
+      linha.setAttribute("x2", b[0]);
+      linha.setAttribute("y2", b[1]);
+      linha.setAttribute("stroke", "currentColor");
+      linha.setAttribute("stroke-width", "0.9");
+      linha.setAttribute("opacity", "0.55");
+      svg.appendChild(linha);
+    });
+
+    estrelas.forEach(function (ponto) {
+      const estrela = document.createElementNS(NS, "circle");
+      estrela.setAttribute("cx", ponto[0]);
+      estrela.setAttribute("cy", ponto[1]);
+      estrela.setAttribute("r", "1.5");
+      estrela.setAttribute("fill", "currentColor");
+      svg.appendChild(estrela);
+    });
+
+    return svg;
+  }
 
   function criarSugestoes() {
     const caixa = document.createElement("div");
     caixa.className = "ia-sugestoes";
 
-    SUGESTOES.forEach(function (sugestao) {
+    // As quatro perguntas da referência. São quatro maneiras de usar isto que
+    // a aplicação tem de seu — o céu de agora, o calendário, um planeta e
+    // uma constelação — e é por elas que se percebe que a IA responde com os
+    // dados do AstroGuide e não de cor. A localização não vai na pergunta: o
+    // servidor já a mete no contexto de todas elas.
+    const sugestoes = [
+      { icone: "🔭", texto: "O que consigo ver hoje?" },
+      { icone: "☄️", texto: "Próximos eventos astronómicos." },
+      { icone: "🪐", texto: "Onde está Saturno agora?" },
+      { constelacao: true, texto: "Explica-me uma constelação." }
+    ];
+
+    sugestoes.forEach(function (sugestao) {
       const botao = document.createElement("button");
       botao.type = "button";
       botao.className = "ia-sugestao";
 
-      // Ícone à esquerda, texto ao meio, seta à direita — os três são do
-      // card, e o texto é o único que interessa quando se clica.
+      // O símbolo à esquerda e a pergunta ao lado — o texto é o que
+      // interessa quando se clica, e o símbolo é o que distingue as linhas
+      // antes de se ler o texto.
       const icone = document.createElement("span");
       icone.className = "ia-sugestao-icone";
       icone.setAttribute("aria-hidden", "true");
-      icone.appendChild(document.createTextNode(sugestao.icone));
+      if (sugestao.constelacao) {
+        icone.appendChild(criarIconeConstelacao());
+      } else {
+        icone.appendChild(document.createTextNode(sugestao.icone));
+      }
 
       const texto = document.createElement("span");
       texto.className = "ia-sugestao-texto";
       texto.appendChild(document.createTextNode(sugestao.texto));
 
+      // O chevron da direita. Não é conteúdo, é a promessa de que tocar aqui
+      // segue para algum lado.
       const seta = document.createElement("span");
       seta.className = "ia-sugestao-seta";
       seta.setAttribute("aria-hidden", "true");
@@ -257,6 +397,8 @@
         // primeiro ter marcado a conversa como ocupada.
         if (!campo || ocupado || !disponivel) return;
         campo.value = sugestao.texto;
+        ajustarAlturaCampo();
+        atualizarBotaoEnviar();
         window.enviarMensagemIA();
       });
       caixa.appendChild(botao);
@@ -277,18 +419,14 @@
   };
 
   function criarAvatar(classe) {
-    // O avatar de quem falou. A estrela é da IA; a pessoa de quem pergunta é
-    // desenhada em CSS (ver o ia.css) e por isso não leva carácter nenhum
-    // dentro.
+    // O avatar de quem falou, desenhado todo em CSS (ver o ia.css): a orbe com
+    // o anel da AstroGuide para as respostas — o mesmo emblema do cabeçalho —
+    // e a silhueta da pessoa para as perguntas. Não leva carácter nenhum
+    // dentro: é decoração, e um leitor de ecrã a ler um símbolo a meio da
+    // conversa só atrapalha.
     const avatar = document.createElement("span");
     avatar.className = "ia-avatar " + classe;
-    // É decoração — de que lado vem a bolha já se sabe pelo sítio onde ela
-    // está —, e um leitor de ecrã a ler um símbolo a meio da conversa só
-    // atrapalha.
     avatar.setAttribute("aria-hidden", "true");
-    if (classe === "ia") {
-      avatar.appendChild(document.createTextNode("✦"));
-    }
     return avatar;
   }
 
@@ -301,12 +439,19 @@
     const linha = document.createElement("div");
     linha.className = "ia-linha " + classe;
 
-    // textContent e nunca innerHTML: o texto vem de um modelo, e um modelo que
-    // devolvesse "<img onerror=...>" transformava o painel numa porta aberta
-    // para a página. Escrito como texto, é texto — o que quer que ele seja.
     const bolha = document.createElement("div");
     bolha.className = "ia-mensagem " + classe;
-    bolha.appendChild(document.createTextNode(texto));
+
+    if (classe === "ia") {
+      // A resposta vem em Markdown. Passa por um formatador que constrói
+      // elementos com nós de texto (ver o formatarMarkdown) — nunca
+      // innerHTML: o texto vem de um modelo, e um modelo que devolvesse
+      // "<img onerror=...>" transformava o painel numa porta aberta para a
+      // página. Escrito como texto, é texto — o que quer que ele seja.
+      bolha.appendChild(formatarMarkdown(texto));
+    } else {
+      bolha.appendChild(document.createTextNode(texto));
+    }
 
     if (classe === "erro") {
       // Uma falha não foi dita por ninguém: fica sem cara nenhuma.
@@ -325,7 +470,191 @@
     return linha;
   }
 
-  function acrescentarBolha(papel, texto) {
+  // ── O Markdown das respostas ──────────────────────────────────────────
+  // O modelo escreve em Markdown — títulos, listas, negritos, blocos de
+  // código — e o painel mostrava tudo isso como asteriscos e cardinales no
+  // meio do texto, o que fazia uma resposta longa parecer um rascunho. Isto
+  // transforma-o em elementos a sério.
+  //
+  // TUDO É CONSTRUÍDO COM NÓS DE TEXTO. Não há innerHTML em lado nenhum: a
+  // resposta é de um modelo, e o que se parece com HTML continua a ser
+  // texto. O que não estiver previsto aqui (tabelas, imagens, links) fica
+  // como texto — que é o que se lê bem na mesma.
+
+  function noDeTexto(texto) {
+    return document.createTextNode(texto);
+  }
+
+  // **negrito**, __negrito__, *itálico*, _itálico_ e `código`. O regex é
+  // criado em cada chamada para não guardar estado entre mensagens.
+  function acrescentarInline(pai, texto) {
+    const marcas = /(\*\*[^*\n]+\*\*|__[^_\n]+__|`[^`\n]+`|\*[^*\n]+\*|_[^_\n]+_)/g;
+    let ultimo = 0;
+    let achado;
+
+    while ((achado = marcas.exec(texto)) !== null) {
+      if (achado.index > ultimo) {
+        pai.appendChild(noDeTexto(texto.slice(ultimo, achado.index)));
+      }
+      const bruto = achado[0];
+      let elemento;
+      if (bruto.slice(0, 2) === "**" || bruto.slice(0, 2) === "__") {
+        elemento = document.createElement("strong");
+        elemento.appendChild(noDeTexto(bruto.slice(2, -2)));
+      } else if (bruto.charAt(0) === "`") {
+        elemento = document.createElement("code");
+        elemento.appendChild(noDeTexto(bruto.slice(1, -1)));
+      } else {
+        elemento = document.createElement("em");
+        elemento.appendChild(noDeTexto(bruto.slice(1, -1)));
+      }
+      pai.appendChild(elemento);
+      ultimo = achado.index + bruto.length;
+    }
+
+    if (ultimo < texto.length) pai.appendChild(noDeTexto(texto.slice(ultimo)));
+  }
+
+  function formatarMarkdown(texto) {
+    const fragmento = document.createDocumentFragment();
+    const linhas = String(texto).replace(/\r\n?/g, "\n").split("\n");
+
+    let paragrafo = null;   // o <p> que está a ser enchido
+    let lista = null;       // a <ul>/<ol> que está a ser enchida
+    let citacao = null;     // o <blockquote> que está a ser enchido
+
+    function fecharBlocos() {
+      paragrafo = null;
+      lista = null;
+      citacao = null;
+    }
+
+    let i = 0;
+    while (i < linhas.length) {
+      const linha = linhas[i];
+
+      // Bloco de código: o que está entre as duas cercas é literal, e é por
+      // isso o único sítio onde não se procura Markdown nenhum.
+      const cerca = /^\s*```\s*([\w+-]*)\s*$/.exec(linha);
+      if (cerca) {
+        fecharBlocos();
+        const codigo = [];
+        i++;
+        while (i < linhas.length && !/^\s*```\s*$/.test(linhas[i])) {
+          codigo.push(linhas[i]);
+          i++;
+        }
+        i++;   // a cerca de fecho
+        const pre = document.createElement("pre");
+        const code = document.createElement("code");
+        code.appendChild(noDeTexto(codigo.join("\n")));
+        pre.appendChild(code);
+        fragmento.appendChild(pre);
+        continue;
+      }
+
+      if (!linha.trim()) {
+        fecharBlocos();
+        i++;
+        continue;
+      }
+
+      // Títulos (#, ##, ###). Viram um parágrafo com o estilo de título e um
+      // <strong> por dentro: dentro de uma conversa, um <h1> não melhora a
+      // leitura de um leitor de ecrã, e a hierarquia da página não é a da
+      // conversa.
+      const titulo = /^\s*#{1,6}\s+(.*)$/.exec(linha);
+      if (titulo) {
+        fecharBlocos();
+        const bloco = document.createElement("p");
+        bloco.className = "ia-md-titulo";
+        const forte = document.createElement("strong");
+        acrescentarInline(forte, titulo[1].trim());
+        bloco.appendChild(forte);
+        fragmento.appendChild(bloco);
+        i++;
+        continue;
+      }
+
+      // Linha horizontal.
+      if (/^\s*([-*_])\s*(?:\1\s*){2,}$/.test(linha)) {
+        fecharBlocos();
+        fragmento.appendChild(document.createElement("hr"));
+        i++;
+        continue;
+      }
+
+      // Citação.
+      const linhaCitada = /^\s*>\s?(.*)$/.exec(linha);
+      if (linhaCitada) {
+        paragrafo = null;
+        lista = null;
+        if (!citacao) {
+          citacao = document.createElement("blockquote");
+          fragmento.appendChild(citacao);
+        }
+        acrescentarInline(citacao, linhaCitada[1]);
+        if (i + 1 < linhas.length && /^\s*>\s?/.test(linhas[i + 1])) {
+          citacao.appendChild(document.createElement("br"));
+        }
+        i++;
+        continue;
+      }
+
+      // Listas com marcador (-, *, •) e numeradas (1., 1)).
+      const marcador = /^\s*([-*•])\s+(.*)$/.exec(linha);
+      const numerada = /^\s*\d+[.)]\s+(.*)$/.exec(linha);
+      if (marcador || numerada) {
+        paragrafo = null;
+        citacao = null;
+        const tipo = numerada ? "ol" : "ul";
+        if (!lista || lista.tagName.toLowerCase() !== tipo) {
+          lista = document.createElement(tipo);
+          fragmento.appendChild(lista);
+        }
+        const item = document.createElement("li");
+        acrescentarInline(item, numerada ? numerada[1] : marcador[2]);
+        lista.appendChild(item);
+        i++;
+        continue;
+      }
+
+      // Texto normal: linhas seguidas são o mesmo parágrafo, e as quebras
+      // simples mantêm-se (o CSS usa pre-wrap nelas).
+      lista = null;
+      citacao = null;
+      if (!paragrafo) {
+        paragrafo = document.createElement("p");
+        fragmento.appendChild(paragrafo);
+      } else {
+        paragrafo.appendChild(noDeTexto("\n"));
+      }
+      acrescentarInline(paragrafo, linha.trim());
+      i++;
+    }
+
+    return fragmento;
+  }
+
+
+  // ── O scroll da conversa ──────────────────────────────────────────────
+  // A pergunta nova leva sempre a conversa ao fim. A resposta, não: quem
+  // está a reler uma mensagem antiga não pode ser empurrado para baixo no
+  // momento em que a resposta chega. Os 96px são a folga de quem já está
+  // praticamente no fim — rolar um dedo para cima não é "ler o histórico".
+
+  function estaNoFim() {
+    const l = lista();
+    if (!l) return true;
+    return (l.scrollHeight - l.scrollTop - l.clientHeight) < 96;
+  }
+
+  function irAoFim() {
+    const l = lista();
+    if (l) l.scrollTop = l.scrollHeight;
+  }
+
+  function acrescentarBolha(papel, texto, forcarScroll) {
     const l = lista();
     if (!l) return null;
     // A primeira mensagem verdadeira deita fora o estado vazio — a
@@ -334,9 +663,17 @@
     // vazio": nesta altura a pergunta já foi acrescentada ao histórico.
     const vazio = l.querySelector(".ia-boas-vindas");
     if (vazio) vazio.remove();
+
+    // Vê-se onde o scroll estava ANTES de a mensagem existir: depois de a
+    // acrescentar, o painel já cresceu e "está no fim" seria sempre verdade.
+    const seguir = forcarScroll === true || estaNoFim();
+
     const linha = criarLinha(papel, texto);
     l.appendChild(linha);
-    l.scrollTop = l.scrollHeight;
+    // A partir da primeira mensagem há conversa para recomeçar: é agora que
+    // o ↺ aparece no cabeçalho.
+    atualizarBotaoNova();
+    if (seguir) irAoFim();
     // Devolve a BOLHA, não a linha: é dentro dela que a contagem da quota se
     // pendura (ver o contarQuota).
     return linha.querySelector(".ia-mensagem");
@@ -430,7 +767,7 @@
 
     const silencioso = document.createElement("span");
     silencioso.className = "ia-sr";
-    silencioso.appendChild(document.createTextNode("A pensar..."));
+    silencioso.appendChild(document.createTextNode("A consultar o céu..."));
     bolha.appendChild(silencioso);
     linha.appendChild(bolha);
 
@@ -499,8 +836,12 @@
       campo.disabled = true;
       campo.placeholder = "AstroGuide AI indisponível";
     }
-    const enviar = btnEnviar();
-    if (enviar) enviar.disabled = true;
+    // A linha do cabeçalho passa a dizer a verdade: o ponto verde continuava
+    // a prometer alguém do outro lado.
+    definirEstado("Indisponível", motivo === "sem_conta"
+      ? "Inicia sessão para conversar"
+      : "Falta configuração no servidor", "off");
+    atualizarBotaoEnviar();
   }
 
 
@@ -555,12 +896,16 @@
     // uma janela de conversa, e se o pedido falhar a bolha de erro fica logo
     // a seguir e vê-se ao que ela responde.
     campo.value = "";
+    ajustarAlturaCampo();
     historico.push({ papel: "user", texto: texto });
-    acrescentarBolha("user", texto);
+    // A pergunta acabou de ser escrita por quem está a ver: a conversa vai
+    // para o fim, mesmo que estivesse a ler mensagens antigas.
+    acrescentarBolha("user", texto, true);
     guardarHistorico();
 
     ocupado = true;
     definirOcupado(true);
+    definirEstado("A consultar o céu…", "Só um instante", "busy");
     mostrarAPensar();
 
     // O relógio do pedido. Só se cancela quando a resposta chega (ou falha),
@@ -611,17 +956,60 @@
       esconderAPensar();
       ocupado = false;
       definirOcupado(false);
+      definirEstado("Online", "Explore o cosmos", "on");
       guardarHistorico();
       // O foco volta à caixa: quem fez uma pergunta é para fazer a seguinte.
       campo.focus();
     }
   };
 
-  function definirOcupado(estado) {
+  // O estado do cabeçalho. O ponto, a palavra e a linha de baixo mudam
+  // juntos: um ponto verde com "Indisponível" ao lado era pior do que não
+  // dizer nada.
+  function definirEstado(principal, detalhe, tipo) {
+    const caixa = document.getElementById("ia-estado");
+    if (!caixa) return;
+    const palavra = caixa.querySelector(".ia-estado-texto");
+    const sub = caixa.querySelector(".ia-estado-sub");
+    if (palavra && principal) palavra.textContent = principal;
+    if (sub && detalhe) sub.textContent = detalhe;
+    caixa.classList.toggle("is-busy", tipo === "busy");
+    caixa.classList.toggle("is-off", tipo === "off");
+  }
+
+  // A caixa de escrita cresce com o texto, até ao limite do ia.css (96px); a
+  // partir daí rola por dentro. O "auto" antes da medida é o que a faz
+  // encolher outra vez quando se apaga uma linha.
+  function ajustarAlturaCampo() {
+    const campo = entrada();
+    if (!campo) return;
+    campo.style.height = "auto";
+    campo.style.height = Math.max(40, Math.min(campo.scrollHeight, 96)) + "px";
+  }
+
+  // O enviar só está ativo quando há algo escrito. O estado é recalculado em
+  // cada mudança da caixa, em cada envio e quando a IA fica disponível ou
+  // não — num sítio só, para não haver dois botões com opiniões diferentes.
+  function atualizarBotaoEnviar() {
     const enviar = btnEnviar();
-    const campo  = entrada();
-    if (enviar) enviar.disabled = estado;
-    if (campo)  campo.disabled = estado;
+    const campo = entrada();
+    if (!enviar) return;
+    const vazio = !campo || !campo.value.trim();
+    enviar.disabled = ocupado || !disponivel || vazio;
+  }
+
+  // O ↺ da conversa nova só aparece quando há conversa para recomeçar: no
+  // ecrã inicial o cabeçalho tem os três controlos da janela, como na
+  // referência. A ação continua a ser o window.novaConversaIA.
+  function atualizarBotaoNova() {
+    const btn = document.querySelector(".ia-btn-nova");
+    if (btn) btn.hidden = historico.length === 0;
+  }
+
+  function definirOcupado(estado) {
+    const campo = entrada();
+    if (campo) campo.disabled = estado;
+    atualizarBotaoEnviar();
   }
 
   function guardarHistorico() {
@@ -662,6 +1050,11 @@
 
     restaurarHistorico();
 
+    // O relógio do cabeçalho. Atualiza-se de 30 em 30 segundos — o suficiente
+    // para o minuto mudar a horas, e não tanto que ande a repintar o painel.
+    atualizarHoraIA();
+    setInterval(atualizarHoraIA, 30000);
+
     const campo = entrada();
     if (campo) {
       // Enter envia, Shift+Enter muda de linha. É a convenção de qualquer
@@ -674,6 +1067,17 @@
           window.enviarMensagemIA();
         }
       });
+
+      // A caixa cresce com o texto e o botão acende quando há o que enviar.
+      campo.addEventListener("input", function () {
+        ajustarAlturaCampo();
+        atualizarBotaoEnviar();
+      });
+
+      // Antes de a /api/ia/estado responder não há IA confirmada: o enviar
+      // fica apagado até se saber.
+      ajustarAlturaCampo();
+      atualizarBotaoEnviar();
     }
 
     // Escape fecha o painel, como fecha o modal das constelações.
@@ -701,14 +1105,23 @@
       const estado = resultados[0];
       const eu = resultados[1];
 
-      // O primeiro nome, e só ele — ver o textoInicial.
+      // O primeiro nome, e só ele — ver o criarBoasVindas.
       if (eu && eu.utilizador && eu.utilizador.nome) {
         nomeUtilizador = String(eu.utilizador.nome).trim().split(" ")[0] || null;
+      }
+
+      // O fuso da conta, para as páginas que não o escrevem no HTML. A hora
+      // do cabeçalho passa a ser a do local escolhido, e não a do computador.
+      if (eu && eu.localizacao && eu.localizacao.timezone) {
+        fusoHorario = String(eu.localizacao.timezone);
+        atualizarHoraIA();
       }
 
       if (estado && estado.disponivel) {
         disponivel = true;
         desenharConversa();
+        definirEstado("Online", "Explore o cosmos", "on");
+        atualizarBotaoEnviar();
       } else {
         // Sem estado não há IA — ou o /api/ia/estado nem respondeu (o
         // servidor em baixo, a rede caída). Trata-se como indisponível: é

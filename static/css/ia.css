@@ -6,24 +6,41 @@
    está por cima de tudo, em qualquer dos cinco ecrãs, e não pertence a
    nenhum deles.
 
-   Onde se põe: em baixo à ESQUERDA. As outras quatro esquinas já têm dono
-   (o menu em cima à esquerda, a conta em cima à direita, as configurações
-   em baixo à direita), e nos ecrãs da aplicação ainda há o cabeçalho e as
-   abas. A esquina de baixo à esquerda é a única livre em todos eles.
+   A REFERÊNCIA: um painel alto de vidro escuro sobre o cosmos, com o
+   símbolo do assistente e o nome em serifa clara no cabeçalho, três
+   controlos de janela à direita, a linha de estado (Online • Explore o
+   cosmos) com a hora da localização escolhida, um cartão de boas-vindas
+   com a borda em gradiente azul-violeta, quatro sugestões em lista e uma
+   pílula de escrita com o foguetão. É isso que este ficheiro desenha.
 
-   O AR: vidro escuro sobre o céu, bordas finas, cantos arredondados e um
-   halo azul-violeta tão fraco que só se nota à procura dele. Uma conversa
-   lê-se durante minutos, e por isso o que aqui manda é a legibilidade e o
-   espaço — bolhas translúcidas com ar à volta, entrelinha larga, texto
-   claro sobre fundo fechado — e não o brilho. Os tokens são os do
-   glass.css; o resto são as medidas desta peça.
+   O céu não está só atrás do vidro: há um campo de estrelas e nebulosas
+   dentro do painel (.ia-cosmos), porque é ele que dá a impressão de se
+   estar a olhar para o espaço e não para uma caixa cinzenta. Fica numa
+   camada decorativa, por baixo de todo o conteúdo.
 
    UMA MENSAGEM É UMA LINHA, NÃO UMA BOLHA. A bolha é o que se lê; a linha
-   é o que se encosta a um lado, e é ela que leva o avatar ao lado. São dois
-   avatares, um por voz: a estrela da IA e a pessoa de quem pergunta. Sem
-   eles, os dois lados da conversa eram duas bolhas parecidas viradas uma
-   para cada lado, e quem abrisse o painel a meio não sabia quem tinha dito
-   o quê — que é exactamente o que eles vêm resolver. */
+   é o que se encosta a um lado, e é ela que leva o avatar ao lado. */
+
+
+/* ── Os tokens da peça ───────────────────────────────────────────────── */
+/* Ficam no painel e não no :root de propósito: são a paleta de uma janela,
+   não a da aplicação. Herdam para tudo o que está lá dentro. */
+
+#painel-ia {
+    --ia-azul: #8ec4ff;
+    --ia-violeta: #a98bff;
+    --ia-texto: #eef2fc;
+    --ia-texto-suave: rgba(196, 210, 236, 0.76);
+    --ia-texto-fraco: rgba(164, 182, 214, 0.72);
+    --ia-borda: rgba(150, 170, 220, 0.2);
+    --ia-vidro: rgba(12, 17, 38, 0.62);
+    --ia-easing: cubic-bezier(0.22, 1, 0.36, 1);
+    /* O diâmetro do retrato do ecrã inicial. A lista de sugestões alinha por
+       ele (ver o .ia-sugestoes), para começar onde o cartão começa. */
+    --ia-avatar-boas: 38px;
+    --ia-fonte: 'Outfit', 'Raleway', sans-serif;
+    --ia-fonte-titulo: 'Cormorant Garamond', 'Times New Roman', serif;
+}
 
 
 /* ── O botão ─────────────────────────────────────────────────────────── */
@@ -39,40 +56,45 @@
     z-index: 9999;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 11px 18px;
-    /* Borda fina fria e o vidro com um toque de violeta: é o botão do
-       painel da AstroGuide AI, e o painel tem o mesmo halo azul-violeta. */
-    border: 1px solid rgba(140, 175, 255, 0.22);
-    border-top-color: var(--glass-border-top);
+    gap: 9px;
+    padding: 8px 18px 8px 8px;
+    border: 1px solid rgba(160, 180, 240, 0.26);
+    border-top-color: rgba(200, 215, 255, 0.36);
     border-radius: 999px;
-    background: linear-gradient(160deg, rgba(110, 184, 255, 0.12), rgba(124, 108, 255, 0.09)),
-        var(--glass-bg);
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    backdrop-filter: blur(var(--glass-blur));
-    /* O último brilho é o da estrela a sair do botão: sem ele, o botão fica
-       apagado ao lado dos outros controlos flutuantes, que têm todos um halo
-       do acento quando o rato lhes passa por cima. */
+    background:
+        linear-gradient(150deg, rgba(110, 140, 255, 0.2), rgba(150, 110, 255, 0.14)),
+        rgba(8, 12, 28, 0.52);
+    -webkit-backdrop-filter: blur(22px) saturate(135%);
+    backdrop-filter: blur(22px) saturate(135%);
     box-shadow:
-        0 8px 28px rgba(0, 0, 0, 0.4),
-        0 0 18px rgba(110, 184, 255, 0.1);
-    /* Rótulo claro e estrela azul, como na referência: o texto é que se lê,
-       e o acento fica só no símbolo. */
-    color: rgba(235, 242, 252, 0.95);
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        0 10px 30px rgba(0, 0, 0, 0.44),
+        0 0 24px rgba(110, 140, 255, 0.16);
+    color: rgba(240, 245, 255, 0.95);
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.015em;
     cursor: pointer;
-    transition: color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    transition:
+        color 0.25s ease,
+        border-color 0.25s ease,
+        box-shadow 0.3s ease,
+        transform 0.3s var(--ia-easing);
 }
 
 #btn-ia:hover {
     color: #fff;
-    border-color: var(--accent);
+    border-color: rgba(150, 190, 255, 0.6);
+    transform: translateY(-1px);
     box-shadow:
-        0 8px 28px rgba(0, 0, 0, 0.4),
-        0 0 24px var(--accent-glow);
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        0 12px 34px rgba(0, 0, 0, 0.48),
+        0 0 30px rgba(120, 160, 255, 0.32);
+}
+
+#btn-ia:active {
+    transform: translateY(0) scale(0.985);
 }
 
 #btn-ia:focus-visible {
@@ -80,22 +102,31 @@
     outline-offset: 3px;
 }
 
-/* A estrela do rótulo. O ✦ já é um símbolo, mas com o brilho do acento fica
-   a ser a única coisa azul num botão de texto branco — é o que faz o olho
-   ir para lá primeiro. É a mesma estrela que assina as respostas lá dentro
-   (ver o .ia-avatar). */
+/* A estrela do rótulo, numa pequena orbe de vidro. É a mesma estrela que
+   assina as respostas e o cabeçalho do painel. */
 #btn-ia .ia-estrela {
-    color: var(--accent);
-    font-size: 1rem;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid rgba(180, 205, 255, 0.4);
+    background: radial-gradient(circle at 34% 28%, #cfe4ff, #8f8bff 48%, #4a3bb0 78%, #241c63);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 0 16px rgba(130, 150, 255, 0.45);
+    color: #fff;
+    font-size: 0.7rem;
     line-height: 1;
-    text-shadow: 0 0 10px var(--accent-glow);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    transition: box-shadow 0.3s ease;
 }
 
 #btn-ia:hover .ia-estrela {
-    /* A estrela não desbota no hover: é ela que assina o botão, e o branco
-       é do texto. */
-    color: var(--accent);
-    text-shadow: 0 0 12px var(--accent-glow);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        0 0 22px rgba(140, 165, 255, 0.65);
 }
 
 
@@ -103,60 +134,57 @@
 
 #painel-ia {
     position: fixed;
-    /* Por cima do botão, com a folga de um dedo — o botão fica sempre
-       clicável por baixo dele, para se poder fechar no mesmo sítio onde se
-       abriu. */
-    bottom: 82px;
-    left: 24px;
+    /* Por cima do botão, com a folga de um dedo. */
+    bottom: 86px;
+    left: 22px;
     z-index: 9999;
     display: none;
     flex-direction: column;
-    /* 420 px na largura: espaço para uma linha de resposta sem partir
-       palavras a meio, e pouco o suficiente para não ser uma segunda página
-       ao lado da aplicação. Num ecrã estreito encolhe com ele. */
-    width: min(420px, calc(100vw - 48px));
-    /* Alto, mas nunca a tapar o céu todo: numa janela baixa encolhe, e o que
-       encolhe é a lista de mensagens, que tem scroll próprio. */
-    max-height: min(600px, calc(100vh - 140px));
+    /* Alto como na referência, mas nunca a sair do ecrã: num portátil de
+       768px de altura encolhe, e o que encolhe é a lista de mensagens, que
+       tem scroll próprio. */
+    width: min(520px, calc(100vw - 40px));
+    height: min(780px, calc(100vh - 104px));
     padding: 0;
-    /* Por cima do glass-panel: um azul-noite mais fechado, para o texto ter
-       o contrário que precisa, e o halo azul-violeta do fundo — tão suave
-       que é uma impressão, não um efeito. */
-    background: rgba(9, 13, 30, 0.68);
-    border-color: rgba(140, 175, 255, 0.16);
-    border-top-color: rgba(160, 195, 255, 0.24);
-    border-radius: 20px;
-    -webkit-backdrop-filter: blur(26px);
-    backdrop-filter: blur(26px);
+    /* O vidro: um azul-noite profundo, quase preto, com uma luz fria no
+       topo. O cosmos que se vê lá dentro é o .ia-cosmos. */
+    background:
+        radial-gradient(120% 70% at 50% -10%, rgba(80, 110, 220, 0.18), transparent 62%),
+        linear-gradient(180deg, rgba(7, 11, 26, 0.9), rgba(4, 7, 18, 0.94));
+    border: 1px solid rgba(155, 175, 230, 0.22);
+    border-top-color: rgba(200, 215, 255, 0.3);
+    border-bottom-color: rgba(110, 130, 210, 0.18);
+    border-radius: 26px;
+    -webkit-backdrop-filter: blur(30px) saturate(140%);
+    backdrop-filter: blur(30px) saturate(140%);
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 24px 60px rgba(0, 0, 0, 0.5),
-        0 0 44px rgba(110, 140, 255, 0.1);
-    transition: width 0.25s ease, max-height 0.25s ease;
-}
-
-/* O ⛶ do cabeçalho: quase full-screen, para as conversas que crescem. É a
-   mesma largura do ecrã de telefone, mais larga — o texto da resposta
-   agradece, e o painel continua a não ser a página inteira. */
-#painel-ia.maximizado {
-    width: min(760px, calc(100vw - 48px));
-    max-height: calc(100vh - 140px);
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 -1px 0 rgba(110, 140, 255, 0.1),
+        0 30px 80px rgba(0, 0, 0, 0.62),
+        0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 64px rgba(90, 120, 255, 0.14);
+    transition: width 0.32s var(--ia-easing), height 0.32s var(--ia-easing);
 }
 
 #painel-ia.aberto {
     display: flex;
-    /* Abre a crescer a partir do canto de baixo, onde está o botão: parece
-       sair de lá em vez de aparecer já feito no sítio. É uma animação de
-       entrada — corre uma vez e acaba —, e o "menos movimento" do fim do
-       ficheiro desliga-a. */
     transform-origin: bottom left;
-    animation: ia-abrir 0.25s ease-out;
+    animation: ia-abrir 0.3s var(--ia-easing) both;
+}
+
+#painel-ia.a-fechar {
+    /* Continua montado durante o fecho para a animação se ver: sem esta
+       classe, tirar o "aberto" punha display:none e o painel desaparecia de
+       repente. O ia.js tira-a quando a animação acaba. */
+    display: flex;
+    pointer-events: none;
+    animation: ia-fechar 0.18s ease-in both;
 }
 
 @keyframes ia-abrir {
     from {
         opacity: 0;
-        transform: translateY(14px);
+        transform: translateY(14px) scale(0.985);
     }
 
     to {
@@ -165,15 +193,116 @@
     }
 }
 
+@keyframes ia-fechar {
+    from {
+        opacity: 1;
+        transform: none;
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(10px) scale(0.988);
+    }
+}
+
+/* O maximizado: mais largo e até ao alto, para as conversas que crescem. */
+#painel-ia.maximizado {
+    width: min(860px, calc(100vw - 40px));
+    height: calc(100vh - 104px);
+}
+
+
+/* ── O cosmos dentro do vidro ────────────────────────────────────────── */
+/* Duas camadas: as nebulosas e o clarão do planeta em baixo (aqui) e um
+   campo de estrelas que respira devagar (no ::before). É decoração, e por
+   isso fica atrás de tudo e não apanha cliques. */
+
+.ia-cosmos {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    overflow: hidden;
+    /* A fotografia da Via Láctea que já é o céu do Observatório (ver o
+       index.js) é o que dá profundidade ao vidro: sem ela, os gradientes
+       sozinhos ficam lisos e o painel parece uma caixa. Por cima vai a
+       escuridão que deixa o texto legível e as nebulosas da paleta.
+
+       É uma cópia em retrato (4:5), a 960px e 200 KB, e não o space.jpg
+       inteiro: o original tem 6 472px e 4,7 MB, e aqui só se via a faixa
+       central dele por cima do vidro — o resto era download a mais, em
+       todas as páginas onde o painel aparece. */
+    background:
+        linear-gradient(180deg, rgba(6, 9, 22, 0.42), rgba(4, 7, 18, 0.66)),
+        radial-gradient(ellipse 65% 45% at 82% 4%, rgba(126, 86, 220, 0.3), transparent 62%),
+        radial-gradient(ellipse 70% 55% at 6% 92%, rgba(34, 110, 200, 0.24), transparent 64%),
+        radial-gradient(ellipse 55% 38% at 55% 104%, rgba(110, 80, 230, 0.32), transparent 66%),
+        url("../images/space-ia.jpg") 50% 40% / cover no-repeat;
+    opacity: 0.96;
+    filter: saturate(1.12);
+}
+
+.ia-cosmos::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(1.6px 1.6px at 12% 9%, rgba(255, 255, 255, 0.85), transparent 100%),
+        radial-gradient(1.2px 1.2px at 29% 20%, rgba(210, 225, 255, 0.7), transparent 100%),
+        radial-gradient(1.8px 1.8px at 46% 6%, rgba(255, 255, 255, 0.75), transparent 100%),
+        radial-gradient(1px 1px at 64% 16%, rgba(200, 220, 255, 0.6), transparent 100%),
+        radial-gradient(1.5px 1.5px at 81% 8%, rgba(255, 255, 255, 0.85), transparent 100%),
+        radial-gradient(1px 1px at 93% 23%, rgba(210, 225, 255, 0.55), transparent 100%),
+        radial-gradient(1.2px 1.2px at 8% 34%, rgba(255, 255, 255, 0.5), transparent 100%),
+        radial-gradient(1.1px 1.1px at 21% 48%, rgba(190, 210, 255, 0.5), transparent 100%),
+        radial-gradient(1.5px 1.5px at 38% 38%, rgba(255, 255, 255, 0.55), transparent 100%),
+        radial-gradient(1px 1px at 57% 44%, rgba(200, 220, 255, 0.45), transparent 100%),
+        radial-gradient(1.4px 1.4px at 74% 36%, rgba(255, 255, 255, 0.6), transparent 100%),
+        radial-gradient(1.1px 1.1px at 89% 47%, rgba(210, 225, 255, 0.5), transparent 100%),
+        radial-gradient(1.2px 1.2px at 16% 66%, rgba(255, 255, 255, 0.45), transparent 100%),
+        radial-gradient(1px 1px at 33% 79%, rgba(200, 220, 255, 0.4), transparent 100%),
+        radial-gradient(1.6px 1.6px at 52% 68%, rgba(255, 255, 255, 0.5), transparent 100%),
+        radial-gradient(1px 1px at 71% 82%, rgba(210, 225, 255, 0.4), transparent 100%),
+        radial-gradient(1.2px 1.2px at 86% 71%, rgba(255, 255, 255, 0.45), transparent 100%),
+        radial-gradient(1px 1px at 95% 88%, rgba(200, 220, 255, 0.35), transparent 100%);
+    animation: ia-cintilar 11s ease-in-out infinite alternate;
+}
+
+/* O clarão do planeta no fundo — a curva violeta que a referência tem por
+   baixo das sugestões. */
+.ia-cosmos::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -170px;
+    width: 560px;
+    height: 300px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 0%,
+            rgba(130, 105, 255, 0.4) 0%,
+            rgba(80, 60, 190, 0.16) 45%,
+            transparent 72%);
+    filter: blur(8px);
+}
+
+@keyframes ia-cintilar {
+
+    0% {
+        opacity: 0.75;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
 
 /* ── Os modos imersivos: sem botão nem painel ──────────────────────── */
 /* Só o VR: lá o ecrã é todo céu, e um botão flutuante por cima dele é uma
-   coisa a mais (a mesma razão do botão de conta e da configuração). Os dois
-   seletores vão juntos porque em VR a classe "observatorio-ativo" sai do
-   body (ver mudarEcra, no index.js).
-   No Observatório 2D, ao contrário, o botão e o painel ficam — é um ecrã com
-   painéis e botões à volta, e o painel da IA é mais um deles (ver a secção
-   seguinte). */
+   coisa a mais. No Observatório 2D, ao contrário, o botão e o painel ficam —
+   é um ecrã com painéis e botões à volta, e o painel da IA é mais um deles. */
 body.vr-ativo #btn-ia,
 body.vr-ativo #painel-ia {
     display: none;
@@ -181,23 +310,10 @@ body.vr-ativo #painel-ia {
 
 
 /* ── No Observatório, ao lado do ⚙️ ──────────────────────────────────── */
-/* Só neste ecrã o botão e o painel saltam do canto de baixo à esquerda para
-   o de baixo à direita, encostados ao ⚙️ das configurações — que é o botão do
-   volume, e com quem a IA faz par. Nas outras abas ficam onde sempre
-   estiveram: ali o canto da direita é das abas e do resto, e não há ⚙️ para
-   lhes fazer companhia (o painel dele nem existe fora daqui — ver o
-   index.css).
-
-   O desvio é só a partir dos 561px: abaixo disso quem manda é o telemóvel,
-   e é o @media lá em baixo que o faz, empilhando o botão por cima do ⚙️ em
-   vez de o pôr ao lado. Guardar isto aqui evita que estas regras, com mais
-   especificidade, ganhassem àquelas num telefone.
-
-   Os 84px da direita são a margem do ⚙️ (24) + a largura dele (48) + o vão
-   de um dedo (12). E os 28px de baixo não são os 24px dele: é o que põe os
-   centros dos dois à mesma altura, já que a pílula (≈40px de alto) não é tão
-   alta como o círculo (48px) — assentes os dois no mesmo chão, a pílula
-   ficava baixa. */
+/* Só neste ecrã o botão e o painel saltam para o canto de baixo à direita,
+   encostados ao ⚙️ das configurações — que é o botão do volume, e com quem a
+   IA faz par. Abaixo dos 561px é o @media do fim que manda, empilhando o
+   botão por cima do ⚙️ em vez de o pôr ao lado. */
 @media (min-width: 561px) {
     body.observatorio-ativo #btn-ia {
         bottom: 28px;
@@ -205,7 +321,6 @@ body.vr-ativo #painel-ia {
         left: auto;
     }
 
-    /* O painel segue o botão: abre por cima dele, encostado à direita. */
     body.observatorio-ativo #painel-ia {
         right: 24px;
         left: auto;
@@ -216,147 +331,266 @@ body.vr-ativo #painel-ia {
 /* ── O cabeçalho ─────────────────────────────────────────────────────── */
 
 .ia-cabecalho {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 16px 10px 18px;
+    flex-shrink: 0;
+}
+
+.ia-identidade {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    min-width: 0;
+}
+
+/* O símbolo: uma orbe com anel, desenhada em SVG no template. O halo e o
+   flutuar ficam aqui — o SVG é o desenho, o CSS é a vida. */
+.ia-emblema {
+    position: relative;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    animation: ia-flutuar 7s ease-in-out infinite;
+}
+
+.ia-emblema::before {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(120, 140, 255, 0.35), transparent 68%);
+    filter: blur(6px);
+    pointer-events: none;
+}
+
+.ia-emblema svg {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    overflow: visible;
+    filter: drop-shadow(0 0 10px rgba(120, 150, 255, 0.5));
+}
+
+@keyframes ia-flutuar {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-3px);
+    }
+}
+
+/* O nome em serifa clara, como na referência: é o único sítio da aplicação
+   onde um serifa deste tamanho aparece, e é isso que faz o painel parecer
+   uma janela de produto e não mais um cartão. */
+.ia-titulo {
+    min-width: 0;
+    color: #ece9ff;
+    font-family: var(--ia-fonte-titulo);
+    font-size: 1.95rem;
+    font-weight: 600;
+    letter-spacing: 0.012em;
+    line-height: 1.05;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 0 28px rgba(150, 165, 255, 0.3);
+}
+
+/* Os controlos da janela: —, ⛶ e ✕. Redondos por fora, quadrados por
+   dentro, com um ícone de traço fino — três botões de vidro iguais. */
+.ia-controlos {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 15px 16px 10px;
     flex-shrink: 0;
-    /* Um véu de azul muito fraco, mais denso em cima. Dá ao título o ar de
-       estar debaixo de uma luz, sem uma linha dura a atravessar o painel —
-       o divisor entre o cabeçalho e a conversa é o da linha de estado,
-       abaixo (ver o .ia-estado::after). */
-    background: linear-gradient(180deg, rgba(110, 184, 255, 0.07), transparent);
 }
 
-.ia-titulo {
-    min-width: 0;
-    color: var(--accent);
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.18rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-shadow: 0 0 18px rgba(110, 184, 255, 0.35);
-}
-
-/* Os botões do cabeçalho. Redondos e discretos: são controlos secundários,
-   e o painel tem pouca largura para gastar.
-
-   São quatro, e de dois grupos diferentes — o ↺ é da conversa e os outros
-   três são do painel, uma mini-janela em regra: — para minimizar, ⛶ para
-   maximizar, ✕ para fechar. Por isso o ↺ encosta ao título (é o
-   margin-right: auto que abre o vão) e os três ficam juntos à direita, como
-   em qualquer janela. */
 .ia-btn-cabecalho {
     flex-shrink: 0;
-    width: 28px;
-    height: 28px;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
     padding: 0;
-    border: 1px solid transparent;
-    border-radius: 50%;
-    background: transparent;
-    color: rgba(180, 200, 230, 0.7);
+    border: 1px solid rgba(170, 190, 240, 0.22);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+    color: rgba(226, 236, 255, 0.85);
     font-family: inherit;
     font-size: 0.95rem;
     line-height: 1;
     cursor: pointer;
-    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.25s ease,
+        transform 0.2s var(--ia-easing);
 }
 
+.ia-btn-cabecalho svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* O ↺ da conversa nova. Só aparece quando há conversa (ver o ia.js): no
+   ecrã inicial o cabeçalho tem os três controlos da janela, como na
+   referência. O [hidden] ganha ao display:grid do botão. */
 .ia-btn-nova {
-    margin-right: auto;
+    margin-right: 2px;
+}
+
+.ia-btn-cabecalho[hidden] {
+    display: none;
 }
 
 .ia-btn-cabecalho:hover {
     color: #fff;
-    border-color: var(--glass-border);
-    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(160, 195, 255, 0.5);
+    background: rgba(120, 155, 255, 0.14);
+    box-shadow: 0 0 18px rgba(110, 140, 255, 0.22);
+}
+
+.ia-btn-cabecalho:active {
+    transform: scale(0.93);
 }
 
 .ia-btn-cabecalho:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--ia-azul);
     outline-offset: 2px;
 }
 
 
 /* ── A linha de estado ───────────────────────────────────────────────── */
-/* "Online • Pronto para explorar o universo", por baixo do cabeçalho. É o
-   que diz, antes de qualquer pergunta, que há alguém do outro lado.
-
-   O ponto verde é desenhado aqui e não um emoji 🟢: um emoji muda de
-   máquina para máquina — o verde do Windows, o gradiente da Apple — e esta
-   linha tem de ser a mesma em todas. */
+/* "Online • Explore o cosmos", à esquerda, e a hora da localização escolhida
+   à direita, como na referência. O ponto verde é desenhado em CSS e não um
+   emoji 🟢: um emoji muda de máquina para máquina. */
 
 .ia-estado {
     position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 0 16px 12px;
+    padding: 0 20px 14px;
     flex-shrink: 0;
-    color: rgba(165, 195, 230, 0.72);
-    font-size: 0.72rem;
-    letter-spacing: 0.02em;
+    color: var(--ia-texto-fraco);
+    font-size: 0.84rem;
+    letter-spacing: 0.01em;
 }
 
 .ia-estado-ponto {
     flex-shrink: 0;
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
-    background: #35d97e;
-    box-shadow: 0 0 8px rgba(53, 217, 126, 0.6);
+    background: #43e08c;
+    box-shadow: 0 0 10px rgba(67, 224, 140, 0.65);
+    animation: ia-pulsar 3.2s ease-in-out infinite;
 }
 
-/* O divisor entre o cabeçalho e o conteúdo: um gradiente que nasce e morre
-   nas pontas em vez de uma linha a acabar a direito contra o canto
-   arredondado — num painel de vidro, uma linha com um fim brusco lê-se como
-   um risco. */
-.ia-estado::after {
-    content: "";
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 0;
-    height: 1px;
-    background: linear-gradient(90deg,
-            transparent,
-            rgba(255, 255, 255, 0.14) 20%,
-            rgba(255, 255, 255, 0.14) 80%,
-            transparent);
-    pointer-events: none;
+/* Enquanto a resposta não chega, o ponto passa a azul e pulsa mais depressa:
+   é a única coisa do cabeçalho que diz que algo está a acontecer. */
+.ia-estado.is-busy .ia-estado-ponto {
+    background: var(--ia-azul);
+    box-shadow: 0 0 11px rgba(110, 170, 255, 0.7);
+    animation-duration: 1.3s;
+}
+
+/* E quando não há IA nenhuma, o verde seria uma promessa falsa. */
+.ia-estado.is-off .ia-estado-ponto {
+    background: #ff8fa3;
+    box-shadow: 0 0 9px rgba(255, 143, 163, 0.5);
+    animation: none;
+}
+
+.ia-estado-texto {
+    color: #dfe8f7;
+    font-weight: 500;
+}
+
+.ia-estado.is-off .ia-estado-texto {
+    color: rgba(255, 178, 192, 0.92);
+}
+
+.ia-estado-sep {
+    color: rgba(150, 172, 205, 0.5);
+    font-size: 0.62rem;
+}
+
+.ia-estado-sub {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(180, 196, 222, 0.82);
+}
+
+/* A hora da localização escolhida (21:30 - 24 Out 2024). Os algarismos são
+   tabulares para o relógio não dançar a cada minuto. */
+.ia-hora {
+    margin-left: auto;
+    flex-shrink: 0;
+    color: rgba(158, 176, 206, 0.78);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+@keyframes ia-pulsar {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.55;
+        transform: scale(0.86);
+    }
 }
 
 
 /* ── A conversa ──────────────────────────────────────────────────────── */
 
 .ia-mensagens {
+    position: relative;
+    z-index: 1;
     flex: 1;
+    /* Sem isto, o cabeçalho e o compositor empurravam a lista para fora do
+       painel em janelas baixas — o flex-item recusa encolher abaixo do
+       conteúdo sem um min-height:0. */
+    min-height: 0;
     overflow-y: auto;
-    padding: 18px 16px;
+    padding: 6px 18px 10px;
     display: flex;
     flex-direction: column;
-    /* Bastante ar entre mensagens: um chat apertado lê-se como uma
-       transcrição, e isto é uma conversa. */
     gap: 16px;
-    /* Por cima do ::before do glass-panel. Aquele gradiente decorativo do
-       painel é pintado por cima de tudo o que não estiver posicionado — nos
-       outros painéis dá-lhe um brilho de vidro, mas aqui passava por cima das
-       bolhas e esbatia o texto das primeiras mensagens. Levantando esta
-       camada, as bolhas ficam com a cor que lhes é devida. */
-    position: relative;
-    /* Sem isto, uma mensagem longa sem espaços (um URL, uma palavra enorme)
-       estica a bolha e com ela o painel todo. */
     overflow-wrap: anywhere;
     /* A barra de scroll ocupa sempre o seu espaço, mesmo quando não há nada
-       para rolar. Sem isto, a primeira resposta a chegar — que é quando a
-       barra aparece — encolhia o painel e empurrava tudo para o lado. */
+       para rolar: sem isto, a primeira resposta a chegar encolhia o painel e
+       empurrava tudo para o lado. */
     scrollbar-gutter: stable;
-    /* Afinada e escura, com o thumb no acento: a barra do sistema, num painel
-       escuro, é uma faixa clara que corta o vidro ao meio. As duas primeiras
-       propriedades são as do Firefox, que ignora os ::-webkit-* — e o Chrome
-       faz o contrário —, daí estarem ambas. */
     scrollbar-width: thin;
-    scrollbar-color: rgba(122, 150, 255, 0.3) transparent;
+    scrollbar-color: rgba(122, 150, 255, 0.28) transparent;
 }
 
 .ia-mensagens::-webkit-scrollbar {
@@ -369,41 +603,33 @@ body.vr-ativo #painel-ia {
 
 .ia-mensagens::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background: rgba(122, 150, 255, 0.3);
+    background: rgba(122, 150, 255, 0.26);
 }
 
 .ia-mensagens::-webkit-scrollbar-thumb:hover {
-    background: rgba(122, 150, 255, 0.5);
+    background: rgba(122, 150, 255, 0.45);
 }
 
 
 /* ── As linhas e as bolhas ───────────────────────────────────────────── */
 
-/* A linha: o que se encosta a um lado, e o que leva o avatar. A largura
-   máxima está aqui e não na bolha porque é a linha que não pode encher o
-   painel todo — a bolha, dentro dela, fica com a largura do que diz. */
 .ia-linha {
     display: flex;
-    /* Alinhado em baixo, e não em cima: põe a estrela à altura do canto que
-       fica em bico na bolha (o border-bottom-left-radius, mais abaixo), que
-       é o canto que aponta para quem falou. */
     align-items: flex-end;
-    gap: 8px;
-    max-width: 92%;
+    gap: 9px;
+    max-width: 94%;
 }
 
-/* A pergunta: à direita, com o avatar do lado de fora. */
 .ia-linha.utilizador {
     align-self: flex-end;
-    max-width: 86%;
+    max-width: 88%;
 }
 
-/* A resposta: à esquerda. */
 .ia-linha.ia {
     align-self: flex-start;
 }
 
-/* A falha: também à esquerda, e sem avatar nenhum. Uma falha não foi dita pelo
+/* A falha: à esquerda e sem avatar nenhum. Uma falha não foi dita pelo
    modelo, e dar-lhe a mesma cara que às respostas era fazer passar por dele
    uma coisa que ele nunca disse. */
 .ia-linha.erro {
@@ -411,36 +637,59 @@ body.vr-ativo #painel-ia {
 }
 
 /* O avatar. São dois — a estrela da IA e a pessoa de quem pergunta —, com a
-   mesma roda e a mesma medida, porque são as duas vozes da mesma conversa.
-
-   Eles existem porque sem eles não se sabia quem tinha dito o quê. Eram duas
-   bolhas parecidas, uma à esquerda e outra à direita, e o lado era a única
-   pista: quem abrisse o painel a meio, com a conversa já a rolar, tinha de
-   seguir cada bolha até ao princípio para saber de quem era. Com uma cara de
-   cada lado, lê-se de relance. */
+   mesma roda e a mesma medida, porque são as duas vozes da mesma conversa. */
 .ia-avatar {
     position: relative;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    border: 1px solid rgba(124, 168, 255, 0.42);
-    /* Dois azuis em vez de um: a roda da IA tem o acento e um pouco de
-       violeta, que é o segundo tom do painel — o mesmo do botão de enviar. */
-    background: linear-gradient(150deg, rgba(110, 184, 255, 0.3), rgba(124, 108, 255, 0.2));
-    box-shadow: 0 0 16px rgba(110, 150, 255, 0.22);
-    color: var(--accent);
-    font-size: 0.72rem;
+    border: 1px solid rgba(140, 185, 255, 0.38);
+    background: radial-gradient(circle at 32% 28%, rgba(140, 200, 255, 0.34), rgba(120, 108, 255, 0.24) 62%, rgba(10, 16, 40, 0.5));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        0 0 16px rgba(110, 150, 255, 0.18);
+    color: var(--ia-azul);
+    font-size: 0.7rem;
     line-height: 1;
+}
+
+/* O avatar da AstroGuide AI é o emblema do cabeçalho em ponto pequeno: a
+   orbe de vidro com o anel a passar-lhe à frente. É o que liga a resposta ao
+   nome que está lá em cima — a mesma marca a falar. Desenhado em CSS (gradiente
+   + um anel em ::before) e não em SVG: há uma orbe por resposta, e várias
+   cópias do mesmo SVG com os mesmos gradientes davam ids repetidos na página. */
+.ia-avatar.ia {
+    border-color: rgba(190, 210, 255, 0.5);
+    background:
+        radial-gradient(circle at 34% 26%, #f2f8ff 0%, #c2d8ff 26%, #8f8bff 56%, #4a3bb0 80%, #221a55 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        inset -2px -3px 6px rgba(10, 12, 40, 0.5),
+        0 0 14px rgba(120, 150, 255, 0.45);
+}
+
+/* O anel: uma elipse de traço fino, inclinada, a atravessar a orbe. */
+.ia-avatar.ia::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 150%;
+    height: 46%;
+    transform: translate(-50%, -50%) rotate(-22deg);
+    border: 1.2px solid rgba(170, 226, 255, 0.9);
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(140, 200, 255, 0.55);
+    pointer-events: none;
 }
 
 /* O avatar de quem pergunta: a mesma roda, e nada mais igual. O cinza não é
    falta de ideias — o azul é a marca da AstroGuide AI em todo o painel, e um
-   segundo círculo azul do outro lado punha as duas vozes a parecer a mesma.
-   Quem fala aqui é a pessoa, e a pessoa não tem cor nenhuma nesta aplicação. */
+   segundo círculo azul do outro lado punha as duas vozes a parecer a mesma. */
 .ia-avatar.utilizador {
     border-color: rgba(255, 255, 255, 0.2);
     background: rgba(255, 255, 255, 0.07);
@@ -449,12 +698,8 @@ body.vr-ativo #painel-ia {
 }
 
 /* A silhueta da pessoa, desenhada com os dois pseudo-elementos — uma cabeça
-   redonda e os ombros — em vez de um carácter como "👤".
-
-   Um emoji traria a paleta do sistema para dentro de um painel que é todo azul
-   e vidro — o amarelo no Windows, o azul na Apple — e mudava de feitio de
-   máquina para máquina. Duas formas com border-radius não mudam em lado
-   nenhum, e ficam da cor que o .utilizador lhes der. */
+   redonda e os ombros — em vez de um carácter como "👤". Um emoji traria a
+   paleta do sistema para dentro de um painel que é todo azul e vidro. */
 .ia-avatar.utilizador::before,
 .ia-avatar.utilizador::after {
     content: "";
@@ -464,46 +709,40 @@ body.vr-ativo #painel-ia {
     background: currentColor;
 }
 
-/* A cabeça. */
+/* Em percentagem e não em píxeis: o mesmo desenho serve o avatar pequeno da
+   conversa e o grande do ecrã inicial. */
 .ia-avatar.utilizador::before {
-    top: 5px;
-    width: 7px;
-    height: 7px;
+    top: 18%;
+    width: 25%;
+    height: 25%;
     border-radius: 50%;
 }
 
-/* Os ombros: meia-lua com o lado de baixo a direito, que é o que faz isto ler
-   como uma pessoa e não como dois círculos soltos. */
 .ia-avatar.utilizador::after {
-    top: 13px;
-    width: 13px;
-    height: 7px;
+    top: 46%;
+    width: 46%;
+    height: 26%;
     border-radius: 999px 999px 0 0;
 }
 
 .ia-mensagem {
     min-width: 0;
-    padding: 11px 15px;
+    padding: 12px 15px;
     border-radius: 16px;
-    font-size: 0.885rem;
-    /* Entrelinha larga: é texto para ler, não uma etiqueta. */
-    line-height: 1.62;
-    /* Um relevo curto por baixo: assenta a bolha no vidro em vez de a deixar
-       colada a ele. É o mesmo truque dos glass-panel, em ponto pequeno. */
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
-    /* O texto vem do modelo e escreve-se como se escreve num chat: os
-       parágrafos que ele separa com linhas em branco ficam separados. */
+    font-size: 0.89rem;
+    line-height: 1.7;
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.26);
     white-space: pre-wrap;
     /* Entra a aparecer, para a resposta não saltar para o ecrã de repente.
        É uma animação de uma vez só, não um brilho em ciclo — e o
        prefers-reduced-motion do fim do ficheiro desliga-a. */
-    animation: ia-entrar 0.25s ease-out;
+    animation: ia-entrar 0.28s var(--ia-easing) both;
 }
 
 @keyframes ia-entrar {
     from {
         opacity: 0;
-        transform: translateY(6px);
+        transform: translateY(7px);
     }
 
     to {
@@ -512,44 +751,45 @@ body.vr-ativo #painel-ia {
     }
 }
 
-/* O bico. O canto de baixo do lado de quem falou fica quase a direito em vez
-   de arredondado, e é isso que diz para que lado a bolha aponta sem uma seta
-   desenhada. */
+/* O bico: o canto de baixo do lado de quem falou fica quase a direito. */
 .ia-mensagem.utilizador {
-    border-bottom-right-radius: 5px;
-    /* A pergunta: mais compacta que a resposta (menos recuo e letra um
-       pouco menor) e com um fundo ligeiramente azulado — do lado direito do
-       chat vê-se que é outra voz sem se ler uma palavra sequer. */
-    padding: 8px 14px;
-    font-size: 0.86rem;
-    background: rgba(64, 104, 190, 0.3);
-    border: 1px solid rgba(110, 184, 255, 0.32);
-    color: #eaf4ff;
+    border-bottom-right-radius: 6px;
+    padding: 9px 14px;
+    font-size: 0.87rem;
+    line-height: 1.6;
+    background: linear-gradient(140deg, rgba(92, 136, 232, 0.44), rgba(122, 102, 232, 0.36));
+    border: 1px solid rgba(155, 195, 255, 0.34);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        0 5px 16px rgba(24, 40, 100, 0.32);
+    color: #f4f8ff;
 }
 
-/* A resposta: um cartão escuro translúcido, com o acento azul-violeta a
-   entrar pela borda — fina, para não desenhar uma moldura à volta de cada
+/* A resposta: o mesmo cartão de vidro do ecrã inicial, com a borda em
+   gradiente mais discreta — fina, para não desenhar uma moldura a cada
    frase. */
 .ia-mensagem.ia {
-    border-bottom-left-radius: 5px;
-    background: rgba(17, 24, 48, 0.66);
-    border: 1px solid rgba(128, 168, 255, 0.16);
-    color: rgba(226, 236, 252, 0.96);
+    border-bottom-left-radius: 6px;
+    border: 1px solid transparent;
+    background:
+        linear-gradient(180deg, rgba(15, 21, 44, 0.8), rgba(10, 15, 34, 0.88)) padding-box,
+        linear-gradient(150deg, rgba(168, 132, 255, 0.42), rgba(96, 150, 255, 0.12) 48%, rgba(96, 210, 255, 0.38)) border-box;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 4px 16px rgba(0, 0, 0, 0.26);
+    color: rgba(232, 240, 255, 0.96);
 }
 
 /* Uma falha, não uma resposta: lê-se como aviso, e não se confunde com o
    que a IA disse. Nada do que está aqui foi dito pelo modelo. */
 .ia-mensagem.erro {
-    border-bottom-left-radius: 5px;
-    background: rgba(255, 112, 133, 0.12);
-    border: 1px solid rgba(255, 112, 133, 0.35);
+    border-bottom-left-radius: 6px;
+    background: rgba(255, 112, 133, 0.1);
+    border: 1px solid rgba(255, 112, 133, 0.32);
     color: #ffc2cc;
 }
 
-/* A contagem da quota diária, dentro da bolha do erro. Fica por baixo da
-   frase, separada por uma linha tracejada, para se ler como um relógio e não
-   como mais uma frase do aviso — é a única coisa da conversa que muda sozinha.
-   Os algarismos tabulares são para o número não dançar a cada bateria. */
+/* A contagem da quota diária, dentro da bolha do erro. */
 .ia-contagem {
     display: block;
     margin-top: 9px;
@@ -561,46 +801,148 @@ body.vr-ativo #painel-ia {
     font-variant-numeric: tabular-nums;
 }
 
-/* A IA a pensar. Veste as mesmas roupas das respostas — estrela e bolha —
-   porque o que está a acontecer é uma resposta a chegar: se o "a pensar"
-   aparecesse noutro sítio, a resposta final parecia mudar de lugar. */
-#ia-a-pensar .ia-mensagem {
+
+/* ── Markdown das respostas ──────────────────────────────────────────── */
+/* O modelo escreve em Markdown, e o ia.js transforma-o em elementos (nunca
+   com innerHTML: o que vem do modelo é texto, e continua a ser texto). O que
+   se segue é só o vestido. */
+
+.ia-md {
+    white-space: normal;
+}
+
+.ia-md>*:first-child {
+    margin-top: 0;
+}
+
+.ia-md>*:last-child {
+    margin-bottom: 0;
+}
+
+.ia-md p {
+    margin: 0 0 0.7em;
+    white-space: pre-wrap;
+}
+
+.ia-md .ia-md-titulo {
+    margin: 0.45em 0 0.4em;
+    padding-left: 10px;
+    border-left: 2px solid rgba(142, 196, 255, 0.55);
+    color: #f4f8ff;
+    font-family: var(--ia-fonte);
+    font-size: 0.94rem;
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    line-height: 1.35;
+}
+
+.ia-md .ia-md-titulo strong {
+    font-weight: 600;
+}
+
+.ia-md ul,
+.ia-md ol {
+    margin: 0.25em 0 0.8em;
+    padding-left: 1.15em;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.32em;
+}
+
+.ia-md li {
+    padding-left: 0.15em;
+    line-height: 1.6;
+}
+
+.ia-md li::marker {
+    color: rgba(142, 186, 255, 0.9);
+}
+
+.ia-md strong {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.ia-md em {
+    color: rgba(215, 232, 255, 0.94);
+}
+
+.ia-md code {
+    padding: 1px 5px;
+    border: 1px solid rgba(140, 175, 255, 0.18);
+    border-radius: 6px;
+    background: rgba(110, 160, 255, 0.12);
+    color: #d8eaff;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.82em;
+    white-space: pre-wrap;
+}
+
+.ia-md pre {
+    margin: 0.4em 0 0.8em;
+    padding: 10px 12px;
+    border: 1px solid rgba(140, 175, 255, 0.16);
+    border-radius: 12px;
+    background: rgba(4, 7, 18, 0.72);
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.ia-md pre code {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: rgba(219, 234, 255, 0.9);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    white-space: pre;
+}
+
+.ia-md blockquote {
+    margin: 0.35em 0 0.8em;
+    padding: 2px 0 2px 11px;
+    border-left: 2px solid rgba(169, 139, 255, 0.48);
+    color: rgba(202, 218, 246, 0.84);
+}
+
+.ia-md hr {
+    height: 1px;
+    margin: 0.85em 0;
+    border: 0;
+    background: linear-gradient(90deg, transparent, rgba(170, 200, 255, 0.24), transparent);
 }
 
 
 /* ── O indicador de resposta a chegar ────────────────────────────────── */
-/* Três pontos que se acendem por turnos, e nada mais. Substituem a roda que
-   havia — que era do index.css, um ficheiro que só a aplicação carrega e que
-   deixava um quadrado invisível nas outras páginas —, e ficam sozinhos na
-   bolha: pontos em movimento já dizem "algo está a chegar", com um texto
-   ao lado só diriam a mesma coisa duas vezes.
 
-   O que anunciam fica numa classe que só os leitores de ecrã leem (ver o
-   .ia-sr): eles não veem pontos a mexer-se. */
+#ia-a-pensar .ia-mensagem {
+    display: flex;
+    align-items: center;
+    padding: 13px 16px;
+}
 
 .ia-pontos {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 3px 0;
+    padding: 2px 0;
 }
 
 .ia-pontos span {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: var(--accent);
-    animation: ia-ponto 1.2s ease-in-out infinite;
+    background: radial-gradient(circle at 34% 30%, #d8ecff, #8ec4ff 62%);
+    box-shadow: 0 0 9px rgba(120, 180, 255, 0.55);
+    animation: ia-ponto 1.35s ease-in-out infinite;
 }
 
 .ia-pontos span:nth-child(2) {
-    animation-delay: 0.18s;
+    animation-delay: 0.16s;
 }
 
 .ia-pontos span:nth-child(3) {
-    animation-delay: 0.36s;
+    animation-delay: 0.32s;
 }
 
 @keyframes ia-ponto {
@@ -608,19 +950,19 @@ body.vr-ativo #painel-ia {
     0%,
     60%,
     100% {
-        opacity: 0.35;
+        opacity: 0.32;
         transform: none;
+        box-shadow: 0 0 4px rgba(120, 180, 255, 0.2);
     }
 
     30% {
         opacity: 1;
         transform: translateY(-3px);
+        box-shadow: 0 0 12px rgba(140, 195, 255, 0.75);
     }
 }
 
-/* Só para os leitores de ecrã: presente no layout, invisível à vista. O
-   clip é o padrão de sempre — sem ele, um span vazio de 1 px podia ganhar
-   scroll a mais em cima. */
+/* Só para os leitores de ecrã: presente no layout, invisível à vista. */
 .ia-sr {
     position: absolute;
     width: 1px;
@@ -634,97 +976,221 @@ body.vr-ativo #painel-ia {
 }
 
 
-/* ── O estado vazio ──────────────────────────────────────────────────── */
+/* ── O ecrã inicial ──────────────────────────────────────────────────── */
 
-/* Sem conversa, o painel não pode ser um cursor a piscar à espera. Fica a
-   apresentação — a saudação pelo nome de quem chegou, o que a IA faz e, mais
-   importante, o que não faz — e por baixo quatro perguntas para começar.
-
-   Os atalhos não são decoração: são a única coisa no painel que diz o que
-   se lhe pode pedir. Sem eles, quem abre isto pela primeira vez escreve
-   "olá", recebe um "olá" de volta, e não descobre nem metade do que ali
-   está. E, sendo a regra da casa que a IA não calcula nada, uma pergunta
-   de partida é a maneira mais rápida de mostrar o que ela faz bem. */
 .ia-boas-vindas {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    /* Centrado no espaço que sobra, em vez de encostado ao cabeçalho: é uma
-       apresentação, e o meio do painel é onde ela se lê. Com uma janela
-       baixa, o espaço livre desaparece e o "auto" com ele — e o conteúdo
-       rola, em vez de ser cortado. */
+    gap: 14px;
+    /* Centrado no espaço que sobra: a referência é uma janela alta, e o
+       conteúdo fica a respirar entre o cabeçalho e o compositor. Numa janela
+       baixa o espaço livre desaparece e o "auto" com ele — e o conteúdo rola,
+       em vez de ser cortado. */
     margin: auto 0;
 }
 
-.ia-boas-vindas .ia-linha {
-    max-width: 100%;
+/* O cartão de boas-vindas e o avatar de quem chegou, em baixo à esquerda. */
+.ia-boas-linha {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
 }
 
+/* O avatar do ecrã inicial é maior do que o da conversa: é o retrato de quem
+   chega, encostado ao canto de baixo do cartão, como na referência. */
+.ia-boas-linha .ia-avatar {
+    width: var(--ia-avatar-boas);
+    height: var(--ia-avatar-boas);
+    margin-bottom: 4px;
+}
+
+.ia-boas-cartao {
+    flex: 1;
+    min-width: 0;
+    padding: 20px 22px 22px;
+    border: 1px solid transparent;
+    border-radius: 22px;
+    /* O fundo em duas camadas: o vidro escuro por dentro e o gradiente
+       azul-violeta só na borda (padding-box / border-box). É o que dá o
+       contorno luminoso da referência sem uma segunda moldura. */
+    background:
+        linear-gradient(180deg, rgba(15, 21, 44, 0.82), rgba(10, 15, 34, 0.9)) padding-box,
+        linear-gradient(150deg,
+            rgba(172, 132, 255, 0.6),
+            rgba(96, 150, 255, 0.16) 42%,
+            rgba(96, 215, 255, 0.66)) border-box;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 18px 44px rgba(0, 0, 0, 0.4),
+        0 0 38px rgba(90, 160, 255, 0.14);
+    animation: ia-entrar 0.32s var(--ia-easing) both;
+}
+
+.ia-boas-saudacao {
+    margin: 0 0 14px;
+    color: #f5f3ff;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    line-height: 1.35;
+}
+
+.ia-boas-texto {
+    margin: 0;
+    color: rgba(230, 236, 250, 0.94);
+    font-size: 0.98rem;
+    line-height: 1.7;
+}
+
+.ia-boas-pergunta {
+    margin-top: 14px;
+}
+
+/* As quatro sugestões, em lista — como na referência. Cada uma é uma linha
+   inteira: ícone à esquerda, a pergunta ao meio e o chevron à direita.
+
+   A lista começa onde o cartão começa, e não na margem do painel: o vão da
+   esquerda é a coluna do avatar, que na referência fica ao lado do cartão. */
 .ia-sugestoes {
     display: flex;
     flex-direction: column;
     gap: 9px;
-    /* Encostado ao texto das respostas, e não à estrela: é com o que a IA
-       diz que estas perguntas se alinham. */
-    padding-left: 34px;
+    margin-left: calc(var(--ia-avatar-boas) + 12px);
 }
 
-/* Os atalhos de partida são cards horizontais: ícone à esquerda, a pergunta
-   ao meio, a seta à direita. A seta não informa de nada — ela é a promessa
-   de que tocar aqui segue para algum lado —, e o ícone põe cada pergunta a
-   distinguir-se das vizinhas antes de se ler o texto. */
+/* As quatro linhas entram uma a seguir à outra, a partir do cartão. É o que
+   faz o ecrã inicial parecer que se está a montar à frente de quem chega, em
+   vez de aparecer tudo de uma vez já feito. */
+.ia-sugestoes .ia-sugestao {
+    animation: ia-entrar 0.4s var(--ia-easing) both;
+}
+
+.ia-sugestoes .ia-sugestao:nth-child(2) {
+    animation-delay: 0.05s;
+}
+
+.ia-sugestoes .ia-sugestao:nth-child(3) {
+    animation-delay: 0.1s;
+}
+
+.ia-sugestoes .ia-sugestao:nth-child(4) {
+    animation-delay: 0.15s;
+}
+
 .ia-sugestao {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 14px;
     width: 100%;
-    padding: 10px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.045);
-    color: rgba(214, 228, 248, 0.9);
+    min-height: 60px;
+    padding: 7px 14px 7px 9px;
+    border: 1px solid rgba(150, 170, 215, 0.2);
+    border-radius: 14px;
+    background:
+        linear-gradient(180deg, rgba(20, 26, 50, 0.62), rgba(12, 17, 36, 0.66));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.045),
+        0 6px 18px rgba(0, 0, 0, 0.22);
+    color: #e8ecf8;
     font-family: inherit;
-    font-size: 0.82rem;
+    font-size: 0.98rem;
     line-height: 1.35;
     text-align: left;
     cursor: pointer;
-    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    transition:
+        transform 0.28s var(--ia-easing),
+        border-color 0.28s ease,
+        background 0.28s ease,
+        box-shadow 0.28s ease,
+        color 0.2s ease;
+}
+
+/* O reflexo que percorre o vidro quando o rato passa. */
+.ia-sugestao::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(120% 100% at 0% 0%, rgba(150, 195, 255, 0.16), transparent 62%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
 }
 
 .ia-sugestao:hover {
     color: #fff;
-    border-color: rgba(110, 184, 255, 0.5);
-    background: rgba(110, 184, 255, 0.1);
+    border-color: rgba(130, 180, 255, 0.46);
+    transform: translateY(-1px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 10px 24px rgba(0, 0, 0, 0.32),
+        0 0 24px rgba(110, 150, 255, 0.16);
+}
+
+.ia-sugestao:hover::after {
+    opacity: 1;
+}
+
+.ia-sugestao:active {
+    transform: translateY(0) scale(0.996);
 }
 
 .ia-sugestao:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--ia-azul);
     outline-offset: 2px;
 }
 
+/* O ícone de cada sugestão, numa pequena placa de vidro. */
 .ia-sugestao-icone {
     flex-shrink: 0;
-    font-size: 0.95rem;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(150, 180, 240, 0.16);
+    border-radius: 12px;
+    background: radial-gradient(circle at 35% 25%, rgba(90, 130, 220, 0.28), rgba(10, 14, 30, 0.52));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    font-size: 1.4rem;
     line-height: 1;
+    text-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    transition: border-color 0.28s ease, background 0.28s ease;
+}
+
+.ia-sugestao:hover .ia-sugestao-icone {
+    border-color: rgba(165, 200, 255, 0.4);
+    background: radial-gradient(circle at 35% 25%, rgba(110, 150, 255, 0.34), rgba(12, 18, 38, 0.55));
+}
+
+/* A constelação é um SVG de traço, da cor do acento, e não um emoji: é o
+   único dos quatro símbolos que não existe no teclado. */
+.ia-sugestao-icone svg {
+    width: 24px;
+    height: 24px;
+    color: #cfe0ff;
+    filter: drop-shadow(0 0 6px rgba(120, 170, 255, 0.5));
 }
 
 .ia-sugestao-texto {
     flex: 1;
     min-width: 0;
+    padding-top: 1px;
 }
 
-/* A seta. Com o rato por cima, acompanha o hover do card com um passo para
-   a direita — o movimento mínimo que diz "isto vai". */
 .ia-sugestao-seta {
     flex-shrink: 0;
-    color: rgba(160, 190, 225, 0.55);
-    font-size: 1.05rem;
+    color: rgba(190, 205, 230, 0.6);
+    font-family: var(--ia-fonte-titulo);
+    font-size: 1.45rem;
     line-height: 1;
-    transition: color 0.2s ease, transform 0.2s ease;
+    transition: color 0.2s ease, transform 0.25s var(--ia-easing);
 }
 
 .ia-sugestao:hover .ia-sugestao-seta {
-    color: var(--accent);
+    color: #dceaff;
     transform: translateX(3px);
 }
 
@@ -732,27 +1198,22 @@ body.vr-ativo #painel-ia {
    e centra-se: não é uma mensagem da conversa, é um estado do painel. */
 .ia-aviso {
     margin: auto;
-    padding: 20px;
-    color: rgba(180, 200, 230, 0.75);
-    font-size: 0.85rem;
-    line-height: 1.6;
+    padding: 22px 18px;
+    color: rgba(186, 202, 230, 0.78);
+    font-size: 0.86rem;
+    line-height: 1.62;
     text-align: center;
     white-space: pre-wrap;
 }
 
-/* A porta de saída do aviso: quando falta é a conta e não a chave, o aviso
-   remete para /entrar — e remeter num texto que não se pode clicar é mandar
-   a pessoa procurar sozinha a barra de endereço. É um <a> e não um botão,
-   pelo mesmo motivo do #btn-conta (ver conta.css): funciona antes de o
-   JavaScript responder e com o teclado. */
 .ia-aviso-accao {
     display: inline-block;
     margin-top: 14px;
     padding: 9px 18px;
-    border: 1px solid var(--accent);
+    border: 1px solid rgba(130, 185, 255, 0.6);
     border-radius: 999px;
-    background: var(--accent-soft);
-    color: var(--accent);
+    background: rgba(110, 184, 255, 0.14);
+    color: #d9ecff;
     font-weight: 600;
     text-decoration: none;
     transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
@@ -760,80 +1221,103 @@ body.vr-ativo #painel-ia {
 
 .ia-aviso-accao:hover {
     color: #fff;
-    box-shadow: 0 0 18px var(--accent-glow);
+    background: rgba(110, 184, 255, 0.22);
+    box-shadow: 0 0 20px rgba(110, 150, 255, 0.28);
 }
 
 .ia-aviso-accao:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--ia-azul);
     outline-offset: 2px;
 }
 
 
 /* ── Escrever ────────────────────────────────────────────────────────── */
 
+/* A pílula de escrita da referência: o campo dentro de um só objeto de
+   vidro, com o foguetão à direita. */
 .ia-formulario {
     position: relative;
+    z-index: 1;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 10px;
-    padding: 12px 14px 6px;
+    margin: 8px 16px 0;
+    padding: 6px 6px 6px 16px;
+    min-height: 60px;
     flex-shrink: 0;
+    border: 1px solid rgba(155, 175, 230, 0.3);
+    border-radius: 999px;
+    background: rgba(9, 13, 30, 0.66);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 10px 26px rgba(0, 0, 0, 0.28);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    transition:
+        border-color 0.25s ease,
+        background 0.25s ease,
+        box-shadow 0.3s ease;
 }
 
-.ia-formulario::before {
-    content: "";
+/* O foco acende a pílula inteira, e não só o campo. */
+.ia-formulario:focus-within {
+    border-color: rgba(140, 185, 255, 0.6);
+    background: rgba(11, 16, 36, 0.76);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 0 0 3px rgba(110, 165, 255, 0.1),
+        0 0 30px rgba(110, 150, 255, 0.2);
+}
+
+/* As duas estrelas do lado esquerdo da pílula. São texto e não emoji: herdam
+   a cor do acento e não mudam de máquina para máquina. */
+.ia-compositor-icone {
+    position: relative;
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    color: #d8e2ff;
+    font-size: 1.05rem;
+    line-height: 22px;
+    text-align: center;
+    text-shadow: 0 0 10px rgba(150, 130, 255, 0.65);
+}
+
+.ia-compositor-icone::after {
+    content: "✧";
     position: absolute;
-    left: 12px;
-    right: 12px;
-    top: 0;
-    height: 1px;
-    background: linear-gradient(90deg,
-            transparent,
-            rgba(255, 255, 255, 0.14) 20%,
-            rgba(255, 255, 255, 0.14) 80%,
-            transparent);
-    pointer-events: none;
+    top: -6px;
+    left: 10px;
+    font-size: 0.62rem;
+    color: #9fc6ff;
+    opacity: 0.9;
 }
 
 #ia-entrada {
     flex: 1;
     min-width: 0;
-    /* Grande o suficiente para a pergunta caber à vontade, e com o canto bem
-       arredondado — é a caixa de escrita de uma conversa, não um campo de
-       formulário. Duas linhas chegam para o tamanho das perguntas que aqui
-       se fazem; o resto rola por dentro. */
-    min-height: 44px;
-    max-height: 96px;
-    padding: 11px 15px;
-    border: 1px solid rgba(140, 175, 255, 0.18);
-    border-radius: 16px;
-    background: rgba(10, 16, 36, 0.6);
-    /* Um sulco por dentro: a caixa de escrita não é uma bolha da conversa,
-       é um sítio onde se escreve — e um sulco diz isso melhor do que uma
-       cor mais escura sozinha. */
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
-    color: #eaf4ff;
+    min-height: 38px;
+    max-height: 84px;
+    padding: 8px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #eef3ff;
     font-family: inherit;
-    font-size: 0.88rem;
+    font-size: 0.96rem;
     line-height: 1.45;
     resize: none;
     overflow-y: auto;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-sizing: border-box;
 }
 
 #ia-entrada::placeholder {
-    color: rgba(180, 200, 230, 0.4);
+    color: rgba(168, 184, 212, 0.72);
 }
 
-/* O foco acende a caixa sem a transformar: borda no acento, um anel macio
-   e o mesmo halo azul-violeta do painel. */
 #ia-entrada:focus {
     outline: none;
-    border-color: var(--accent);
-    box-shadow:
-        inset 0 1px 3px rgba(0, 0, 0, 0.25),
-        0 0 0 3px rgba(110, 184, 255, 0.14),
-        0 0 20px rgba(110, 140, 255, 0.18);
+    box-shadow: none;
 }
 
 #ia-entrada:disabled {
@@ -841,58 +1325,244 @@ body.vr-ativo #painel-ia {
     cursor: not-allowed;
 }
 
-/* O enviar: um círculo com o acento a virar violeta, à direita da caixa.
-   É o único elemento do painel com cor cheia — por isso é para lá que o olho
-   vai quando a pergunta está pronta. */
+/* O foguetão. É o único elemento do painel com cor cheia — por isso é para
+   lá que o olho vai quando a pergunta está pronta. O emoji é o foguetão do
+   sistema, mas filtrado para branco: aqui não há laranja nem vermelho, só o
+   símbolo a sair do azul. */
 #ia-enviar {
     flex-shrink: 0;
-    width: 42px;
-    height: 42px;
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(200, 215, 255, 0.3);
     border-radius: 50%;
-    background: linear-gradient(140deg, #6eb8ff, #7b6cff);
-    box-shadow: 0 6px 18px rgba(90, 120, 255, 0.32);
+    background: radial-gradient(circle at 34% 28%, #7fb0ff, #6c5cff 55%, #4a3cc9);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 8px 22px rgba(80, 90, 240, 0.4),
+        0 0 26px rgba(110, 140, 255, 0.35);
     color: #fff;
     font-family: inherit;
-    font-size: 1rem;
+    font-size: 1.15rem;
     line-height: 1;
     cursor: pointer;
-    transition: box-shadow 0.2s ease, filter 0.2s ease;
+    transition:
+        filter 0.2s ease,
+        box-shadow 0.25s ease,
+        transform 0.2s var(--ia-easing),
+        opacity 0.2s ease;
 }
 
-/* O hover e o foco dão-lhe o glow — suave, e só aqui e na caixa de escrita:
-   são os dois controlos onde a conversa acontece. */
+/* A seta do enviar, desenhada em SVG no template: chega e sobe. Não é um
+   emoji — um emoji muda de desenho de máquina para máquina, e este botão é o
+   que se carrega em todas. O traço fica um dedo acima do centro ótico do
+   círculo, senão a ponta da seta encosta à base e o botão parece cair. */
+#ia-enviar svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transform: translateY(-1px);
+}
+
 #ia-enviar:hover:not(:disabled) {
     filter: brightness(1.08);
+    transform: translateY(-1px);
     box-shadow:
-        0 6px 22px rgba(90, 120, 255, 0.42),
-        0 0 22px rgba(110, 150, 255, 0.35);
+        inset 0 1px 0 rgba(255, 255, 255, 0.32),
+        0 10px 26px rgba(80, 90, 240, 0.5),
+        0 0 32px rgba(120, 150, 255, 0.45);
+}
+
+#ia-enviar:active:not(:disabled) {
+    transform: translateY(0) scale(0.93);
 }
 
 #ia-enviar:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--ia-azul);
     outline-offset: 2px;
 }
 
+/* Vazio, o botão apaga-se como qualquer botão desativado: o foguentão
+   continua lá, mas não chama ninguém. */
 #ia-enviar:disabled {
-    opacity: 0.45;
+    opacity: 0.55;
+    filter: saturate(0.7);
+    box-shadow: none;
     cursor: not-allowed;
+    animation: none;
 }
-
 
 /* ── O rodapé ────────────────────────────────────────────────────────── */
 /* A nota de baixo, pequena e ao centro: as respostas saem dos dados reais
    do AstroGuide e não de memória. Diz-se uma vez, discretamente, como se diz
-   a fonte de uma citação — não é um rodapé de publicidade. */
+   a fonte de uma citação. */
 
 .ia-rodape {
+    position: relative;
+    z-index: 1;
     flex-shrink: 0;
-    padding: 2px 16px 12px;
-    color: rgba(160, 190, 225, 0.5);
-    font-size: 0.68rem;
-    letter-spacing: 0.02em;
+    padding: 9px 18px 14px;
+    color: rgba(162, 180, 208, 0.7);
+    font-size: 0.78rem;
+    letter-spacing: 0.015em;
     text-align: center;
+}
+
+.ia-rodape span {
+    margin-right: 4px;
+    opacity: 0.9;
+}
+
+
+/* ── Ecrãs baixos ────────────────────────────────────────────────────── */
+/* Num portátil de 900px de altura o painel fica com menos 100px do que na
+   referência, e o ecrã inicial — o cartão e as quatro perguntas — deixava de
+   caber sem rolar. Aqui ele aperta as medidas sem mudar a composição: o que
+   se perde é folga, não conteúdo. */
+@media (max-height: 860px) and (min-width: 561px) {
+    .ia-boas-vindas {
+        gap: 13px;
+    }
+
+    .ia-boas-cartao {
+        padding: 17px 20px 18px;
+        border-radius: 20px;
+    }
+
+    .ia-boas-saudacao {
+        margin-bottom: 11px;
+        font-size: 1.06rem;
+    }
+
+    .ia-boas-texto {
+        font-size: 0.94rem;
+        line-height: 1.66;
+    }
+
+    .ia-boas-pergunta {
+        margin-top: 11px;
+    }
+
+    .ia-boas-linha .ia-avatar {
+        --ia-avatar-boas: 36px;
+        width: 36px;
+        height: 36px;
+    }
+
+    .ia-sugestoes {
+        gap: 8px;
+        margin-left: 48px;
+    }
+
+    .ia-sugestao {
+        min-height: 56px;
+        gap: 12px;
+        font-size: 0.94rem;
+    }
+
+    .ia-sugestao-icone {
+        width: 40px;
+        height: 40px;
+        font-size: 1.3rem;
+    }
+
+    .ia-cabecalho {
+        padding: 12px 14px 7px 16px;
+    }
+
+    .ia-titulo {
+        font-size: 1.78rem;
+    }
+
+    .ia-emblema,
+    .ia-emblema svg {
+        width: 40px;
+        height: 40px;
+    }
+
+    .ia-formulario {
+        min-height: 56px;
+        margin-top: 7px;
+    }
+
+    #ia-enviar {
+        width: 44px;
+        height: 44px;
+    }
+
+    .ia-rodape {
+        padding: 8px 18px 13px;
+    }
+}
+
+/* Num portátil de 768px de altura sobram ainda menos píxeis. Aperta-se mais
+   um pouco, para o cartão e as quatro perguntas caberem sem rolar: o ecrã
+   inicial é uma coisa para se ver de uma vez. */
+@media (max-height: 800px) and (min-width: 561px) {
+    .ia-boas-vindas {
+        gap: 10px;
+    }
+
+    .ia-boas-cartao {
+        padding: 14px 18px 16px;
+    }
+
+    .ia-boas-saudacao {
+        margin-bottom: 9px;
+        font-size: 1rem;
+    }
+
+    .ia-boas-texto {
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+
+    .ia-boas-pergunta {
+        margin-top: 9px;
+    }
+
+    .ia-sugestoes {
+        gap: 7px;
+    }
+
+    .ia-sugestao {
+        min-height: 52px;
+        font-size: 0.94rem;
+    }
+
+    .ia-sugestao-icone {
+        width: 38px;
+        height: 38px;
+        font-size: 1.25rem;
+    }
+
+    .ia-cabecalho {
+        padding: 10px 16px 6px 18px;
+    }
+
+    .ia-estado {
+        padding-bottom: 12px;
+    }
+
+    .ia-formulario {
+        min-height: 56px;
+        margin-top: 6px;
+    }
+
+    #ia-enviar {
+        width: 42px;
+        height: 42px;
+    }
+
+    .ia-rodape {
+        padding: 6px 18px 10px;
+    }
 }
 
 
@@ -900,81 +1570,237 @@ body.vr-ativo #painel-ia {
 @media (max-width: 560px) {
 
     /* O painel ocupa a largura toda, com uma margem de dedo de cada lado, e
-       sobe até quase ao topo: num telefone um painel de 420px encostado à
-       esquerda deixava uma tira de céu inútil à direita, e uma conversa
-       precisa de altura mais do que de outra coisa. O que encolhe é a lista
-       de mensagens, com o seu scroll — o cabeçalho e a caixa de escrita
-       ficam sempre à vista. */
+       sobe até quase ao topo: num telefone uma conversa precisa de altura
+       mais do que de outra coisa. O que encolhe é a lista de mensagens, com
+       o seu scroll — o cabeçalho e a pílula de escrita ficam sempre à
+       vista. */
     #painel-ia {
-        left: 10px;
-        right: 10px;
+        left: 8px;
+        right: 8px;
         width: auto;
-        max-height: calc(100vh - 110px);
+        bottom: 76px;
+        height: calc(100vh - 92px);
+        border-radius: 24px;
+        --ia-avatar-boas: 32px;
     }
 
     /* No telefone o painel já é quase full-screen: o ⛶ não tem o que
-       aumentar, e a classe dele não pode travar o width:auto de cima — a
-       regra .maximizado tem mais especificidade e ganhava a esta. */
+       aumentar, e a classe dele não pode travar o width:auto de cima. */
     #painel-ia.maximizado {
         width: auto;
-        max-height: calc(100vh - 110px);
+        height: calc(100vh - 92px);
     }
 
-    /* O botão encolhe para o rótulo: "✦ AstroGuide AI" num telefone tapa
-       meia barra de navegação, e a estrela sozinha já se identifica. */
+    /* O botão encolhe: "✦ AstroGuide AI" num telefone tapa meia barra de
+       navegação. */
     #btn-ia {
         bottom: 16px;
-        left: 16px;
-        padding: 10px 14px;
-        font-size: 0.8rem;
+        left: 14px;
+        padding: 7px 14px 7px 7px;
+        font-size: 0.79rem;
+    }
+
+    #btn-ia .ia-estrela {
+        width: 22px;
+        height: 22px;
+        font-size: 0.66rem;
     }
 
     /* No Observatório do telefone o botão sobe para cima do ⚙️ em vez de ficar
        ao lado dele: a pílula ocupa meia barra, e ao lado roubava à barra do
        tour guiado os 84px que ela ali precisa (ver o @media do #tour-barra,
-       no index.css). Empilhado poupa esse espaço, e o ⚙️ continua a ser o que
-       fica mais à mão no canto. O painel não precisa de nada: a regra de cima
-       já o põe de ponta a ponta. */
+       no index.css). Empilhado poupa esse espaço. */
     body.observatorio-ativo #btn-ia {
         bottom: 84px;
         right: 24px;
         left: auto;
     }
 
-    /* Num telefone a bolha pode ir quase de ponta a ponta: os 8% que sobram
-       de margem são uma faixa de vidro a menos e uma linha de texto a mais. */
+    .ia-cabecalho {
+        padding: 14px 12px 8px 14px;
+        gap: 8px;
+    }
+
+    .ia-identidade {
+        gap: 10px;
+    }
+
+    .ia-emblema,
+    .ia-emblema svg {
+        width: 38px;
+        height: 38px;
+    }
+
+    .ia-titulo {
+        font-size: 1.55rem;
+    }
+
+    .ia-controlos {
+        gap: 6px;
+    }
+
+    .ia-btn-cabecalho {
+        width: 30px;
+        height: 30px;
+    }
+
+    .ia-btn-cabecalho svg {
+        width: 13px;
+        height: 13px;
+    }
+
+    .ia-estado {
+        padding: 0 15px 12px;
+        font-size: 0.75rem;
+        gap: 6px;
+    }
+
+    .ia-hora {
+        font-size: 0.7rem;
+        letter-spacing: 0;
+    }
+
+    .ia-mensagens {
+        padding: 4px 14px 8px;
+    }
+
     .ia-linha {
         max-width: 96%;
     }
 
     .ia-linha.utilizador {
-        max-width: 90%;
+        max-width: 92%;
+    }
+
+    .ia-boas-cartao {
+        padding: 16px 16px 18px;
+        border-radius: 18px;
+    }
+
+    .ia-boas-saudacao {
+        font-size: 1.02rem;
+        margin-bottom: 12px;
+    }
+
+    .ia-boas-texto {
+        font-size: 0.905rem;
+        line-height: 1.68;
+    }
+
+    .ia-boas-pergunta {
+        margin-top: 12px;
+    }
+
+    .ia-sugestoes {
+        gap: 8px;
+    }
+
+    .ia-sugestao {
+        min-height: 56px;
+        gap: 12px;
+        font-size: 0.94rem;
+    }
+
+    .ia-sugestao-icone {
+        width: 40px;
+        height: 40px;
+        font-size: 1.28rem;
+    }
+
+    .ia-formulario {
+        margin: 8px 12px 0;
+        min-height: 54px;
+        padding: 4px 4px 4px 14px;
+    }
+
+    #ia-enviar {
+        width: 44px;
+        height: 44px;
+        font-size: 1rem;
+    }
+
+    #ia-enviar svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .ia-rodape {
+        padding: 8px 14px 12px;
+        font-size: 0.7rem;
+    }
+}
+
+/* Um telemóvel muito estreito: a hora encolhe e o subtítulo do estado pode
+   partir, mas o nome e os três controlos ficam. */
+@media (max-width: 380px) {
+    .ia-titulo {
+        font-size: 1.36rem;
+    }
+
+    .ia-estado-sub {
+        display: none;
+    }
+
+    .ia-estado-sep {
+        display: none;
+    }
+
+    .ia-emblema,
+    .ia-emblema svg {
+        width: 34px;
+        height: 34px;
+    }
+
+    .ia-boas-linha .ia-avatar {
+        display: none;
+    }
+
+    /* Sem retrato à esquerda, o vão que ele abria desaparece. */
+    .ia-sugestoes {
+        margin-left: 0;
     }
 }
 
 
 /* ── Menos movimento ─────────────────────────────────────────────────── */
-/* As animações daqui são todas de entrada — a mensagem a aparecer, o painel
-   a abrir —, e são decorativas: sem elas tudo funciona igual e tudo aparece
-   no sítio. Quem tem o sistema configurado para menos movimento recebe as
-   mensagens já colocadas e o painel já aberto.
+/* As animações daqui são de entrada e de ambiente — o painel a abrir, a
+   mensagem a aparecer, a orbe a flutuar, as estrelas a respirar —, e são
+   decorativas: sem elas tudo funciona igual e tudo aparece no sítio. Quem
+   tem o sistema configurado para menos movimento recebe tudo parado.
 
-   Os três pontos do "a pensar" NÃO desaparecem, de propósito: não são
-   movimento decorativo, são a indicação de que algo está a acontecer, e um
-   indicador parado parece um ecrã bloqueado. O que se lhes tira é o SALTO —
-   o mesmo truque do glass.css com as estrelas —, e fica o esbatimento. */
+   Os três pontos do "a pensar" NÃO desaparecem: não são movimento
+   decorativo, são a indicação de que algo está a acontecer. O que se lhes
+   tira é o SALTO, e fica o esbatimento. */
 @media (prefers-reduced-motion: reduce) {
 
-    .ia-mensagem {
-        animation: none;
-    }
-
-    #painel-ia.aberto {
+    .ia-mensagem,
+    .ia-boas-cartao,
+    .ia-sugestoes .ia-sugestao,
+    #painel-ia.aberto,
+    #painel-ia.a-fechar {
         animation: none;
     }
 
     #painel-ia {
         transition: none;
+    }
+
+    .ia-cosmos::before,
+    .ia-emblema,
+    .ia-estado-ponto {
+        animation: none;
+    }
+
+    .ia-sugestao,
+    .ia-sugestao::after,
+    .ia-btn-cabecalho,
+    #btn-ia,
+    #ia-enviar {
+        transition-duration: 0.01ms;
+    }
+
+    .ia-sugestao:hover {
+        transform: none;
     }
 
     .ia-pontos span {
@@ -987,6 +1813,7 @@ body.vr-ativo #painel-ia {
         60%,
         100% {
             opacity: 0.3;
+            box-shadow: none;
         }
 
         30% {
