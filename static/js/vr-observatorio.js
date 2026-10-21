@@ -1231,6 +1231,11 @@ function vrAnimar() {
         }
     }
 
+    // O painel de detalhes acompanha a câmara no PC (aproximação): fica sempre
+    // por cima do planeta, à mesma distância aparente. Numa sessão XR não se
+    // mexe — o utilizador é que anda, e uma legenda colada à cabeça não é céu.
+    if (!vrSessaoAtiva) posicionarPainelInfoVR();
+
     // Em sessão: ponta do laser à distância do alvo + destaque do botão
     if (vrSessaoAtiva) atualizarMiradoresVR();
 
@@ -1363,6 +1368,7 @@ function selecionarAstroVR(astro) {
 
     vrPainelInfo3D = criarPainelInfo3DVR(astro);
     vrScene.add(vrPainelInfo3D);
+    posicionarPainelInfoVR();
 
     mostrarInfoAstroVR(astro); // painel HTML (espelho no PC)
 
@@ -1467,13 +1473,53 @@ function criarPainelInfo3DVR(astro) {
     // Decorativo — não deve roubar o raio ao planeta selecionado
     sprite.raycast = () => {};
 
-    // Fica entre o observador e o astro, ligeiramente abaixo, para não tapar
-    // o planeta selecionado.
-    const pos = altAzParaXYZ(astro.altitude, astro.azimute, RAIO_CEU_VR);
-    sprite.position.copy(pos).multiplyScalar(0.88);
-    sprite.position.y -= 30;
-    sprite.scale.set(150, 75, 1);
+    // A posição não é decidida aqui: o painel fica ACIMA do astro e a conta
+    // depende de onde está a câmara nesse instante (ver o
+    // posicionarPainelInfoVR, chamado logo a seguir a este sprite entrar na
+    // cena e, no PC, a cada fotograma).
+    sprite.scale.set(PAINEL_INFO_LARGURA, PAINEL_INFO_ALTURA, 1);
     return sprite;
+}
+
+// ── Onde é que o painel de detalhes fica ────────────────────────────────────
+// ACIMA do astro selecionado — nunca à frente dele. Antes o painel ficava
+// entre o observador e o planeta, e o que se ganhava em proximidade perdia-se
+// em vista: tapava o planeta e o céu em volta.
+//
+// Três coisas que esta conta tem de respeitar:
+//  1. o painel vai a 80% do caminho entre a câmara e o astro, por isso está
+//     sempre à frente do céu (até no zénite) e atrás da superfície do planeta;
+//  2. o tamanho acompanha essa distância, para o painel ter sempre o mesmo
+//     tamanho aparente — na vista geral e com a câmara colada ao planeta;
+//  3. o desvio é feito no "para cima" da câmara e não no +Y do mundo: com um
+//     astro perto do zénite, o +Y do mundo aponta para o observador e o painel
+//     ia parar atrás do planeta em vez de por cima dele.
+const PAINEL_INFO_LARGURA = 132;   // no mundo, à distância da cúpula (500)
+const PAINEL_INFO_ALTURA = 66;
+const PAINEL_INFO_CAMINHO = 0.8;   // fração da distância câmara → astro
+
+function posicionarPainelInfoVR() {
+    if (!vrPainelInfo3D || !vrUltimaSelecao || !vrCamera) return;
+
+    const alvo = altAzParaXYZ(vrUltimaSelecao.altitude, vrUltimaSelecao.azimute, RAIO_CEU_VR);
+    const cfg = astroCfg(vrUltimaSelecao.nome);
+    const raio = cfg ? cfg.size * FATOR_ESCALA_VR : 20;
+
+    const paraAstro = alvo.clone().sub(vrCamera.position);
+    const distancia = Math.max(paraAstro.length(), 1);
+    const escala = distancia / RAIO_CEU_VR;   // 1 à distância da cúpula
+    const altura = PAINEL_INFO_ALTURA * escala;
+
+    vrPainelInfo3D.scale.set(PAINEL_INFO_LARGURA * escala, altura, 1);
+
+    const cima = new THREE.Vector3(0, 1, 0).applyQuaternion(vrCamera.quaternion);
+
+    // Acima do planeta e do seu anel de seleção, com uma folga que também
+    // acompanha a distância para não desaparecer de perto.
+    vrPainelInfo3D.position
+        .copy(vrCamera.position)
+        .addScaledVector(paraAstro, PAINEL_INFO_CAMINHO)
+        .addScaledVector(cima, raio * 1.15 + altura / 2 + 20 * escala);
 }
 
 // ── Painel de detalhes HTML (espelho do PC) ─────────────────────────────────
