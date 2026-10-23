@@ -2105,9 +2105,15 @@ function agendarDesenhoObservatorio() {
 // ── Parallax do fundo panorâmico ───────────────────────────────────
 // O fundo acompanha o zoom da câmara, mas só uma fração dele — o porquê está
 // no bloco de desenho, no modo 360°.
+//
+// O expoente subiu de 0,3 para 0,65 quando os astros passaram a crescer com o
+// zoom (ver o fatorForma, no desenharObservatorio): a 0,3 o fundo ia a 1,28x
+// no zoom máximo enquanto os planetas iam a 2,2x, e o céu abria-se à volta de
+// uma Via Láctea que ficava parada no mesmo sítio. A 0,65 ele chega aos 1,9x
+// — perto dos astros, sem nunca lhes passar à frente.
 const FUNDO_FOLGA = 1.4;        // folga vertical: imagem a mais para olhar acima/abaixo
-const FUNDO_ZOOM_MAX = 1.35;    // o máximo que o fundo cresce com o zoom
-const FUNDO_PARALLAX = 0.3;     // expoente do zoom: <1 = o fundo cresce menos que as estrelas
+const FUNDO_ZOOM_MAX = 1.9;     // o máximo que o fundo cresce com o zoom
+const FUNDO_PARALLAX = 0.65;    // expoente do zoom: <1 = o fundo cresce menos que as estrelas
 const FUNDO_ESCALA_MAX = FUNDO_FOLGA * FUNDO_ZOOM_MAX;
 
 // ── Cache do fundo do céu (fotografia da Via Láctea) ───────────────
@@ -2119,8 +2125,10 @@ const FUNDO_ESCALA_MAX = FUNDO_FOLGA * FUNDO_ZOOM_MAX;
 //
 // O bitmap é preparado à escala do zoom MÁXIMO, não à do zoom atual: é isso
 // que permite ao fundo acompanhar o zoom sem voltar a passar pela escala e
-// pelo filtro a cada passo da roda. Com o zoom todo aberto desenha-se mais
-// pequeno do que ele é (nunca maior), por isso nunca perde nitidez.
+// pelo filtro a cada passo da roda. Com o zoom todo aberto desenha-se no
+// tamanho dele (nunca maior), por isso nunca perde nitidez — exceto num ecrã
+// tão grande que nem a fotografia chegue, e aí a escala fica travada na
+// resolução dela (ver o Math.min, mais abaixo).
 let fundoCeuCache = null; // { chave, imagem }
 
 function obterFundoCeuPreparado(alturaAlvo) {
@@ -2132,8 +2140,16 @@ function obterFundoCeuPreparado(alturaAlvo) {
     if (fundoCeuCache && fundoCeuCache.chave === chave) return fundoCeuCache.imagem;
 
     // Escala a imagem para cobrir a altura do canvas, com a folga vertical e a
-    // margem do zoom lá dentro.
-    const escala = (alturaAlvo / imgCeuFundo.naturalHeight) * FUNDO_ESCALA_MAX;
+    // margem do zoom lá dentro — mas nunca acima da resolução da fotografia.
+    // Num ecrã 4K esta conta pedia um bitmap de ~58 MP (uns 230 MB) para um
+    // fundo que a fotografia não tem pixels para encher: memória a dobrar por
+    // nenhuma nitidez a mais. Travada no tamanho dela, o fundo cresce até onde
+    // a fotografia aguenta e, daí para cima, é ampliado como qualquer
+    // fotografia seria.
+    const escala = Math.min(
+        1,
+        (alturaAlvo / imgCeuFundo.naturalHeight) * FUNDO_ESCALA_MAX
+    );
     const largura = Math.round(imgCeuFundo.naturalWidth * escala);
     const altura = Math.round(imgCeuFundo.naturalHeight * escala);
 
@@ -2556,16 +2572,24 @@ function desenharObservatorio() {
             // pista de profundidade — a Via Láctea lê-se atrás das estrelas em
             // vez de pintada na mesma folha.
             //
+            // A ampliação é a mesma que os astros usam (ver ampliacaoDoCeu):
+            // um só número define "quanto é que o céu está ampliado", e o
+            // fundo e o que se desenha por cima dele nunca podem discordar
+            // sobre o que é o zoom.
+            //
             // Nunca abaixo de 1: encolher o fundo abria buracos em cima e em
             // baixo, porque a folga vertical está contada à justa.
-            const razaoZoom = CAMERA_FOV_BASE / cameraFOV;
             const escalaZoom = Math.min(FUNDO_ZOOM_MAX,
-                                        Math.max(1, Math.pow(razaoZoom, FUNDO_PARALLAX)));
+                                        Math.pow(ampliacaoDoCeu(), FUNDO_PARALLAX));
 
-            // O bitmap está preparado à escala do zoom máximo; aqui desconta-se
-            // essa margem, para que com o zoom todo aberto ele apareça
-            // exatamente no tamanho de sempre.
-            const fator = escalaZoom / FUNDO_ZOOM_MAX;
+            // A altura com que o fundo tem de sair: a do canvas, vezes a folga
+            // vertical, vezes o zoom. O fator sai daqui — e não do tamanho do
+            // bitmap — para o enquadramento ser sempre este, mesmo quando o
+            // bitmap é preparado mais pequeno do que o zoom pedia (o travão na
+            // resolução da fotografia, no obterFundoCeuPreparado): nesse caso
+            // ele é ampliado, mas o céu continua a cobrir o ecrã e a folga
+            // vertical continua a dar para olhar acima e abaixo.
+            const fator = (height * FUNDO_FOLGA * escalaZoom) / imgH;
             const wrap = Math.round(imgW * fator);
             const alt = Math.round(imgH * fator);
 
