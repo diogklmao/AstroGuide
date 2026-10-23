@@ -2388,6 +2388,20 @@ function atualizarBotaoCeusSobOsPes() {
 // já se vê aquilo para que se desceu.
 const ALFA_ABAIXO = 0.6;
 
+// ── Quanto é que o céu está ampliado ──────────────────────────────
+// A projeção 360° desenha com uma distância focal f = width / (2·tan(fov/2)),
+// e é ela que decide o tamanho aparente de tudo o que está no céu. A razão
+// entre ela e a da abertura (CAMERA_FOV_BASE) é a ampliação exata da vista —
+// a razão dos FOVs seria só uma aproximação, que erra mais quanto mais o zoom
+// fecha. Nunca desce de 1: afastar a câmara até aos 110° não encolhe o que já
+// se desenhava.
+function ampliacaoDoCeu() {
+    const rad = Math.PI / 180;
+    const abertura = Math.tan(CAMERA_FOV_BASE * rad / 2);
+    const atual = Math.tan(cameraFOV * rad / 2);
+    return Math.max(1, abertura / atual);
+}
+
 // ── Renderização do Observatório ──────────────────────────────────
 function desenharObservatorio() {
     // Antes do teste do canvas: o rótulo do botão depende só de onde a câmara
@@ -2407,6 +2421,25 @@ function desenharObservatorio() {
 
     const modoSelect = document.getElementById("sel-modo-visao");
     const modoVisao = modoSelect ? modoSelect.value : "360";
+
+    // Os tamanhos acompanham o zoom (ver ampliacaoDoCeu): sem isto, aproximar
+    // a câmara afastava as estrelas umas das outras, o fundo crescia — e os
+    // astros, as linhas e os símbolos ficavam cada vez mais pequenos no meio
+    // do céu que se abria. No planisfério não há FOV (é uma projeção zenital),
+    // por isso lá não há ampliação nenhuma para aplicar.
+    const ampliacao = modoVisao === "360" ? ampliacaoDoCeu() : 1;
+
+    // As formas (pontos das estrelas, discos dos planetas, símbolos do céu
+    // profundo) crescem com o zoom até um teto. O teto existe porque estes
+    // tamanhos já são simbólicos à partida — o Sol tem 50 de raio na abertura,
+    // e não os 4 px que o diâmetro real dele pediria a esta distância focal —
+    // e a 2,2× ainda se vê céu à volta dele.
+    const fatorForma = Math.min(2.2, ampliacao);
+
+    // Os traços e os rótulos crescem menos: são sinalética por cima do céu, e
+    // à ampliação toda as linhas das constelações ficavam gordas e os nomes
+    // competiam com as estrelas que nomeiam.
+    const fatorSinal = Math.min(1.6, Math.sqrt(ampliacao));
 
     // Lido uma vez por desenho, e não a cada objeto: são ~98 estrelas, 36
     // objetos de céu profundo e 73 linhas de constelação, e cada pergunta
@@ -2758,8 +2791,8 @@ function desenharObservatorio() {
     // 2. Desenhar as linhas das constelações (se ativo)
     if (showConstelacoes) {
         ctx.strokeStyle = "rgba(110, 200, 255, 0.8)"; // Azul claro opaco para a linha
-        ctx.lineWidth = 2.0;
-        ctx.shadowBlur = 12; // Efeito neon
+        ctx.lineWidth = 2.0 * fatorSinal;
+        ctx.shadowBlur = 12 * fatorSinal; // Efeito neon
         ctx.shadowColor = "rgba(110, 200, 255, 1)"; // Cor do brilho neon
 
         const constelacoes = observatorioDados.constelacoes;
@@ -2847,12 +2880,12 @@ function desenharObservatorio() {
                 ctx.shadowBlur = 6;
                 ctx.shadowColor = "rgba(110, 200, 255, 1)"; // Efeito glow para o texto
                 ctx.fillStyle = "rgba(255, 255, 255, 0.95)"; // Texto quase branco e opaco
-                ctx.font = "bold italic 11px sans-serif"; // Fonte maior e a negrito
+                ctx.font = `bold italic ${Math.round(11 * fatorSinal)}px sans-serif`; // Fonte maior e a negrito
                 ctx.textAlign = "center";
                 ctx.fillText(constelacao.nome, sumX / count, sumY / count);
 
                 // Repor o shadowBlur para as linhas na próxima iteração do ciclo
-                ctx.shadowBlur = 12;
+                ctx.shadowBlur = 12 * fatorSinal;
             }
 
             // Registar constelação como elemento clicável
@@ -2891,9 +2924,9 @@ function desenharObservatorio() {
         // estrela". O brilho neon é o mesmo das constelações, mas mais curto —
         // são uns 20 símbolos por frame, e não 15 linhas.
         ctx.strokeStyle = "rgba(255, 214, 140, 0.85)";
-        ctx.lineWidth = 1.6;
+        ctx.lineWidth = 1.6 * fatorSinal;
         ctx.setLineDash([]);
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 6 * fatorSinal;
         ctx.shadowColor = "rgba(255, 200, 110, 0.9)";
 
         // A fonte e o alinhamento dos rótulos são iguais para todos, por isso
@@ -2901,7 +2934,7 @@ function desenharObservatorio() {
         // vez de cada vez que lhe é atribuída (o mesmo motivo do ciclo das
         // estrelas). A cor do texto, essa, tem de ser reposta dentro do ciclo —
         // o ponto ao centro da nebulosa planetária pinta-se com o fillStyle.
-        ctx.font = "9px sans-serif";
+        ctx.font = `${Math.round(9 * fatorSinal)}px sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
 
@@ -2913,7 +2946,10 @@ function desenharObservatorio() {
             const pos = projectar(dso.altitude, dso.azimute);
             if (!pos) continue; // fora do campo de visão, na projeção 360°
 
-            const raio = raioSimboloCeuProfundo(dso.dimensao);
+            // O símbolo cresce com o zoom, como o objeto que representa (ver
+            // o fatorForma): a relação entre ele e as estrelas à volta fica a
+            // mesma em toda a escala.
+            const raio = raioSimboloCeuProfundo(dso.dimensao) * fatorForma;
 
             // Debaixo do horizonte desenha-se apagado (ver ALFA_ABAIXO). O
             // desenharSimboloCeuProfundo faz o seu próprio save/restore e não
@@ -2962,7 +2998,7 @@ function desenharObservatorio() {
     // uma vez em vez de uma vez por estrela — ctx.font obriga o browser a analisar
     // a string outra vez de cada vez que lhe é atribuída.
     if (showNomesEstrelas) {
-        ctx.font = "9px sans-serif";
+        ctx.font = `${Math.round(9 * fatorSinal)}px sans-serif`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
     }
@@ -2987,6 +3023,10 @@ function desenharObservatorio() {
         let starSize = maxStarSize - ((est.mag - (-1.5)) / (5.0 - (-1.5))) * (maxStarSize - minStarSize);
         starSize = Math.max(minStarSize, Math.min(maxStarSize, starSize));
 
+        // E depois com base no zoom: o ponto cresce com o céu que o rodeia,
+        // em vez de ficar um grão de areia no meio de um vazio maior.
+        starSize *= fatorForma;
+
         // Halo de brilho para as estrelas principais
         if (est.mag < 1.8) {
             ctx.beginPath();
@@ -3004,10 +3044,11 @@ function desenharObservatorio() {
         // Polaris destaca-se com uma pequena mira
         if (est_id === "polaris") {
             ctx.strokeStyle = "rgba(110, 184, 255, 0.35)";
-            ctx.lineWidth = 1;
+            ctx.lineWidth = fatorSinal;
+            const mira = 7 * fatorForma;
             ctx.beginPath();
-            ctx.moveTo(pos.x - 7, pos.y); ctx.lineTo(pos.x + 7, pos.y);
-            ctx.moveTo(pos.x, pos.y - 7); ctx.lineTo(pos.x, pos.y + 7);
+            ctx.moveTo(pos.x - mira, pos.y); ctx.lineTo(pos.x + mira, pos.y);
+            ctx.moveTo(pos.x, pos.y - mira); ctx.lineTo(pos.x, pos.y + mira);
             ctx.stroke();
         }
 
@@ -3045,7 +3086,12 @@ function desenharObservatorio() {
             if (!pos) return; // ignora se estiver fora do FOV 3D
 
             const imgAstro = imagemAstro(astro.nome);
-            const size = tamanhoAstro(astro.nome);
+
+            // O disco cresce com o zoom, como as estrelas e as linhas. Todos os
+            // tamanhos deste bloco saem daqui — o recorte circular, os anéis do
+            // Saturno, a ISS, os halos e o rótulo —, por isso é aqui que a
+            // ampliação entra, uma vez só.
+            const size = tamanhoAstro(astro.nome) * fatorForma;
 
             // Debaixo do horizonte o astro desenha-se apagado (ver ALFA_ABAIXO).
             // Fica posto antes dos ramos das imagens: o ramo do recorte circular
@@ -3119,7 +3165,7 @@ function desenharObservatorio() {
 
             // Rótulo de Nome do Astro
             ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 9px sans-serif";
+            ctx.font = `bold ${Math.round(9 * fatorSinal)}px sans-serif`;
             ctx.textAlign = "center";
             ctx.textBaseline = "bottom";
             ctx.fillText(astro.nome, pos.x, pos.y - size - 4);
@@ -3139,7 +3185,7 @@ function desenharObservatorio() {
                 // desenhada larga e baixa, tem de cobrir a LARGURA toda. Com o
                 // size + 4 dos planetas, clicar nas pontas dos painéis solares
                 // não pegava — e são elas que ocupam quase toda a imagem.
-                raio: imgAstro ? (astro.nome === "ISS" ? size * 1.5 : size + 4) : 12,
+                raio: imgAstro ? (astro.nome === "ISS" ? size * 1.5 : size + 4) : 12 * fatorForma,
                 tipo: astro.tipo,
                 mag: astro.tipo === "sol" ? "-26.7" : (astro.tipo === "lua" ? "-12.5" : "Variável"),
                 altitude: astro.altitude,
@@ -3159,10 +3205,10 @@ function desenharObservatorio() {
         const itemNoEcra = elementosNoEcra.find(el => el.id === objetoSelecionado.id);
         if (itemNoEcra) {
             ctx.beginPath();
-            ctx.arc(itemNoEcra.x, itemNoEcra.y, itemNoEcra.raio + 4, 0, 2 * Math.PI);
+            ctx.arc(itemNoEcra.x, itemNoEcra.y, itemNoEcra.raio + 4 * fatorSinal, 0, 2 * Math.PI);
             ctx.strokeStyle = "#ce93d8";
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([3, 3]);
+            ctx.lineWidth = 1.5 * fatorSinal;
+            ctx.setLineDash([3 * fatorSinal, 3 * fatorSinal]);
             ctx.stroke();
             ctx.setLineDash([]);
         }
