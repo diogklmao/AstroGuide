@@ -63,9 +63,11 @@ body.page-perfil {
 }
 
 /* Recuos por cartão: o da referência é mais curto no cabeçalho (o avatar
-   quase toca às bordas) e mais folgado nos cartões de secção. */
+   quase toca às bordas) e mais folgado nos cartões de secção. Os 20px de lado
+   são os mesmos em todos — incluindo o cabeçalho —, para o título, os campos e
+   as listas ficarem todos na mesma linha vertical, de cartão para cartão. */
 .perfil-cartao {
-    padding: 18px 22px 16px;
+    padding: 16px 20px 14px;
 }
 
 /* ── Cabeçalho: quem é ───────────────────────────────────────────────── */
@@ -74,7 +76,7 @@ body.page-perfil {
     display: flex;
     align-items: center;
     gap: 20px;
-    padding: 14px 24px;
+    padding: 14px 20px;
     /* Deixa o lado direito (o selo da conta e a administração) descer sozinho
        para a linha de baixo num ecrã estreito, em vez de espremer o nome e o
        email contra ele. */
@@ -280,15 +282,15 @@ a.perfil-pill-admin:hover {
 .perfil-tiles {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 16px;
+    gap: 9px;
+    margin-top: 14px;
 }
 
 .perfil-tile {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 7px 14px;
+    gap: 11px;
+    padding: 6px 12px;
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.035);
@@ -302,8 +304,8 @@ a.perfil-pill-admin:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border-radius: 10px;
 }
 
@@ -372,7 +374,7 @@ a.perfil-pill-admin:hover {
    quase branco, como na referência. */
 label.perfil-rotulo {
     display: block;
-    margin-top: 10px;
+    margin-top: 8px;
     font-size: 0.82rem;
     color: rgba(225, 232, 250, 0.85);
 }
@@ -380,8 +382,8 @@ label.perfil-rotulo {
 .perfil-campo {
     box-sizing: border-box;
     width: 100%;
-    margin: 6px 0 2px;
-    padding: 10px 12px;
+    margin: 5px 0 2px;
+    padding: 9px 12px;
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 10px;
     background: rgba(9, 14, 32, 0.6);
@@ -836,9 +838,26 @@ textarea.perfil-campo {
     margin-top: 4px;
 }
 
+/* Data e hora na mesma linha: são dois valores curtos da mesma observação, e
+   empilhados davam ao formulário duas linhas de altura para dois números. Em
+   duas colunas iguais leem-se como o par que são, e o caderno encolhe uma
+   linha — que é o que faz a diferença de altura para os favoritos ser menor. */
+.perfil-form-duo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 10px;
+}
+
+/* Cada metade é um rótulo + o campo dele. O min-width a zero é o que deixa a
+   data e a hora encolherem por igual em vez de a mais comprida mandar na
+   largura da coluna. */
+.perfil-form-celula {
+    min-width: 0;
+}
+
 .perfil-lista-obs {
     gap: 8px;
-    margin-top: 16px;
+    margin-top: 14px;
 }
 
 /* As observações são mais altas que uma linha de favorito (têm a nota), por
@@ -1191,14 +1210,38 @@ textarea.perfil-campo {
 
 /* ── Favoritos e caderno, lado a lado ────────────────────────────────── */
 /* As duas listas da conta, uma ao lado da outra — a da referência. São
-   independentes: a de cima cresce com os favoritos, a de baixo com as
-   observações, e nenhuma puxa a outra. O align-items: start é o que impede
-   as duas de ficarem com a altura da maior. */
+   independentes no conteúdo, mas não no desenho: os dois cartões começam e
+   acabam na mesma linha, para a coluna não ficar com um degrau a meio. O
+   align-items: stretch (o de omissão) é o que lhes dá a altura do mais alto;
+   o minmax(0, 1fr) de cada coluna é o que as mantém exatamente da mesma
+   largura — com "1fr" simples, uma linha de favorito comprida podia alargar
+   a sua coluna e roubar largura à outra. */
 .perfil-dupla {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 13px;
-    align-items: start;
+    align-items: stretch;
+}
+
+/* Cada cartão da dupla é uma coluna flexível, para o que está lá dentro poder
+   crescer quando sobra altura — é disso que a caixa do convite (logo abaixo)
+   se serve. O conteúdo normal continua encostado ao topo, que é onde se lê. */
+.perfil-dupla > .perfil-cartao {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* A caixa do convite (favoritos vazios) cresce e centra-se no espaço que
+   sobra: o cartão fica da altura do caderno sem a caixa ficar a flutuar a
+   meio caminho. Com favoritos, a lista é que manda e o resto é só margem. */
+.perfil-dupla > .perfil-cartao > .perfil-vazio {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin-top: 12px;
+    padding: 24px 22px;
 }
 
 /* ── Terminar sessão ─────────────────────────────────────────────────── */
@@ -1222,7 +1265,7 @@ textarea.perfil-campo {
     /* Favoritos e caderno descem para cima e baixo: lado a lado, cada um
        ficava com menos de metade do ecrã. */
     .perfil-dupla {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -1249,6 +1292,12 @@ textarea.perfil-campo {
 
     .perfil-tiles {
         grid-template-columns: 1fr;
+    }
+
+    /* Com o cartão estreito, a data e a hora voltam a empilhar: em duas
+       colunas de ~150px o "23/10/2026" ficava encostado à seta. */
+    .perfil-form-duo {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .perfil-cabecalho-lado {
