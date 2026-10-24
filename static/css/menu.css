@@ -8,7 +8,7 @@ body.page-menu {
     background: #03040c;
 }
 
-/* Foto 618.jpg — blur com filter (não backdrop-filter) */
+/* Fundo TON 618 — blur com filter (não backdrop-filter) */
 .page-menu .bg-foto {
     position: fixed;
     inset: 0;
@@ -16,7 +16,8 @@ body.page-menu {
     overflow: hidden;
 }
 
-.page-menu .bg-foto img {
+.page-menu .bg-foto img,
+.page-menu .bg-foto video {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -27,6 +28,10 @@ body.page-menu {
     object-fit: cover;
     transform: translate(-50%, -50%);
     filter: blur(1.5px) saturate(1.4);
+}
+
+.page-menu .bg-foto video {
+    pointer-events: none;
 }
 
 /* O tratamento da luz. Três coisas ao mesmo tempo, e todas subtis: o centro
