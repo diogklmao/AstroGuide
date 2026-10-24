@@ -39,6 +39,11 @@ let vrUltimoTempoMs = 0;
 // se desvia do alvo se a mão se mexer durante o clique).
 let vrControladoresInfo = [];
 let vrGatilhoPuxado = false;
+// Instante do último pulso do gatilho ("selectstart"). Serve para o botão HTML
+// do DOM Overlay reconhecer — e ignorar — o clique que o navegador sintetiza
+// quando o gatilho é puxado com o raio por cima dele (ver
+// sairSessaoVRDoOverlay): esse clique terminava a sessão sem ninguém querer.
+let vrUltimoGatilhoMs = 0;
 
 // Cache dos alvos de seleção (invalidado quando os grupos mudam) e temporários
 // para o raycast do laser SEM alocações no ciclo de renderização.
@@ -991,6 +996,7 @@ function criarControladoresVR() {
         // («SAIR DO VR», «VISTA GERAL»). Um pulso = uma ação (debounce).
         // Fora de alvo nenhum, nada acontece — a navegação nunca é bloqueada.
         controlador.addEventListener("selectstart", () => {
+            vrUltimoGatilhoMs = performance.now();
             laser.material.color.setHex(0xffffff);
             ponta.material.color.setHex(0xffcc02);
             if (!vrGatilhoPuxado) {
@@ -1127,6 +1133,25 @@ function sairSessaoVR() {
         console.warn("VR: ao terminar a sessão (pode já ter terminado):", err && err.message);
         restaurarInterfaceAposSessao();
     });
+}
+
+// O botão HTML «SAIR DO VR» do DOM Overlay (dentro dos óculos). Durante a
+// sessão, o gatilho do controlador é propriedade da cena 3D: é ele que
+// seleciona planetas e botões. Quando o raio cruzava o botão HTML a meio de um
+// pulso do gatilho, o navegador sintetizava um clique DOM que terminava a
+// sessão — clicar num planeta baixo ou no espaço vazio saía do VR por aqui.
+// Por isso ignora-se o clique que acompanha um pulso do gatilho (é sempre
+// sintetizado pelo navegador e chega colado ao "selectstart"); o botão
+// continua a responder a cliques reais de rato/toque, e dentro dos óculos a
+// saída continua a ter três caminhos: o botão 3D «SAIR DO VR», o grip dos
+// controladores e os controlos do sistema do Quest.
+function sairSessaoVRDoOverlay(evento) {
+    if (vrSessaoAtiva && (vrGatilhoPuxado || performance.now() - vrUltimoGatilhoMs < 400)) {
+        evento.preventDefault();
+        evento.stopPropagation();
+        return;
+    }
+    sairSessaoVR();
 }
 
 // Restaura a interface normal quando a sessão termina — por QUALQUER caminho
@@ -1328,17 +1353,39 @@ function portadorDeDadosVR(objeto, chave) {
     return null;
 }
 
+// Escolhe, de entre as interseções do raio, o alvo que vale para a ação.
+// A ordem NÃO é simplesmente a da distância: um ASTRO ganha sempre a um botão
+// do painel 3D. O painel é filho da câmara (vive 2,1m à frente da cabeça) e,
+// sem esta prioridade, um planeta por trás do painel nunca era selecionável —
+// o primeiro hit era sempre o botão mais próximo, e o gatilho disparava-o:
+// clicar num planeta podia mesmo terminar a sessão (o «SAIR DO VR»).
+// Os botões continuam a responder: só perdem quando o raio cruza mesmo um
+// astro, e como o painel segue a cabeça, basta desviar a cabeça para o afastar
+// do planeta — o astro é que é fixo no mundo.
+function alvoSobRaioVR(intersecoes) {
+    for (const intersecao of intersecoes) {
+        if (portadorDeDadosVR(intersecao.object, "astro")) return intersecao;
+    }
+    for (const intersecao of intersecoes) {
+        if (portadorDeDadosVR(intersecao.object, "acao")) return intersecao;
+    }
+    return null;
+}
+
 function selecionarComRaycastVR(origem) {
     const intersecoes = raycastVR(origem);
-    if (!intersecoes.length) return;
-    const alvo = intersecoes[0].object;
+    const escolhido = alvoSobRaioVR(intersecoes);
+    // Espaço vazio: não faz NADA — em particular não termina a sessão WebXR
+    // nem navega para lado nenhum. O gatilho só age sobre o que o raio
+    // acertou mesmo (a geometria do astro ou o botão visível).
+    if (!escolhido) return;
 
-    const botao = portadorDeDadosVR(alvo, "acao");
+    const botao = portadorDeDadosVR(escolhido.object, "acao");
     if (botao) {
         executarAcaoVR(botao.userData.acao);
         return;
     }
-    const portador = portadorDeDadosVR(alvo, "astro");
+    const portador = portadorDeDadosVR(escolhido.object, "astro");
     if (portador) selecionarAstroVR(portador.userData.astro);
 }
 
@@ -1616,9 +1663,16 @@ function criarBotao3DVR(texto, corFundo, corTexto, acao) {
     const textura = new THREE.CanvasTexture(canvas);
     textura.colorSpace = THREE.SRGBColorSpace;
 
-    // Grupo = botão VISUAL + área de clique invisível MUITO maior. A mira de
-    // um controlador não tem a precisão de um rato; sem uma hitbox generosa,
-    // acertar num botão pequeno a 2m era uma lotaria.
+    // Grupo = botão VISUAL + área de clique invisível com uma folga PEQUENA.
+    // A área de antes (1,95 × 0,52 a 2,1m da cabeça — cerca de 50° × 14° de
+    // céu aparente) era uma parede invisível à frente do utilizador: ficava
+    // sempre mais perto do que os planetas (2,1m vs 500m) e interceptava os
+    // raios dos controladores antes deles — era ela que fazia o gatilho
+    // disparar o «SAIR DO VR» ao apontar a um planeta baixo ou ao espaço
+    // vazio, e que condicionava a seleção a uma "zona específica" dos
+    // planetas. Agora a área de clique segue de perto o botão visível (que já
+    // é enorme àquela distância: ~36° de largura), e o que o raio atravessa
+    // sem ser botão ou astro deixa simplesmente de fazer nada.
     const grupo = new THREE.Group();
     grupo.userData.acao = acao;
 
@@ -1629,7 +1683,7 @@ function criarBotao3DVR(texto, corFundo, corTexto, acao) {
     grupo.add(visual);
 
     const areaClique = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.95, 0.52),
+        new THREE.PlaneGeometry(1.45, 0.48),
         new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide })
     );
     grupo.add(areaClique);
@@ -1724,16 +1778,25 @@ function atualizarMiradoresVR() {
         vrRaycaster.ray.set(vrTempOrigem, vrTempDirecao);
 
         const intersecoes = vrRaycaster.intersectObjects(alvosDeSelecaoVR(), true);
+        const escolhido = alvoSobRaioVR(intersecoes);
 
-        // Ponta do laser à distância REAL do primeiro alvo (limitada para não
-        // saltar para o infinito); sem alvo, fica a 3m — confortável de seguir.
-        const distancia = intersecoes.length
-            ? Math.min(Math.max(intersecoes[0].distance, 0.6), 120)
+        // Ponta do laser na distância REAL do alvo resolvido — o MESMO alvo
+        // que o gatilho vai escolher, para a mira e o clique nunca discordarem.
+        // O teto passou de 120 para além da cúpula (500): com o limite antigo a
+        // ponta nunca chegava aos planetas e "desaparecia" muito antes de os
+        // tocar. Sem alvo, fica a 3m — confortável de seguir.
+        const distancia = escolhido
+            ? Math.min(Math.max(escolhido.distance, 0.6), RAIO_CEU_VR * 1.25)
             : 3;
-        info.ponta.position.z = -distancia;
+        // Suavização (sem alocações por frame): sem ela, um raio a roçar o
+        // bordo de um astro fazia a ponta saltar entre 3m e a cúpula a cada
+        // frame — era o "flickering" da mira.
+        info.ponta.position.z += (-distancia - info.ponta.position.z) * 0.35;
 
-        // Destaque do botão apontado (feedback de que está "em cima" dele)
-        const alvo = intersecoes.length ? portadorDeDadosVR(intersecoes[0].object, "acao") : null;
+        // Destaque do botão apontado (feedback de que está "em cima" dele).
+        // Usa o mesmo alvo do gatilho: um astro por trás do botão deixa o
+        // botão sem destaque, em vez de o destaque a piscar a cada frame.
+        const alvo = escolhido ? portadorDeDadosVR(escolhido.object, "acao") : null;
         if (info.hover !== alvo) {
             if (info.hover) info.hover.scale.setScalar(1);
             if (alvo) alvo.scale.setScalar(1.08);
