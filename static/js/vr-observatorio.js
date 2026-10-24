@@ -34,16 +34,15 @@ let vrOlharAlvo = null;
 // Delta de tempo do ciclo de animação (rotação visual das esferas)
 let vrUltimoTempoMs = 0;
 
-// Controladores ativos (laser + ponta) e estado do gatilho — um pulso do
+// Controladores ativos (laser) e estado do gatilho — um pulso do
 // gatilho dispara UMA ação (ao puxar, não à soltar: mais responsivo e não
 // se desvia do alvo se a mão se mexer durante o clique).
 let vrControladoresInfo = [];
 let vrGatilhoPuxado = false;
-// Instante do último pulso do gatilho ("selectstart"). Serve para o botão HTML
-// do DOM Overlay reconhecer — e ignorar — o clique que o navegador sintetiza
-// quando o gatilho é puxado com o raio por cima dele (ver
-// sairSessaoVRDoOverlay): esse clique terminava a sessão sem ninguém querer.
-let vrUltimoGatilhoMs = 0;
+// Temporizador do grip: o «SAIR DO VR» por grip só dispara depois de a pressão
+// ser mantida ~0,7s (ver criarControladoresVR) — um aperto acidental, ao
+// erguer o braço para apontar ao céu, não pode terminar a sessão.
+let vrGripTemporizador = null;
 
 // Cache dos alvos de seleção (invalidado quando os grupos mudam) e temporários
 // para o raycast do laser SEM alocações no ciclo de renderização.
@@ -974,31 +973,22 @@ function criarControladoresVR() {
     for (let i = 0; i < 2; i++) {
         const controlador = vrRenderer.xr.getController(i);
 
-        // Linha de laser — aponta ao longo de -Z (direção do ray) do controlador
+        // Linha de laser — aponta ao longo de -Z (direção do ray) do
+        // controlador. É o raio, e só ele, o verdadeiro ponteiro: o astro
+        // deteta-se onde o raio intersecta a sua geometria. (A antiga "bola"
+        // da ponta foi removida — só atrapalhava a vista.)
         const laser = criarLaser(0x6eb8ff);
         controlador.add(laser);
 
-        // Ponta da mira. A posição em Z é atualizada todos os frames para a
-        // DISTÂNCIA real do alvo (ver atualizarMiradoresVR) — sem isto, a
-        // ponta ficava a 120m e não havia referência nenhuma para acertar nos
-        // botões do painel, que estão a ~2m.
-        const ponta = new THREE.Mesh(
-            new THREE.SphereGeometry(0.5, 8, 8),
-            new THREE.MeshBasicMaterial({ color: 0x9ed4ff, transparent: true, opacity: 0.9 })
-        );
-        ponta.position.z = -2.1;
-        controlador.add(ponta);
-
-        vrControladoresInfo.push({ controlador, laser, ponta, hover: null });
+        vrControladoresInfo.push({ controlador, laser, hover: null, hoverDesde: 0 });
 
         // Puxar o gatilho acende o laser E dispara a ação IMEDIATAMENTE sobre
         // o alvo apontado: astro (abre os detalhes) ou botão 3D do painel
-        // («SAIR DO VR», «VISTA GERAL»). Um pulso = uma ação (debounce).
-        // Fora de alvo nenhum, nada acontece — a navegação nunca é bloqueada.
+        // («SAIR DO VR», «VISTA GERAL» — estes exigem mira decidida, ver o
+        // selecionarComRaycastVR). Um pulso = uma ação (debounce). Fora de
+        // alvo nenhum, nada acontece — a navegação nunca é bloqueada.
         controlador.addEventListener("selectstart", () => {
-            vrUltimoGatilhoMs = performance.now();
             laser.material.color.setHex(0xffffff);
-            ponta.material.color.setHex(0xffcc02);
             if (!vrGatilhoPuxado) {
                 vrGatilhoPuxado = true;
                 selecionarComRaycastVR(controlador);
@@ -1006,15 +996,27 @@ function criarControladoresVR() {
         });
         controlador.addEventListener("selectend", () => {
             laser.material.color.setHex(0x6eb8ff);
-            ponta.material.color.setHex(0x9ed4ff);
             vrGatilhoPuxado = false;
         });
 
-        // Grip (botão de aperto) em qualquer controlador = SAIR DO VR na hora,
-        // sem mirar em nada — redundância de segurança que garante que o
-        // utilizador nunca fica preso na sessão imersiva.
+        // Grip (botão de aperto) = SAIR DO VR, mas só com uma pressão DECIDIDA
+        // (~0,7s mantida). Era saída instantânea "para nunca ficar preso", mas
+        // um aperto acidental — ao erguer o braço para apontar ao céu —
+        // terminava a sessão em qualquer direção. Soltar antes do tempo não
+        // faz nada; e os outros caminhos de saída continuam todos (botão 3D,
+        // controlos do sistema do Quest).
         controlador.addEventListener("squeezestart", () => {
-            sairSessaoVR();
+            if (vrGripTemporizador) clearTimeout(vrGripTemporizador);
+            vrGripTemporizador = setTimeout(() => {
+                vrGripTemporizador = null;
+                sairSessaoVR();
+            }, 700);
+        });
+        controlador.addEventListener("squeezeend", () => {
+            if (vrGripTemporizador) {
+                clearTimeout(vrGripTemporizador);
+                vrGripTemporizador = null;
+            }
         });
 
         vrScene.add(controlador);
@@ -1136,17 +1138,15 @@ function sairSessaoVR() {
 }
 
 // O botão HTML «SAIR DO VR» do DOM Overlay (dentro dos óculos). Durante a
-// sessão, o gatilho do controlador é propriedade da cena 3D: é ele que
-// seleciona planetas e botões. Quando o raio cruzava o botão HTML a meio de um
-// pulso do gatilho, o navegador sintetizava um clique DOM que terminava a
-// sessão — clicar num planeta baixo ou no espaço vazio saía do VR por aqui.
-// Por isso ignora-se o clique que acompanha um pulso do gatilho (é sempre
-// sintetizado pelo navegador e chega colado ao "selectstart"); o botão
-// continua a responder a cliques reais de rato/toque, e dentro dos óculos a
-// saída continua a ter três caminhos: o botão 3D «SAIR DO VR», o grip dos
-// controladores e os controlos do sistema do Quest.
+// sessão imersiva este botão NUNCA é acionado pelo gatilho: o navegador
+// sintetiza um clique DOM quando o raio o cruza a meio de um pulso, e esse
+// clique terminava a sessão — clicar num planeta baixo ou no espaço vazio saía
+// do VR por aqui, e a janela de tempo do clique sintetizado nem sempre é
+// previsível. Dentro dos óculos a saída faz-se pelo botão 3D «SAIR DO VR»,
+// pelo grip (pressão mantida) ou pelos controlos do sistema do Quest; fora de
+// sessão o clique normal (rato/toque, testes no PC) continua a valer.
 function sairSessaoVRDoOverlay(evento) {
-    if (vrSessaoAtiva && (vrGatilhoPuxado || performance.now() - vrUltimoGatilhoMs < 400)) {
+    if (vrSessaoAtiva) {
         evento.preventDefault();
         evento.stopPropagation();
         return;
@@ -1261,7 +1261,7 @@ function vrAnimar() {
     // mexe — o utilizador é que anda, e uma legenda colada à cabeça não é céu.
     if (!vrSessaoAtiva) posicionarPainelInfoVR();
 
-    // Em sessão: ponta do laser à distância do alvo + destaque do botão
+    // Em sessão: destaque do botão sob o raio + prontidão de clique
     if (vrSessaoAtiva) atualizarMiradoresVR();
 
     vrRenderer.render(vrScene, vrCamera);
@@ -1382,6 +1382,17 @@ function selecionarComRaycastVR(origem) {
 
     const botao = portadorDeDadosVR(escolhido.object, "acao");
     if (botao) {
+        // No headset, os botões do painel só acionam com uma mira DECIDIDA: o
+        // raio tem de estar pousado no botão (~0,35s) antes de o gatilho valer.
+        // O painel é fixo à cabeça e, ao olhar para cima, a sua banda de clique
+        // passa a ser céu — um clique descuidado disparava o «SAIR DO VR» e
+        // terminava a sessão apontando a qualquer sítio. O destaque do botão
+        // (hover) é o feedback de que a mira já lá está. No PC, com rato, o
+        // clique continua imediato como sempre.
+        const info = vrControladoresInfo.find(i => i.controlador === origem);
+        if (info && vrSessaoAtiva) {
+            if (info.hover !== botao || performance.now() - info.hoverDesde < 350) return;
+        }
         executarAcaoVR(botao.userData.acao);
         return;
     }
@@ -1762,14 +1773,16 @@ function removerPainelUI3D() {
     vrAlvosCache = null;
 }
 
-// ── Mira dos controladores: ponta à distância do alvo + destaque do botão ──
+// ── Mira dos controladores: destaque do botão apontado + prontidão de clique ─
 // Corre em sessão, dentro do ciclo de animação, SEM alocações (temporários
-// partilhados e cache de alvos). Sem a ponta à distância certa, não há
-// referência visual para acertar num botão a 2m — era este o principal
-// motivo de o gatilho "não reconhecer" os botões.
+// partilhados e cache de alvos). O raio (o laser) é o verdadeiro ponteiro — a
+// "bola" da ponta foi removida. O que aqui se mantém é o destaque do botão sob
+// o raio e a marca de tempo da mira, que dão ao gatilho a noção de mira
+// decidida (ver selecionarComRaycastVR).
 function atualizarMiradoresVR() {
     if (!vrRaycaster || !vrTempOrigem) return;
 
+    const agora = performance.now();
     for (const info of vrControladoresInfo) {
         vrRaycaster.camera = vrCamera;
         vrTempOrigem.setFromMatrixPosition(info.controlador.matrixWorld);
@@ -1780,27 +1793,17 @@ function atualizarMiradoresVR() {
         const intersecoes = vrRaycaster.intersectObjects(alvosDeSelecaoVR(), true);
         const escolhido = alvoSobRaioVR(intersecoes);
 
-        // Ponta do laser na distância REAL do alvo resolvido — o MESMO alvo
-        // que o gatilho vai escolher, para a mira e o clique nunca discordarem.
-        // O teto passou de 120 para além da cúpula (500): com o limite antigo a
-        // ponta nunca chegava aos planetas e "desaparecia" muito antes de os
-        // tocar. Sem alvo, fica a 3m — confortável de seguir.
-        const distancia = escolhido
-            ? Math.min(Math.max(escolhido.distance, 0.6), RAIO_CEU_VR * 1.25)
-            : 3;
-        // Suavização (sem alocações por frame): sem ela, um raio a roçar o
-        // bordo de um astro fazia a ponta saltar entre 3m e a cúpula a cada
-        // frame — era o "flickering" da mira.
-        info.ponta.position.z += (-distancia - info.ponta.position.z) * 0.35;
-
         // Destaque do botão apontado (feedback de que está "em cima" dele).
         // Usa o mesmo alvo do gatilho: um astro por trás do botão deixa o
         // botão sem destaque, em vez de o destaque a piscar a cada frame.
+        // O hoverDesde marca desde quando a mira está pousada neste alvo — é o
+        // que distingue uma mira decidida de um raio a passar por ali.
         const alvo = escolhido ? portadorDeDadosVR(escolhido.object, "acao") : null;
         if (info.hover !== alvo) {
             if (info.hover) info.hover.scale.setScalar(1);
             if (alvo) alvo.scale.setScalar(1.08);
             info.hover = alvo;
+            info.hoverDesde = agora;
         }
     }
 }
