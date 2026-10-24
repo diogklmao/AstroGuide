@@ -980,13 +980,14 @@ function criarControladoresVR() {
         const laser = criarLaser(0x6eb8ff);
         controlador.add(laser);
 
-        vrControladoresInfo.push({ controlador, laser, hover: null, hoverDesde: 0 });
+        const info = { controlador, laser, hover: null, holdBotao: null, holdInicio: 0 };
+        vrControladoresInfo.push(info);
 
-        // Puxar o gatilho acende o laser E dispara a ação IMEDIATAMENTE sobre
-        // o alvo apontado: astro (abre os detalhes) ou botão 3D do painel
-        // («SAIR DO VR», «VISTA GERAL» — estes exigem mira decidida, ver o
-        // selecionarComRaycastVR). Um pulso = uma ação (debounce). Fora de
-        // alvo nenhum, nada acontece — a navegação nunca é bloqueada.
+        // Puxar o gatilho acende o laser E age sobre o alvo apontado: astro
+        // (abre os detalhes, imediato) ou botão 3D do painel (estes exigem
+        // PRESSÃO MANTIDA — ver o selecionarComRaycastVR e o
+        // atualizarMiradoresVR). Fora de alvo nenhum, nada acontece — e um
+        // clique simples nunca termina a sessão.
         controlador.addEventListener("selectstart", () => {
             laser.material.color.setHex(0xffffff);
             if (!vrGatilhoPuxado) {
@@ -997,6 +998,8 @@ function criarControladoresVR() {
         controlador.addEventListener("selectend", () => {
             laser.material.color.setHex(0x6eb8ff);
             vrGatilhoPuxado = false;
+            // Soltar o gatilho antes do tempo cancela a pressão mantida do botão.
+            cancelarHoldBotaoVR(info);
         });
 
         // Grip (botão de aperto) = SAIR DO VR, mas só com uma pressão DECIDIDA
@@ -1372,6 +1375,20 @@ function alvoSobRaioVR(intersecoes) {
     return null;
 }
 
+// Quanto tempo o gatilho tem de ficar PUZADO sobre um botão do painel para o
+// acionar. É a diferença entre "clicar" (que nunca faz nada, mesmo em cima do
+// botão) e "pressionar com intenção" (que o aciona).
+const HOLD_BOTAO_MS = 700;
+
+// Cancela uma pressão mantida num botão do painel (sem a executar) e repõe a
+// escala visual do botão.
+function cancelarHoldBotaoVR(info) {
+    if (!info || !info.holdBotao) return;
+    info.holdBotao.scale.setScalar(info.hover === info.holdBotao ? 1.08 : 1);
+    info.holdBotao = null;
+    info.holdInicio = 0;
+}
+
 function selecionarComRaycastVR(origem) {
     const intersecoes = raycastVR(origem);
     const escolhido = alvoSobRaioVR(intersecoes);
@@ -1382,16 +1399,22 @@ function selecionarComRaycastVR(origem) {
 
     const botao = portadorDeDadosVR(escolhido.object, "acao");
     if (botao) {
-        // No headset, os botões do painel só acionam com uma mira DECIDIDA: o
-        // raio tem de estar pousado no botão (~0,35s) antes de o gatilho valer.
-        // O painel é fixo à cabeça e, ao olhar para cima, a sua banda de clique
-        // passa a ser céu — um clique descuidado disparava o «SAIR DO VR» e
-        // terminava a sessão apontando a qualquer sítio. O destaque do botão
-        // (hover) é o feedback de que a mira já lá está. No PC, com rato, o
-        // clique continua imediato como sempre.
+        // No headset, um clique simples num botão do painel NÃO faz nada. O
+        // painel é fixo à cabeça e a sua banda de clique vive logo abaixo do
+        // centro da visão: quando se olha para o céu, "clicar onde não há
+        // planeta" era clicar neste botão — e o «SAIR DO VR» terminava a
+        // sessão apontando a qualquer sítio. Os botões só acionam com pressão
+        // MANTIDA (~0,7s com o raio no botão, que cresce enquanto se mantém —
+        // ver o atualizarMiradoresVR). No PC, com rato, o clique continua
+        // imediato como sempre.
         const info = vrControladoresInfo.find(i => i.controlador === origem);
         if (info && vrSessaoAtiva) {
-            if (info.hover !== botao || performance.now() - info.hoverDesde < 350) return;
+            if (info.holdBotao !== botao) {
+                cancelarHoldBotaoVR(info);
+                info.holdBotao = botao;
+                info.holdInicio = performance.now();
+            }
+            return;
         }
         executarAcaoVR(botao.userData.acao);
         return;
@@ -1753,8 +1776,10 @@ function criarPainelUI3D() {
 
 function removerPainelUI3D() {
     if (!vrPainelUI3D) return;
-    // Limpa destaques de hover que possam apontar para botões já removidos
+    // Limpa destaques de hover e pressões mantidas que possam apontar para
+    // botões já removidos
     vrControladoresInfo.forEach(info => {
+        cancelarHoldBotaoVR(info);
         if (info.hover) {
             info.hover.scale.setScalar(1);
             info.hover = null;
@@ -1773,12 +1798,12 @@ function removerPainelUI3D() {
     vrAlvosCache = null;
 }
 
-// ── Mira dos controladores: destaque do botão apontado + prontidão de clique ─
+// ── Mira dos controladores: destaque do botão e pressão mantida ───────────
 // Corre em sessão, dentro do ciclo de animação, SEM alocações (temporários
 // partilhados e cache de alvos). O raio (o laser) é o verdadeiro ponteiro — a
-// "bola" da ponta foi removida. O que aqui se mantém é o destaque do botão sob
-// o raio e a marca de tempo da mira, que dão ao gatilho a noção de mira
-// decidida (ver selecionarComRaycastVR).
+// "bola" da ponta foi removida. Aqui fazem-se duas coisas: o destaque do botão
+// sob o raio e a progressão da pressão mantida (que é o que, por fim, aciona
+// o botão — ver o selecionarComRaycastVR).
 function atualizarMiradoresVR() {
     if (!vrRaycaster || !vrTempOrigem) return;
 
@@ -1796,14 +1821,31 @@ function atualizarMiradoresVR() {
         // Destaque do botão apontado (feedback de que está "em cima" dele).
         // Usa o mesmo alvo do gatilho: um astro por trás do botão deixa o
         // botão sem destaque, em vez de o destaque a piscar a cada frame.
-        // O hoverDesde marca desde quando a mira está pousada neste alvo — é o
-        // que distingue uma mira decidida de um raio a passar por ali.
         const alvo = escolhido ? portadorDeDadosVR(escolhido.object, "acao") : null;
         if (info.hover !== alvo) {
             if (info.hover) info.hover.scale.setScalar(1);
             if (alvo) alvo.scale.setScalar(1.08);
             info.hover = alvo;
-            info.hoverDesde = agora;
+        }
+
+        // Pressão mantida num botão do painel: o gatilho tem de ficar puxado
+        // ~0,7s COM o raio no mesmo botão. O botão cresce durante a espera (é
+        // o feedback de que a pressão está a ser registada); soltar o gatilho,
+        // sair do botão ou mudar de alvo cancela. É isto que impede um clique
+        // simples — mesmo em cima do botão — de alguma vez terminar a sessão.
+        if (info.holdBotao) {
+            if (info.hover !== info.holdBotao) {
+                cancelarHoldBotaoVR(info);
+            } else {
+                const mantido = agora - info.holdInicio;
+                if (mantido >= HOLD_BOTAO_MS) {
+                    const acionado = info.holdBotao;
+                    cancelarHoldBotaoVR(info);
+                    executarAcaoVR(acionado.userData.acao);
+                } else {
+                    info.holdBotao.scale.setScalar(1.08 + 0.22 * (mantido / HOLD_BOTAO_MS));
+                }
+            }
         }
     }
 }
