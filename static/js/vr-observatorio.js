@@ -44,6 +44,12 @@ const ESTABILIZAR_PINCA_VR_MS = 100;
 const ESTABILIZAR_ABERTURA_VR_MS = 120;
 const SUAVIZAR_SEGUIMENTO_MAO_VR_S = 0.045;
 const DURACAO_REGRESSO_GRAB_VR_MS = 3500;
+const ALCANCE_RAIO_MAO_VR = 1200;
+const SUAVIZAR_RAIO_MAO_VR = 0.018;
+const ESCALA_DESTAQUE_MAO_VR = 1.055;
+const SUBDIVISOES_DEDO_MAO_VR = 5;
+const SEGMENTOS_RADIAIS_DEDO_MAO_VR = 8;
+const vrDestaquesPinça = new Map();
 // Estado transitório do grabbing. A posição astronómica continua nos dados da
 // API; só se reparenta temporariamente o objeto visual ao controller.
 let vrGrabAtivo = null;
@@ -173,6 +179,11 @@ function iniciarCenaVR() {
     });
     vrRenderer.xr.addEventListener("sessionend", () => {
         vrSessaoAtiva = false;
+        vrMaosInfo.forEach(info => {
+            ocultarRaioMaoVR(info);
+            if (info.modelo) info.modelo.visible = false;
+            reiniciarEstadoMaoVR(info);
+        });
         restaurarInterfaceAposSessao();
     });
 
@@ -1113,9 +1124,14 @@ function criarMaoRastreadaVR(indice) {
         pincaAtiva: false, pincaFecharDesde: 0, pincaAbrirDesde: 0,
         pincaInicio: 0, candidato: null, candidatoDesde: 0,
         objetoAgarrado: null, ancora: null, inputSourceTemMao: false,
-        inputSource: null, rastreioPerdidoDesde: 0,
-        pontaIndicador: new THREE.Vector3(), baseIndicador: new THREE.Vector3(),
-        pontaPolegar: new THREE.Vector3(), palmaMundo: new THREE.Vector3(),
+        inputSource: null, rastreioPerdidoDesde: 0, cliquePinçaEmitido: false,
+        alvoRaio: null, interseçãoRaio: null, distanciaRaio: ALCANCE_RAIO_MAO_VR,
+        origemRaio: new THREE.Vector3(), direcaoRaioSuave: new THREE.Vector3(),
+        raioInicializado: false, raioMao: null, indicadorPinça: null,
+        fimRaioMundo: new THREE.Vector3(), baseIndicador: new THREE.Vector3(),
+        segmentoIndicadorTmp: new THREE.Vector3(), juntaIndicadorTmp: new THREE.Vector3(),
+        pontaPolegar: new THREE.Vector3(), pontaIndicador: new THREE.Vector3(),
+        palmaMundo: new THREE.Vector3(),
         palmaLocal: new THREE.Vector3(), direcaoRaio: new THREE.Vector3(),
         rotacaoAlvo: new THREE.Quaternion(), escalaAlvo: new THREE.Vector3()
     };
@@ -1123,7 +1139,11 @@ function criarMaoRastreadaVR(indice) {
         // Os eventos oficiais servem de sinal de ativação; os limiares próprios
         // no loop continuam a estabilizar o gesto antes de tocar/pegar.
         if (!info.habilitada) return;
-        info.pincaFecharDesde = info.pincaFecharDesde || performance.now();
+        if (!info.pincaFecharDesde) {
+            info.pincaFecharDesde = performance.now();
+            info.candidato = raycastMaoVR(info);
+            info.candidatoDesde = info.candidato ? info.pincaFecharDesde : 0;
+        }
     });
     mao.addEventListener("connected", evento => {
         associarInputSourceMaoVR(info, evento.data);
@@ -1159,26 +1179,28 @@ function criarModeloArticuladoMaoVR(mao) {
     modelo.name = "modelo-articulado-mao-vr";
     const juntasModelo = new Map();
 
-    const materialPalma = new THREE.MeshBasicMaterial({
-        color: 0x8db9d8, side: THREE.DoubleSide, toneMapped: false
+    const materialPalma = new THREE.MeshStandardMaterial({
+        color: 0x202b3b, roughness: 0.38, metalness: 0.22,
+        emissive: 0x071222, emissiveIntensity: 0.32, side: THREE.DoubleSide
     });
-    const materialDedos = new THREE.MeshBasicMaterial({
-        color: 0xb7d9ee, side: THREE.DoubleSide, toneMapped: false
+    const materialDedos = new THREE.MeshStandardMaterial({
+        color: 0x29384c, roughness: 0.32, metalness: 0.2,
+        emissive: 0x08182b, emissiveIntensity: 0.24, side: THREE.DoubleSide
     });
-    const materialJuntas = new THREE.MeshBasicMaterial({
-        color: 0xd7edfa, side: THREE.DoubleSide, toneMapped: false
-    });
-    const esfera = new THREE.SphereGeometry(1, 12, 10);
-    const cilindro = new THREE.CylinderGeometry(1, 1, 1, 8, 1, false);
-    cilindro.rotateX(Math.PI / 2);
-    cilindro.computeVertexNormals();
+    const esferaPalma = new THREE.SphereGeometry(1, 24, 16);
     const verticePonta = new THREE.Vector3();
     const verticeFim = new THREE.Vector3();
     const direcaoLocal = new THREE.Vector3();
     const meioLocal = new THREE.Vector3();
-    const eixoZLocal = new THREE.Vector3(0, 0, 1);
-    const malhaPalma = new THREE.Mesh(esfera, materialPalma);
-    malhaPalma.scale.set(0.045, 0.014, 0.05);
+    const eixoReferenciaLocal = new THREE.Vector3(0, 0, 1);
+    const eixoAlternativoLocal = new THREE.Vector3(1, 0, 0);
+    const vetorLateral = new THREE.Vector3();
+    const vetorNormal = new THREE.Vector3();
+    const centroAmostra = new THREE.Vector3();
+    const centroAntes = new THREE.Vector3();
+    const centroDepois = new THREE.Vector3();
+    const malhaPalma = new THREE.Mesh(esferaPalma, materialPalma);
+    malhaPalma.scale.set(0.052, 0.018, 0.066);
     malhaPalma.frustumCulled = false;
     modelo.add(malhaPalma);
     const matrizMaoInversa = new THREE.Matrix4();
@@ -1191,27 +1213,59 @@ function criarModeloArticuladoMaoVR(mao) {
             `${dedo}-finger-phalanx-intermediate`, `${dedo}-finger-phalanx-distal`, `${dedo}-finger-tip`);
     }
     for (const nome of nomes) {
-        const articulacao = mao.joints[nome];
-        if (!articulacao) continue;
-        const raio = nome === "wrist" || nome === "palm" ? 0.03
-            : nome === "thumb-metacarpal" || nome.endsWith("finger-metacarpal") ? 0.012
-                : nome.endsWith("tip") ? 0.01 : 0.012;
-        const material = nome === "palm" || nome === "wrist" ? materialPalma
-            : nome.endsWith("tip") ? materialJuntas : materialDedos;
-        const malha = new THREE.Mesh(esfera, material);
-        malha.scale.setScalar(raio);
+        if (mao.joints[nome]) juntasModelo.set(nome, { articulacao: mao.joints[nome] });
+    }
+
+    const dedos = [
+        { nomes: ["thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip"],
+            raios: [0.010, 0.0085, 0.007, 0.0035], material: materialDedos },
+        ...["index", "middle", "ring", "pinky"].map(nome => ({
+            nomes: [`${nome}-finger-metacarpal`, `${nome}-finger-phalanx-proximal`,
+                `${nome}-finger-phalanx-intermediate`, `${nome}-finger-phalanx-distal`, `${nome}-finger-tip`],
+            raios: [0.010, 0.0085, 0.0075, 0.006, 0.0035], material: materialDedos
+        }))
+    ];
+    const malhasDedos = [];
+    for (const dedo of dedos) {
+        const articulacoes = dedo.nomes.map(nome => mao.joints[nome]);
+        if (articulacoes.some(articulacao => !articulacao)) continue;
+        const subdivisions = SUBDIVISOES_DEDO_MAO_VR;
+        const anéis = (articulacoes.length - 1) * subdivisions + 1;
+        const lados = SEGMENTOS_RADIAIS_DEDO_MAO_VR;
+        const geometria = new THREE.BufferGeometry();
+        const posicoes = new Float32Array(anéis * lados * 3);
+        const indice = [];
+        for (let anel = 0; anel < anéis - 1; anel++) {
+            for (let lado = 0; lado < lados; lado++) {
+                const atual = anel * lados + lado;
+                const seguinte = anel * lados + (lado + 1) % lados;
+                const abaixo = (anel + 1) * lados + lado;
+                const abaixoSeguinte = (anel + 1) * lados + (lado + 1) % lados;
+                // Angular-then-axial winding keeps tube normals pointing out.
+                indice.push(atual, seguinte, abaixo, seguinte, abaixoSeguinte, abaixo);
+            }
+        }
+        geometria.setAttribute("position", new THREE.BufferAttribute(posicoes, 3).setUsage(THREE.DynamicDrawUsage));
+        geometria.setIndex(indice);
+        const malha = new THREE.Mesh(geometria, dedo.material);
         malha.frustumCulled = false;
         modelo.add(malha);
+        malhasDedos.push({ articulacoes, centros: articulacoes.map(() => new THREE.Vector3()),
+            raios: dedo.raios, geometria, posicoes, malha, subdivisions, anéis, lados });
+    }
 
-        const segmentos = [];
-        const nomePai = paiJuntaMaoVR(nome);
-        if (nomePai) {
-            const segmento = new THREE.Mesh(cilindro, material);
-            segmento.frustumCulled = false;
-            modelo.add(segmento);
-            segmentos.push(segmento);
-        }
-        juntasModelo.set(nome, { articulacao, malha, segmentos, raio, nomePai });
+    function centroCurvaDedo(dedo, segmento, t, destino) {
+        const p1 = dedo.centros[segmento];
+        const p2 = dedo.centros[segmento + 1];
+        const p0 = dedo.centros[Math.max(0, segmento - 1)];
+        const p3 = dedo.centros[Math.min(dedo.centros.length - 1, segmento + 2)];
+        const t2 = t * t, t3 = t2 * t;
+        destino.set(
+            0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+            0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+            0.5 * ((2 * p1.z) + (-p0.z + p2.z) * t + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * t2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * t3)
+        );
+        return destino;
     }
 
     const quaternionJunta = new THREE.Quaternion();
@@ -1220,47 +1274,55 @@ function criarModeloArticuladoMaoVR(mao) {
         matrizMaoInversa.copy(mao.matrixWorld).invert();
         mao.matrixWorld.decompose(posicaoMao, quaternionMaoInversa, escalaMao);
         quaternionMaoInversa.invert();
-        const juntas = juntasModelo;
-        for (const [nome, item] of juntas) {
-            const articulacao = item.articulacao;
-            const visivel = articulacao.visible && articulacao.parent;
-            item.malha.visible = !!visivel;
-            for (const segmento of item.segmentos) segmento.visible = !!visivel;
-            if (!visivel) continue;
-            articulacao.getWorldPosition(verticePonta);
-            item.malha.position.copy(verticePonta).applyMatrix4(matrizMaoInversa);
-            articulacao.getWorldQuaternion(quaternionJunta);
-            item.malha.quaternion.copy(quaternionMaoInversa).multiply(quaternionJunta);
-            for (const segmento of item.segmentos) {
-                const pai = item.nomePai && juntas.get(item.nomePai);
-                if (!pai || !pai.articulacao.visible) {
-                    segmento.visible = false;
-                    continue;
+        for (const dedo of malhasDedos) {
+            const subdivisions = dedo.subdivisions;
+            let visivel = true;
+            for (let i = 0; i < dedo.articulacoes.length; i++) {
+                const articulacao = dedo.articulacoes[i];
+                if (!articulacao.visible || !articulacao.parent) {
+                    visivel = false;
+                    break;
                 }
-                pai.articulacao.getWorldPosition(verticeFim);
-                articulacao.getWorldPosition(verticePonta);
-                verticeFim.applyMatrix4(matrizMaoInversa);
-                verticePonta.applyMatrix4(matrizMaoInversa);
-                direcaoLocal.subVectors(verticePonta, verticeFim);
-                const comprimento = direcaoLocal.length();
-                if (comprimento < 0.001) {
-                    segmento.visible = false;
-                    continue;
-                }
-                meioLocal.addVectors(verticeFim, verticePonta).multiplyScalar(0.5);
-                segmento.position.copy(meioLocal);
-                segmento.quaternion.setFromUnitVectors(eixoZLocal, direcaoLocal.normalize());
-                segmento.scale.set(item.raio * 0.72, item.raio * 0.72, comprimento);
+                articulacao.getWorldPosition(dedo.centros[i]);
+                dedo.centros[i].applyMatrix4(matrizMaoInversa);
             }
+            dedo.malha.visible = visivel;
+            if (!visivel) continue;
+            for (let anel = 0; anel < dedo.anéis; anel++) {
+                const valor = anel / dedo.subdivisions;
+                const segmento = Math.min(dedo.articulacoes.length - 2, Math.floor(valor));
+                const t = Math.min(1, valor - segmento);
+                centroCurvaDedo(dedo, segmento, t, centroAmostra);
+                centroCurvaDedo(dedo, segmento, Math.max(0, t - 0.04), centroAntes);
+                centroCurvaDedo(dedo, segmento, Math.min(1, t + 0.04), centroDepois);
+                direcaoLocal.subVectors(centroDepois, centroAntes).normalize();
+                vetorLateral.crossVectors(direcaoLocal, eixoReferenciaLocal);
+                if (vetorLateral.lengthSq() < 0.0001) vetorLateral.crossVectors(direcaoLocal, eixoAlternativoLocal);
+                vetorLateral.normalize();
+                vetorNormal.crossVectors(vetorLateral, direcaoLocal).normalize();
+                const raioSegmento = dedo.raios[segmento]
+                    + (dedo.raios[segmento + 1] - dedo.raios[segmento]) * t;
+                for (let lado = 0; lado < dedo.lados; lado++) {
+                    const angulo = lado / dedo.lados * Math.PI * 2;
+                    const offsetLateral = Math.cos(angulo) * raioSegmento;
+                    const offsetNormal = Math.sin(angulo) * raioSegmento * 0.88;
+                    const indiceVertice = (anel * dedo.lados + lado) * 3;
+                    dedo.posicoes[indiceVertice] = centroAmostra.x + vetorLateral.x * offsetLateral + vetorNormal.x * offsetNormal;
+                    dedo.posicoes[indiceVertice + 1] = centroAmostra.y + vetorLateral.y * offsetLateral + vetorNormal.y * offsetNormal;
+                    dedo.posicoes[indiceVertice + 2] = centroAmostra.z + vetorLateral.z * offsetLateral + vetorNormal.z * offsetNormal;
+                }
+            }
+            dedo.geometria.attributes.position.needsUpdate = true;
+            dedo.geometria.computeVertexNormals();
         }
 
-        const pulso = juntas.get("wrist");
+        const pulso = juntasModelo.get("wrist");
         if (pulso && pulso.articulacao.visible) {
             pulso.articulacao.getWorldPosition(verticePonta);
             meioLocal.copy(verticePonta).applyMatrix4(matrizMaoInversa);
             let quantidade = 1;
             for (const dedo of ["index", "middle", "ring", "pinky"]) {
-                const metacarpo = juntas.get(`${dedo}-finger-metacarpal`);
+                const metacarpo = juntasModelo.get(`${dedo}-finger-metacarpal`);
                 if (!metacarpo || !metacarpo.articulacao.visible) continue;
                 metacarpo.articulacao.getWorldPosition(verticeFim);
                 meioLocal.add(verticeFim.applyMatrix4(matrizMaoInversa));
@@ -1276,6 +1338,171 @@ function criarModeloArticuladoMaoVR(mao) {
     };
     modelo.userData.juntas = juntasModelo;
     return modelo;
+}
+
+function criarRaioMaoVR(info) {
+    const geometria = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(), new THREE.Vector3(0, 0, -ALCANCE_RAIO_MAO_VR)
+    ]);
+    const material = new THREE.LineBasicMaterial({
+        color: 0x51dcff, transparent: true, opacity: 0.78,
+        depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    const linha = new THREE.Line(geometria, material);
+    linha.frustumCulled = false;
+    linha.renderOrder = 5;
+    linha.visible = false;
+    const ponto = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 12, 10),
+        new THREE.MeshBasicMaterial({ color: 0x83f2ff, transparent: true, opacity: 0.9,
+            depthWrite: false, blending: THREE.AdditiveBlending })
+    );
+    ponto.scale.setScalar(0.035);
+    ponto.renderOrder = 6;
+    ponto.visible = false;
+    info.raioMao = linha;
+    info.indicadorPinça = ponto;
+    vrScene.add(linha, ponto);
+    return linha;
+}
+
+function definirDestaquePinçaVR(info, objeto, interseção) {
+    if (info.indicadorPinça) {
+        const mostrarPonto = !!(objeto && portadorDeDadosVR(objeto, "astro") && interseção);
+        info.indicadorPinça.visible = mostrarPonto;
+        if (mostrarPonto) info.indicadorPinça.position.copy(interseção.point);
+    }
+    const alvoAstronómico = objeto && portadorDeDadosVR(objeto, "astro");
+    const alvoAnterior = info.destaquePinça;
+    if (alvoAnterior === alvoAstronómico) {
+        const estado = alvoAstronómico && vrDestaquesPinça.get(alvoAstronómico);
+        if (estado) {
+            estado.ativo = true;
+            return;
+        }
+        if (!alvoAstronómico || alvoAstronómico.userData.vrAgarrado) return;
+    }
+    info.destaquePinça = alvoAstronómico;
+    if (!info.destaquePinça || info.destaquePinça.userData.vrAgarrado) return;
+    let estado = vrDestaquesPinça.get(info.destaquePinça);
+    if (!estado) {
+        estado = { escalaBase: info.destaquePinça.scale.clone(), intensidade: 0, ativo: true };
+        vrDestaquesPinça.set(info.destaquePinça, estado);
+    } else {
+        estado.ativo = true;
+    }
+}
+
+function atualizarDestaquesPinçaVR(deltaTime) {
+    const alpha = 1 - Math.exp(-Math.max(0, Math.min(deltaTime, 0.1)) / 0.09);
+    for (const [objeto, estado] of vrDestaquesPinça) {
+        if (objeto.userData.vrAgarrado) {
+            // Não repor a escala astronómica: agarrar acabou de dimensionar
+            // o objeto para caber na mão.
+            vrDestaquesPinça.delete(objeto);
+            continue;
+        }
+        const alvo = estado.ativo ? 1 : 0;
+        estado.intensidade += (alvo - estado.intensidade) * alpha;
+        const fator = 1 + (ESCALA_DESTAQUE_MAO_VR - 1) * estado.intensidade;
+        objeto.scale.set(
+            estado.escalaBase.x * fator,
+            estado.escalaBase.y * fator,
+            estado.escalaBase.z * fator
+        );
+        if (!estado.ativo && estado.intensidade < 0.002) {
+            objeto.scale.copy(estado.escalaBase);
+            vrDestaquesPinça.delete(objeto);
+        }
+    }
+}
+
+function ocultarRaioMaoVR(info) {
+    if (info.raioMao) info.raioMao.visible = false;
+    info.alvoRaio = null;
+    info.interseçãoRaio = null;
+    definirDestaquePinçaVR(info, null, null);
+}
+
+function atualizarRaioMaoVR(info, deltaTime) {
+    if (!info || !info.habilitada || !maoEstaRastreadaVR(info)) {
+        if (info) {
+            ocultarRaioMaoVR(info);
+            info.raioInicializado = false;
+        }
+        return null;
+    }
+    const juntas = info.mao.joints;
+    const nomes = [
+        "index-finger-metacarpal", "index-finger-phalanx-proximal",
+        "index-finger-phalanx-intermediate", "index-finger-phalanx-distal", "index-finger-tip"
+    ];
+    const dedo = nomes.map(nome => juntas[nome]);
+    if (dedo.some(junta => !junta || !junta.visible)) {
+        ocultarRaioMaoVR(info);
+        info.raioInicializado = false;
+        return null;
+    }
+
+    const metacarpo = juntas["index-finger-metacarpal"];
+    const proximal = juntas["index-finger-phalanx-proximal"];
+    const media = juntas["index-finger-phalanx-intermediate"];
+    const distal = juntas["index-finger-phalanx-distal"];
+    const ponta = juntas["index-finger-tip"];
+    metacarpo.getWorldPosition(info.baseIndicador);
+    proximal.getWorldPosition(info.juntaIndicadorTmp);
+    media.getWorldPosition(info.segmentoIndicadorTmp);
+    distal.getWorldPosition(info.pontaIndicador);
+    ponta.getWorldPosition(info.origemRaio);
+    const comprimentoCaminho = info.baseIndicador.distanceTo(info.juntaIndicadorTmp)
+        + info.juntaIndicadorTmp.distanceTo(info.segmentoIndicadorTmp)
+        + info.segmentoIndicadorTmp.distanceTo(info.pontaIndicador)
+        + info.pontaIndicador.distanceTo(info.origemRaio);
+    const comprimentoDireto = info.baseIndicador.distanceTo(info.origemRaio);
+    const extensaoIndicador = comprimentoCaminho > 0 ? comprimentoDireto / comprimentoCaminho : 0;
+    const comprimentoDistal = info.pontaIndicador.distanceTo(info.origemRaio);
+    if (comprimentoDireto < 0.055 || extensaoIndicador < 0.76 || comprimentoDistal < 0.008) {
+        ocultarRaioMaoVR(info);
+        info.raioInicializado = false;
+        return null;
+    }
+
+    info.direcaoRaioSuave.subVectors(info.origemRaio, info.pontaIndicador).normalize();
+    if (!info.raioInicializado) {
+        info.direcaoRaio.copy(info.direcaoRaioSuave);
+        info.raioInicializado = true;
+    } else {
+        const alpha = 1 - Math.exp(-Math.max(0, deltaTime) / SUAVIZAR_RAIO_MAO_VR);
+        info.direcaoRaio.lerp(info.direcaoRaioSuave, alpha).normalize();
+    }
+
+    info.raioMao = info.raioMao || criarRaioMaoVR(info);
+    info.raioMao.visible = true;
+    vrRaycaster.camera = vrCamera;
+    const nearAnterior = vrRaycaster.near;
+    const farAnterior = vrRaycaster.far;
+    vrRaycaster.near = 0;
+    vrRaycaster.far = ALCANCE_RAIO_MAO_VR;
+    vrRaycaster.ray.set(info.origemRaio, info.direcaoRaio);
+    const intersecoes = vrRaycaster.intersectObjects(alvosDeSelecaoVR(), true);
+    // Não altera o alcance dos controladores, que reutilizam este Raycaster.
+    vrRaycaster.near = nearAnterior;
+    vrRaycaster.far = farAnterior;
+    const escolhido = alvoSobRaioVR(intersecoes);
+    info.alvoRaio = escolhido
+        ? portadorDeDadosVR(escolhido.object, "astro") || portadorDeDadosVR(escolhido.object, "acao")
+        : null;
+    info.interseçãoRaio = escolhido;
+    info.distanciaRaio = escolhido ? escolhido.distance : ALCANCE_RAIO_MAO_VR;
+    const alcance = escolhido ? Math.max(0, escolhido.distance - 0.01) : ALCANCE_RAIO_MAO_VR;
+    const fim = info.fimRaioMundo.copy(info.direcaoRaio).multiplyScalar(alcance).add(info.origemRaio);
+    const vertices = info.raioMao.geometry.attributes.position;
+    vertices.setXYZ(0, info.origemRaio.x, info.origemRaio.y, info.origemRaio.z);
+    vertices.setXYZ(1, fim.x, fim.y, fim.z);
+    vertices.needsUpdate = true;
+    info.raioMao.geometry.computeBoundingSphere();
+    definirDestaquePinçaVR(info, info.alvoRaio, escolhido);
+    return escolhido;
 }
 
 function paiJuntaMaoVR(nome) {
@@ -1343,32 +1570,16 @@ function reiniciarEstadoMaoVR(info, libertar = true) {
     info.pincaAbrirDesde = 0;
     info.pincaInicio = 0;
     info.rastreioPerdidoDesde = 0;
+    info.raioInicializado = false;
+    info.cliquePinçaEmitido = false;
     info.candidato = null;
     info.candidatoDesde = 0;
 }
 
 function raycastMaoVR(info) {
-    // Meta fornece um targetRaySpace emulado para mãos (ponteiro de mão). Usa-o
-    // primeiro para selecionar objetos distantes; o raio anatómico do indicador
-    // fica como fallback para runtimes sem target ray visível.
-    const controlador = info.infoInput && info.infoInput.controlador;
-    if (info.inputSourceTemMao && controlador && controlador.visible) {
-        controlador.updateMatrixWorld(true);
-        const escolhido = alvoSobRaioVR(raycastVR(controlador));
-        return escolhido ? portadorDeDadosVR(escolhido.object, "astro") : null;
-    }
-
-    const base = articulacaoMaoVR(info, ["index-finger-metacarpal", "index-finger-phalanx-proximal"]);
-    const ponta = articulacaoMaoVR(info, ["index-finger-tip"]);
-    if (!base || !ponta) return null;
-
-    base.getWorldPosition(info.baseIndicador);
-    ponta.getWorldPosition(info.pontaIndicador);
-    info.direcaoRaio.subVectors(info.pontaIndicador, info.baseIndicador).normalize();
-    vrRaycaster.camera = vrCamera;
-    vrRaycaster.ray.set(info.baseIndicador, info.direcaoRaio);
-    const escolhido = alvoSobRaioVR(vrRaycaster.intersectObjects(alvosDeSelecaoVR(), true));
-    return escolhido ? portadorDeDadosVR(escolhido.object, "astro") : null;
+    // O raio contínuo do indicador já consultou o Raycaster neste frame;
+    // reaproveita o alvo exato para que clique, seleção e grab coincidam.
+    return info && info.raioMao && info.raioMao.visible ? info.alvoRaio : null;
 }
 
 function posicaoPalmaLocalVR(info) {
@@ -1392,6 +1603,7 @@ function posicaoPalmaLocalVR(info) {
 }
 
 function atualizarMaosVR(deltaTime) {
+    for (const estado of vrDestaquesPinça.values()) estado.ativo = false;
     const agora = performance.now();
     for (const info of vrMaosInfo) {
         if (!info.habilitada) continue;
@@ -1399,6 +1611,7 @@ function atualizarMaosVR(deltaTime) {
             // Esconde imediatamente o último modelo, evitando congelar a mão
             // numa pose antiga; a perda também liberta qualquer astro agarrado.
             if (info.modelo) info.modelo.visible = false;
+            ocultarRaioMaoVR(info);
             if (info.rastreada || info.objetoAgarrado) reiniciarEstadoMaoVR(info);
             continue;
         }
@@ -1406,6 +1619,7 @@ function atualizarMaosVR(deltaTime) {
         info.rastreada = true;
         if (info.mao.updateMatrixWorld) info.mao.updateMatrixWorld(true);
         articularJuntasMaoVR(info);
+        atualizarRaioMaoVR(info, deltaTime);
         if (vrGrabAtivo && vrGrabAtivo.info !== info) {
             // Outro input controla já um objeto: não conservar uma pinça
             // pendente que pudesse ser promovida a seleção/grab mais tarde.
@@ -1424,13 +1638,23 @@ function atualizarMaosVR(deltaTime) {
 
         if (!info.pincaAtiva) {
             if (distanciaPinça <= LIMIAR_PINCA_FECHAR_VR) {
-                if (!info.pincaFecharDesde) info.pincaFecharDesde = agora;
-                if (agora - info.pincaFecharDesde >= ESTABILIZAR_PINCA_VR_MS) {
-                    info.pincaAtiva = true;
-                    info.pincaInicio = agora;
-                    info.pincaAbrirDesde = 0;
+                if (!info.pincaFecharDesde) {
+                    info.pincaFecharDesde = agora;
+                    // Captura o alvo sob o raio quando a pinça começa; a ligeira
+                    // flexão necessária ao gesto não perde o alvo de seleção.
                     info.candidato = raycastMaoVR(info);
                     info.candidatoDesde = info.candidato ? agora : 0;
+                }
+                if (agora - info.pincaFecharDesde >= ESTABILIZAR_PINCA_VR_MS) {
+                    info.pincaAtiva = true;
+                    info.pincaInicio = info.pincaFecharDesde;
+                    info.pincaAbrirDesde = 0;
+                    info.cliquePinçaEmitido = false;
+                    const alvoAtual = raycastMaoVR(info);
+                    if (alvoAtual && alvoAtual !== info.candidato) {
+                        info.candidato = alvoAtual;
+                        info.candidatoDesde = agora;
+                    }
                 }
             } else {
                 info.pincaFecharDesde = 0;
@@ -1440,9 +1664,11 @@ function atualizarMaosVR(deltaTime) {
             if (agora - info.pincaAbrirDesde >= ESTABILIZAR_ABERTURA_VR_MS) {
                 if (info.objetoAgarrado) {
                     soltarAstroVR(info);
-                } else if (info.candidato && !vrGrabAtivo
-                    && info.pincaAbrirDesde - info.pincaInicio < ATRASO_GRAB_VR_MS) {
+                } else if (info.candidato && info.candidato.userData.astro && !vrGrabAtivo
+                    && info.pincaAbrirDesde - info.pincaInicio < ATRASO_GRAB_VR_MS
+                    && !info.cliquePinçaEmitido) {
                     selecionarAstroVR(info.candidato.userData.astro);
+                    info.cliquePinçaEmitido = true;
                 }
                 const controladorInfo = info.infoInput;
                 if (controladorInfo) {
@@ -1454,6 +1680,7 @@ function atualizarMaosVR(deltaTime) {
                 info.pincaAtiva = false;
                 info.pincaFecharDesde = 0;
                 info.pincaAbrirDesde = 0;
+                info.cliquePinçaEmitido = false;
                 info.candidato = null;
                 info.candidatoDesde = 0;
             }
@@ -1475,11 +1702,27 @@ function atualizarMaosVR(deltaTime) {
 
         if (!info.pincaAtiva || info.objetoAgarrado || vrGrabAtivo) continue;
         const candidato = raycastMaoVR(info);
-        if (candidato !== info.candidato) {
-            info.candidato = candidato;
-            info.candidatoDesde = candidato ? agora : 0;
+        if (candidato) {
+            if (candidato !== info.candidato) {
+                info.candidato = candidato;
+                info.candidatoDesde = agora;
+            }
+        } else if (info.raioMao && info.raioMao.visible && info.candidato) {
+            // Se o raio continua válido mas já não atinge nada, não ativar um
+            // alvo antigo. Preserva-o apenas quando a pinça flexiona o dedo e
+            // o raio é ocultado para evitar uma direção anatómica enganadora.
+            info.candidato = null;
+            info.candidatoDesde = 0;
         }
-        if (info.candidato && agora - info.candidatoDesde >= ATRASO_GRAB_VR_MS) {
+        if (info.candidato && info.candidato.userData.acao && !info.cliquePinçaEmitido
+            && agora - info.candidatoDesde >= HOLD_BOTAO_MS) {
+            // As ações 3D mantêm a mesma proteção de pressão prolongada dos
+            // controladores; uma pinça breve nunca pode, por exemplo, sair do VR.
+            executarAcaoVR(info.candidato.userData.acao);
+            info.cliquePinçaEmitido = true;
+        }
+        if (info.candidato && info.candidato.userData.astro && !info.pincaAbrirDesde
+            && agora - info.candidatoDesde >= ATRASO_GRAB_VR_MS) {
             info.ancora = articulacaoMaoVR(info, ["wrist"]);
             agarrarAstroVR(info, info.candidato);
         }
@@ -1783,6 +2026,9 @@ function vrAnimar() {
         atualizarMaosVR(dt);
         atualizarMiradoresVR();
     }
+    // Continua a concluir o fade de destaques iniciado no fim do tracking,
+    // mesmo depois de a sessão XR terminar.
+    atualizarDestaquesPinçaVR(dt);
     atualizarRegressosAstrosVR(dt);
 
     vrRenderer.render(vrScene, vrCamera);
