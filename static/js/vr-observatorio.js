@@ -42,7 +42,7 @@ let vrGrabAtivo = null;
 let vrObjetosRegressando = [];
 let vrAstroRebuildPendente = false;
 const ATRASO_GRAB_VR_MS = 280;
-const DURACAO_REGRESSO_GRAB_VR_MS = 450;
+const DURACAO_REGRESSO_GRAB_VR_MS = 1800;
 // Temporizador do grip: o «SAIR DO VR» por grip só dispara depois de a pressão
 // ser mantida ~0,7s (ver criarControladoresVR) — um aperto acidental, ao
 // erguer o braço para apontar ao céu, não pode terminar a sessão.
@@ -86,17 +86,8 @@ let vrStartYaw = 0, vrStartPitch = 0;
 const RAIO_CEU_VR = 500; // distância da "cúpula celeste" ao observador
 
 // ── Céu sob os pés, sempre ligado ───────────────────────────────────────────
-// No Observatório 2D o céu debaixo do horizonte só aparece com a caixa "Ver
-// abaixo do horizonte" ligada (ver verAbaixoDoHorizonte, no index.js) — sem
-// ela, cada camada salta os objetos de baixo com um "if (!visivel)".
-// Aqui não há caixa nenhuma: no VR o observador está DENTRO da cúpula, sem
-// chão a tapar nada, e metade da graça do modo imersivo é poder baixar os olhos
-// e ver o céu todo à volta. Por isso a opção está sempre ligada.
-// O que se copia do 2D é a OPACIDADE: o que está debaixo do horizonte desenha-
-// se apagado, para continuar a ler-se como "não observável neste instante" e
-// não se confundir com o que está acima. O valor é o mesmo ALFA_ABAIXO do
-// index.js (0,6) — o nome leva sufixo _VR só para não colidir com o de lá,
-// já que as duas constantes vivem no mesmo âmbito global.
+// O céu inteiro continua visível no VR. A opacidade reduzida fica apenas nas
+// estrelas e linhas de constelações abaixo do horizonte, nunca nos planetas.
 const ALFA_ABAIXO_VR = 0.6;
 
 // ── Iniciar a cena ──────────────────────────────────────────────────────────
@@ -772,17 +763,14 @@ function reconstruirAstrosVR() {
     vrGrupoAstros = grupo;
 
     dadosVRAtuais.astros.forEach(astro => {
-        // O Sol, a Lua e os planetas debaixo do horizonte TAMBÉM se desenham
-        // (céu sob os pés, sempre ligado — ver ALFA_ABAIXO_VR). Como no 2D com
-        // a caixa ligada, ficam apagados: vê-se que estão lá sem se confundirem
-        // com os que estão observáveis.
+        // O Sol, a Lua e os planetas debaixo do horizonte também se desenham.
+        // Mantêm o mesmo brilho que os objetos acima do horizonte.
         const cfg = astroCfg(astro.nome);
         if (!cfg) return;
 
-        // Opacidade do astro: cheia acima do horizonte, ALFA_ABAIXO_VR abaixo.
-        // O Sol leva um extra de brilho (0,95), sobre o qual o fator se aplica.
-        const opacidadeBase = (astro.tipo === "sol") ? 0.95 : 1;
-        const opacidade = astro.visivel ? opacidadeBase : opacidadeBase * ALFA_ABAIXO_VR;
+        // O brilho/opacidade é independente do horizonte. O Sol mantém o extra
+        // de brilho histórico; todos os outros astros usam opacidade total.
+        const opacidade = (astro.tipo === "sol") ? 0.95 : 1;
 
         // ── 1) Esfera real com textura planetária (caso principal) ──────────
         // Volume, iluminação e profundidade reais; a textura acompanha a
@@ -1296,7 +1284,7 @@ function vrAnimar() {
     // Interação por controller e transições de regresso são atualizadas sem
     // criar listeners/objetos por frame.
     if (vrSessaoAtiva) atualizarMiradoresVR();
-    atualizarRegressosAstrosVR(agoraMs);
+    atualizarRegressosAstrosVR(dt);
 
     vrRenderer.render(vrScene, vrCamera);
 }
@@ -1350,7 +1338,9 @@ function alvosDeSelecaoVR() {
         const alvos = [];
         if (vrGrupoAstros) {
             for (const objeto of vrGrupoAstros.children) {
-                if (!objeto.userData.vrAgarrado && !objeto.userData.vrRegressando) alvos.push(objeto);
+                // Durante o regresso o astro continua selecionável para que um
+                // novo aperto possa interromper a animação e agarrá-lo de novo.
+                if (!objeto.userData.vrAgarrado) alvos.push(objeto);
             }
         }
         if (vrPainelUI3D) alvos.push(vrPainelUI3D);
@@ -1470,7 +1460,7 @@ function iniciarGatilhoControllerVR(info) {
     info.astroParaAgarrar = null;
 
     const alvo = selecionarComRaycastVR(info.controlador, true);
-    if (!alvo || alvo.parent !== vrGrupoAstros || alvo.userData.vrRegressando) return;
+    if (!alvo || alvo.parent !== vrGrupoAstros) return;
     info.astroSelecionavel = alvo;
     info.astroParaAgarrar = alvo;
 }
@@ -1521,7 +1511,8 @@ function sincronizarPosicoesAstrosVR() {
 }
 
 function agarrarAstroVR(info, objeto) {
-    if (vrGrabAtivo || !objeto || objeto.parent !== vrGrupoAstros || objeto.userData.vrRegressando) return;
+    if (vrGrabAtivo || !objeto || objeto.parent !== vrGrupoAstros) return;
+    if (objeto.userData.vrRegressando) interromperRegressoAstroVR(objeto);
     objeto.updateWorldMatrix(true, true);
     info.controlador.updateWorldMatrix(true, false);
     info.controlador.attach(objeto); // transfere temporariamente para o espaço do controller
@@ -1563,6 +1554,7 @@ function soltarAstroVR(info) {
     vrObjetosRegressando.push({
         objeto,
         inicio: performance.now(),
+        tempoDecorrido: 0,
         posicaoInicio: objeto.position.clone(),
         rotacaoInicio: objeto.quaternion.clone(),
         escalaInicio: objeto.scale.clone(),
@@ -1575,15 +1567,30 @@ function soltarAstroVR(info) {
     vrAlvosCache = null;
 }
 
-function atualizarRegressosAstrosVR(agora) {
+function interromperRegressoAstroVR(objeto) {
+    const indice = vrObjetosRegressando.findIndex(item => item.objeto === objeto);
+    if (indice < 0) return false;
+    vrObjetosRegressando.splice(indice, 1);
+    objeto.userData.vrRegressando = false;
+    vrAlvosCache = null;
+    return true;
+}
+
+function atualizarRegressosAstrosVR(deltaTime) {
     for (let i = vrObjetosRegressando.length - 1; i >= 0; i--) {
         const item = vrObjetosRegressando[i];
         const astro = astroAtualVR(item.objeto.userData.astro);
         item.objeto.userData.astro = astro;
         definirPosicaoAltAzVR(item.posicaoAlvo, astro.altitude, astro.azimute, RAIO_CEU_VR);
 
-        const t = Math.min(1, (agora - item.inicio) / DURACAO_REGRESSO_GRAB_VR_MS);
-        const suave = t * t * (3 - 2 * t);
+        // Usa deltaTime limitado do render loop, para a transição manter a
+        // mesma duração independentemente da taxa de frames. EaseInOutCubic
+        // abranda naturalmente no início e no fim da transição.
+        item.tempoDecorrido += deltaTime * 1000;
+        const t = Math.min(1, item.tempoDecorrido / DURACAO_REGRESSO_GRAB_VR_MS);
+        const suave = t < 0.5
+            ? 4 * t * t * t
+            : 1 - Math.pow(-2 * t + 2, 3) / 2;
         item.objeto.position.lerpVectors(item.posicaoInicio, item.posicaoAlvo, suave);
         item.objeto.quaternion.slerpQuaternions(item.rotacaoInicio, item.rotacaoAlvo, suave);
         item.objeto.scale.lerpVectors(item.escalaInicio, item.escalaAlvo, suave);
