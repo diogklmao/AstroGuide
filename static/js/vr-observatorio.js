@@ -34,11 +34,15 @@ let vrOlharAlvo = null;
 // Delta de tempo do ciclo de animação (rotação visual das esferas)
 let vrUltimoTempoMs = 0;
 
-// Controladores ativos (laser) e estado do gatilho — um pulso do
-// gatilho dispara UMA ação (ao puxar, não à soltar: mais responsivo e não
-// se desvia do alvo se a mão se mexer durante o clique).
+// Controladores ativos e estado transitório do trigger (toque/agarre).
 let vrControladoresInfo = [];
-let vrGatilhoPuxado = false;
+// Estado transitório do grabbing. A posição astronómica continua nos dados da
+// API; só se reparenta temporariamente o objeto visual ao controller.
+let vrGrabAtivo = null;
+let vrObjetosRegressando = [];
+let vrAstroRebuildPendente = false;
+const ATRASO_GRAB_VR_MS = 280;
+const DURACAO_REGRESSO_GRAB_VR_MS = 450;
 // Temporizador do grip: o «SAIR DO VR» por grip só dispara depois de a pressão
 // ser mantida ~0,7s (ver criarControladoresVR) — um aperto acidental, ao
 // erguer o braço para apontar ao céu, não pode terminar a sessão.
@@ -240,13 +244,17 @@ function redimensionarCanvasVR() {
 
 // ── Conversão alt/az → coordenadas 3D (mesmo sistema do Observatório 2D) ────
 // Norte (az=0°) fica em -Z, que é a direção "em frente" da câmara.
-function altAzParaXYZ(altGraus, azGraus, raio) {
+function definirPosicaoAltAzVR(destino, altGraus, azGraus, raio) {
     const alt = altGraus * Math.PI / 180;
     const az = azGraus * Math.PI / 180;
     const x = raio * Math.cos(alt) * Math.sin(az);
     const y = raio * Math.sin(alt);
     const z = -raio * Math.cos(alt) * Math.cos(az);
-    return new THREE.Vector3(x, y, z);
+    return destino.set(x, y, z);
+}
+
+function altAzParaXYZ(altGraus, azGraus, raio) {
+    return definirPosicaoAltAzVR(new THREE.Vector3(), altGraus, azGraus, raio);
 }
 
 // ── Tempo simulado (partilhado com o Observatório 2D) ───────────────────────
@@ -725,6 +733,17 @@ function desenharAstrosVR(dados) {
 function reconstruirAstrosVR() {
     if (!vrScene || !dadosVRAtuais) return;
 
+    // Enquanto um astro está agarrado ou a regressar, preserva a instância
+    // manipulada (e os seus recursos GPU). Atualiza já as posições dos outros
+    // astros com os dados mais recentes; o rebuild completo fica pendente até
+    // terminar o regresso, usando sempre a astronomia mais recente como alvo.
+    if (vrGrabAtivo || vrObjetosRegressando.length) {
+        vrAstroRebuildPendente = true;
+        sincronizarPosicoesAstrosVR();
+        return;
+    }
+    vrAstroRebuildPendente = false;
+
     // Remove o grupo anterior (se existir) para não acumular objetos duplicados
     // sempre que uma textura ou imagem termina de carregar.
     if (vrGrupoAstros) {
@@ -816,6 +835,7 @@ function reconstruirAstrosVR() {
                 : cfg.size * 2 * FATOR_ESCALA_VR;
         const altura = ehISS ? largura / 1.5 : largura;
         sprite.scale.set(largura, altura, 1);
+        guardarEstadoOriginalAstroVR(sprite);
         grupo.add(sprite);
     });
 
@@ -903,6 +923,7 @@ function criarEsferaAstroVR(astro, cfg, textura, opacidade) {
     grupo.userData.esfera = esfera;
     grupo.userData.rotacaoVel = ehSol ? 0.005 : (astro.tipo === "lua" ? 0 : 0.02);
     esfera.rotation.y = vrRotacoesVisuais[astro.nome] || 0;
+    guardarEstadoOriginalAstroVR(grupo);
 
     return grupo;
 }
@@ -980,24 +1001,23 @@ function criarControladoresVR() {
         const laser = criarLaser(0x6eb8ff);
         controlador.add(laser);
 
-        const info = { controlador, laser, hover: null, holdBotao: null, holdInicio: 0 };
+        const info = {
+            controlador, laser, hover: null, holdBotao: null, holdInicio: 0,
+            gatilhoPuxado: false, gatilhoInicio: 0,
+            astroSelecionavel: null, astroParaAgarrar: null, objetoAgarrado: null
+        };
         vrControladoresInfo.push(info);
 
-        // Puxar o gatilho acende o laser E age sobre o alvo apontado: astro
-        // (abre os detalhes, imediato) ou botão 3D do painel (estes exigem
-        // PRESSÃO MANTIDA — ver o selecionarComRaycastVR e o
-        // atualizarMiradoresVR). Fora de alvo nenhum, nada acontece — e um
-        // clique simples nunca termina a sessão.
+        // Toque rápido seleciona e abre a informação. Manter o gatilho ~0,28s
+        // no mesmo astro agarra-o ao controller; a soltura devolve-o suavemente
+        // ao estado astronómico atual. O espaço vazio continua sem ação.
         controlador.addEventListener("selectstart", () => {
             laser.material.color.setHex(0xffffff);
-            if (!vrGatilhoPuxado) {
-                vrGatilhoPuxado = true;
-                selecionarComRaycastVR(controlador);
-            }
+            if (!info.gatilhoPuxado) iniciarGatilhoControllerVR(info);
         });
         controlador.addEventListener("selectend", () => {
             laser.material.color.setHex(0x6eb8ff);
-            vrGatilhoPuxado = false;
+            terminarGatilhoControllerVR(info);
             // Soltar o gatilho antes do tempo cancela a pressão mantida do botão.
             cancelarHoldBotaoVR(info);
         });
@@ -1161,6 +1181,14 @@ function sairSessaoVRDoOverlay(evento) {
 // (botão «SAIR DO VR», DOM Overlay, sistema do Quest, erro). Idempotente:
 // pode ser chamada várias vezes sem efeitos laterais.
 function restaurarInterfaceAposSessao() {
+    if (vrGrabAtivo) soltarAstroVR(vrGrabAtivo.info);
+    vrControladoresInfo.forEach(info => {
+        info.gatilhoPuxado = false;
+        info.gatilhoInicio = 0;
+        info.astroSelecionavel = null;
+        info.astroParaAgarrar = null;
+        cancelarHoldBotaoVR(info);
+    });
     vrSessaoAtiva = false;
     vrSessaoXR = null;
     document.body.classList.remove("vr-sessao");
@@ -1230,7 +1258,8 @@ function vrAnimar() {
     // vrRotacoesVisuais) para sobreviver aos rebuilds do grupo.
     if (vrGrupoAstros) {
         for (const obj of vrGrupoAstros.children) {
-            if (obj.userData.esfera && obj.userData.rotacaoVel && obj.userData.astro) {
+            if (obj.userData.esfera && obj.userData.rotacaoVel && obj.userData.astro
+                && !obj.userData.vrAgarrado && !obj.userData.vrRegressando) {
                 const nome = obj.userData.astro.nome;
                 const angulo = (vrRotacoesVisuais[nome] || 0) + obj.userData.rotacaoVel * dt;
                 vrRotacoesVisuais[nome] = angulo;
@@ -1264,8 +1293,10 @@ function vrAnimar() {
     // mexe — o utilizador é que anda, e uma legenda colada à cabeça não é céu.
     if (!vrSessaoAtiva) posicionarPainelInfoVR();
 
-    // Em sessão: destaque do botão sob o raio + prontidão de clique
+    // Interação por controller e transições de regresso são atualizadas sem
+    // criar listeners/objetos por frame.
     if (vrSessaoAtiva) atualizarMiradoresVR();
+    atualizarRegressosAstrosVR(agoraMs);
 
     vrRenderer.render(vrScene, vrCamera);
 }
@@ -1317,7 +1348,11 @@ function alvosDeSelecaoVR() {
     // não deve andar a construir listas novas a cada tique.
     if (!vrAlvosCache) {
         const alvos = [];
-        if (vrGrupoAstros) alvos.push(...vrGrupoAstros.children);
+        if (vrGrupoAstros) {
+            for (const objeto of vrGrupoAstros.children) {
+                if (!objeto.userData.vrAgarrado && !objeto.userData.vrRegressando) alvos.push(objeto);
+            }
+        }
         if (vrPainelUI3D) alvos.push(vrPainelUI3D);
         vrAlvosCache = alvos;
     }
@@ -1389,7 +1424,7 @@ function cancelarHoldBotaoVR(info) {
     info.holdInicio = 0;
 }
 
-function selecionarComRaycastVR(origem) {
+function selecionarComRaycastVR(origem, adiarSelecaoAstro = false) {
     const intersecoes = raycastVR(origem);
     const escolhido = alvoSobRaioVR(intersecoes);
     // Espaço vazio: não faz NADA — em particular não termina a sessão WebXR
@@ -1420,7 +1455,151 @@ function selecionarComRaycastVR(origem) {
         return;
     }
     const portador = portadorDeDadosVR(escolhido.object, "astro");
-    if (portador) selecionarAstroVR(portador.userData.astro);
+    if (portador) {
+        if (adiarSelecaoAstro) return portador;
+        selecionarAstroVR(portador.userData.astro);
+    }
+    return null;
+}
+
+function iniciarGatilhoControllerVR(info) {
+    if (vrGrabAtivo) return;
+    info.gatilhoPuxado = true;
+    info.gatilhoInicio = performance.now();
+    info.astroSelecionavel = null;
+    info.astroParaAgarrar = null;
+
+    const alvo = selecionarComRaycastVR(info.controlador, true);
+    if (!alvo || alvo.parent !== vrGrupoAstros || alvo.userData.vrRegressando) return;
+    info.astroSelecionavel = alvo;
+    info.astroParaAgarrar = alvo;
+}
+
+function terminarGatilhoControllerVR(info) {
+    if (!info.gatilhoPuxado) return;
+    const duracao = performance.now() - info.gatilhoInicio;
+    if (info.objetoAgarrado) {
+        soltarAstroVR(info);
+    } else if (info.astroSelecionavel && duracao < ATRASO_GRAB_VR_MS) {
+        // Toque curto: selecionar é independente do gesto de agarrar.
+        selecionarAstroVR(info.astroSelecionavel.userData.astro);
+    }
+    info.gatilhoPuxado = false;
+    info.astroSelecionavel = null;
+    info.astroParaAgarrar = null;
+}
+
+function guardarEstadoOriginalAstroVR(objeto) {
+    // Posição astronómica atualizada a partir dos dados API; nunca é lida da
+    // transformação visual temporária. Rotação/escala são a forma visual base.
+    objeto.userData.vrPosicaoAstronomica = objeto.position.clone();
+    objeto.userData.vrRotacaoOriginal = objeto.quaternion.clone();
+    objeto.userData.vrEscalaOriginal = objeto.scale.clone();
+}
+
+function astroAtualVR(astro) {
+    if (!astro || !dadosVRAtuais || !Array.isArray(dadosVRAtuais.astros)) return astro;
+    return dadosVRAtuais.astros.find(a => a.nome === astro.nome && a.tipo === astro.tipo) || astro;
+}
+
+function sincronizarPosicoesAstrosVR() {
+    if (!dadosVRAtuais || !Array.isArray(dadosVRAtuais.astros)) return;
+    const sincronizar = objeto => {
+        if (!objeto || !objeto.userData || !objeto.userData.astro) return;
+        const atualizado = astroAtualVR(objeto.userData.astro);
+        objeto.userData.astro = atualizado;
+        definirPosicaoAltAzVR(objeto.userData.vrPosicaoAstronomica, atualizado.altitude, atualizado.azimute, RAIO_CEU_VR);
+        if (!objeto.userData.vrAgarrado && !objeto.userData.vrRegressando) {
+            objeto.position.copy(objeto.userData.vrPosicaoAstronomica);
+        }
+    };
+    if (vrGrupoAstros) vrGrupoAstros.children.forEach(sincronizar);
+    if (vrGrabAtivo) sincronizar(vrGrabAtivo.objeto);
+    vrObjetosRegressando.forEach(item => sincronizar(item.objeto));
+    const sol = dadosVRAtuais.astros.find(a => a.tipo === "sol");
+    if (vrLuzSol && sol) definirPosicaoAltAzVR(vrLuzSol.position, sol.altitude, sol.azimute, RAIO_CEU_VR);
+}
+
+function agarrarAstroVR(info, objeto) {
+    if (vrGrabAtivo || !objeto || objeto.parent !== vrGrupoAstros || objeto.userData.vrRegressando) return;
+    objeto.updateWorldMatrix(true, true);
+    info.controlador.updateWorldMatrix(true, false);
+    info.controlador.attach(objeto); // transfere temporariamente para o espaço do controller
+
+    // Os astros vivem a ~500 unidades astronómicas da origem, demasiado longe
+    // para uma exploração física à mão. Traz-se o objeto para 80cm à frente do
+    // controller e reduz-se só a sua escala VISUAL; os valores base guardados
+    // continuam intactos e serão restaurados suavemente ao largar.
+    const astro = objeto.userData.astro;
+    const cfg = astroCfg(astro && astro.nome);
+    const diametro = !cfg ? 30
+        : astro.nome === "ISS" ? cfg.size * 3 * FATOR_ESCALA_VR
+            : astro.nome === "Saturno" ? cfg.size * 2.2 * FATOR_ESCALA_VR
+                : cfg.size * 2 * FATOR_ESCALA_VR;
+    const fatorVisual = 0.28 / Math.max(diametro, 0.001);
+    objeto.position.set(0, 0, -0.8);
+    // Mantém a orientação mundial que o attach acabou de preservar; a rotação
+    // do controller passa então a rodar o objeto naturalmente na mão.
+    objeto.scale.copy(objeto.userData.vrEscalaOriginal).multiplyScalar(fatorVisual);
+    objeto.userData.vrAgarrado = true;
+    info.objetoAgarrado = objeto;
+    info.astroParaAgarrar = null;
+    vrGrabAtivo = { info, objeto };
+    vrAlvosCache = null;
+}
+
+function soltarAstroVR(info) {
+    const objeto = info && info.objetoAgarrado;
+    if (!objeto || !vrGrupoAstros) return;
+
+    // Reparenting preserva a pose em que o utilizador largou o objeto. A seguir
+    // interpola-se para o alt/az mais recente e para a orientação/escala base.
+    vrGrupoAstros.attach(objeto);
+    objeto.userData.vrAgarrado = false;
+    objeto.userData.vrRegressando = true;
+    const astro = astroAtualVR(objeto.userData.astro);
+    objeto.userData.astro = astro;
+    const posicao = objeto.userData.vrPosicaoAstronomica.clone();
+    vrObjetosRegressando.push({
+        objeto,
+        inicio: performance.now(),
+        posicaoInicio: objeto.position.clone(),
+        rotacaoInicio: objeto.quaternion.clone(),
+        escalaInicio: objeto.scale.clone(),
+        posicaoAlvo: posicao,
+        rotacaoAlvo: objeto.userData.vrRotacaoOriginal.clone(),
+        escalaAlvo: objeto.userData.vrEscalaOriginal.clone()
+    });
+    info.objetoAgarrado = null;
+    vrGrabAtivo = null;
+    vrAlvosCache = null;
+}
+
+function atualizarRegressosAstrosVR(agora) {
+    for (let i = vrObjetosRegressando.length - 1; i >= 0; i--) {
+        const item = vrObjetosRegressando[i];
+        const astro = astroAtualVR(item.objeto.userData.astro);
+        item.objeto.userData.astro = astro;
+        definirPosicaoAltAzVR(item.posicaoAlvo, astro.altitude, astro.azimute, RAIO_CEU_VR);
+
+        const t = Math.min(1, (agora - item.inicio) / DURACAO_REGRESSO_GRAB_VR_MS);
+        const suave = t * t * (3 - 2 * t);
+        item.objeto.position.lerpVectors(item.posicaoInicio, item.posicaoAlvo, suave);
+        item.objeto.quaternion.slerpQuaternions(item.rotacaoInicio, item.rotacaoAlvo, suave);
+        item.objeto.scale.lerpVectors(item.escalaInicio, item.escalaAlvo, suave);
+
+        if (t >= 1) {
+            item.objeto.position.copy(item.posicaoAlvo);
+            item.objeto.quaternion.copy(item.rotacaoAlvo);
+            item.objeto.scale.copy(item.escalaAlvo);
+            item.objeto.userData.vrRegressando = false;
+            vrObjetosRegressando.splice(i, 1);
+            vrAlvosCache = null;
+        }
+    }
+    if (!vrGrabAtivo && !vrObjetosRegressando.length && vrAstroRebuildPendente) {
+        reconstruirAstrosVR();
+    }
 }
 
 function executarAcaoVR(acao) {
@@ -1809,6 +1988,7 @@ function atualizarMiradoresVR() {
 
     const agora = performance.now();
     for (const info of vrControladoresInfo) {
+        if (info.objetoAgarrado) continue;
         vrRaycaster.camera = vrCamera;
         vrTempOrigem.setFromMatrixPosition(info.controlador.matrixWorld);
         info.controlador.getWorldQuaternion(vrTempQuat);
@@ -1822,10 +2002,22 @@ function atualizarMiradoresVR() {
         // Usa o mesmo alvo do gatilho: um astro por trás do botão deixa o
         // botão sem destaque, em vez de o destaque a piscar a cada frame.
         const alvo = escolhido ? portadorDeDadosVR(escolhido.object, "acao") : null;
+        const astroAlvo = escolhido ? portadorDeDadosVR(escolhido.object, "astro") : null;
         if (info.hover !== alvo) {
             if (info.hover) info.hover.scale.setScalar(1);
             if (alvo) alvo.scale.setScalar(1.08);
             info.hover = alvo;
+        }
+
+        // O grabbing só começa se o gatilho estiver mantido e o mesmo astro
+        // continuar sob o raio durante o atraso de distinção toque/agarre.
+        if (info.gatilhoPuxado && info.astroParaAgarrar) {
+            if (astroAlvo !== info.astroParaAgarrar) {
+                info.astroParaAgarrar = null;
+            } else if (agora - info.gatilhoInicio >= ATRASO_GRAB_VR_MS) {
+                agarrarAstroVR(info, info.astroParaAgarrar);
+                continue;
+            }
         }
 
         // Pressão mantida num botão do painel: o gatilho tem de ficar puxado
