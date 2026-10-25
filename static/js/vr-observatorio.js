@@ -43,13 +43,13 @@ const LIMIAR_PINCA_ABRIR_VR = 0.05;
 const ESTABILIZAR_PINCA_VR_MS = 100;
 const ESTABILIZAR_ABERTURA_VR_MS = 120;
 const SUAVIZAR_SEGUIMENTO_MAO_VR_S = 0.045;
+const DURACAO_REGRESSO_GRAB_VR_MS = 3500;
 // Estado transitório do grabbing. A posição astronómica continua nos dados da
 // API; só se reparenta temporariamente o objeto visual ao controller.
 let vrGrabAtivo = null;
 let vrObjetosRegressando = [];
 let vrAstroRebuildPendente = false;
 const ATRASO_GRAB_VR_MS = 280;
-const DURACAO_REGRESSO_GRAB_VR_MS = 1800;
 // Temporizador do grip: o «SAIR DO VR» por grip só dispara depois de a pressão
 // ser mantida ~0,7s (ver criarControladoresVR) — um aperto acidental, ao
 // erguer o braço para apontar ao céu, não pode terminar a sessão.
@@ -1013,9 +1013,7 @@ function criarControladoresVR() {
         if (maoInfo) maoInfo.mao.visible = false;
         controlador.addEventListener("connected", evento => {
             if (!maoInfo) return;
-            maoInfo.inputSourceTemMao = !!(evento.data && evento.data.hand);
-            if (maoInfo.inputSourceTemMao && vrSessaoAtiva) maoInfo.habilitada = true;
-            maoInfo.mao.visible = maoInfo.inputSourceTemMao && maoInfo.habilitada;
+            associarInputSourceMaoVR(maoInfo, evento.data);
             laser.visible = !maoInfo.inputSourceTemMao;
             if (maoInfo.inputSourceTemMao) {
                 // Um source de mão nunca deve reaproveitar um trigger/grab que
@@ -1031,9 +1029,10 @@ function criarControladoresVR() {
             if (info.objetoAgarrado && !maoInfo?.inputSourceTemMao) soltarAstroVR(info);
             if (maoInfo) {
                 reiniciarEstadoMaoVR(maoInfo);
+                maoInfo.inputSource = null;
                 maoInfo.inputSourceTemMao = false;
                 maoInfo.habilitada = false;
-                maoInfo.mao.visible = false;
+                atualizarVisibilidadeMaoVR(maoInfo);
                 laser.visible = true;
             }
         });
@@ -1095,15 +1094,26 @@ function criarMaoRastreadaVR(indice) {
     }
     if (!mao) return null;
 
-    // Three.js atualiza estas articulações a partir do XRHand/XRFrame de cada
-    // input source. Só são consultadas quando a mão está visível/rastreada.
+    // O r160 constrói a lista em getHand() (sincronamente se a fonte já ligou)
+    // e cria as juntas em connect(). Ligamos sempre o modelo aos XRJointSpace
+    // que o renderer atualizará por frame; se conectarem mais tarde, o listener
+    // connected atualiza o mapa quando o Three.js já tiver criado as juntas.
+    const modelo = new THREE.Group();
+    modelo.visible = false;
+    modelo.userData.juntas = new Map();
+    if (mao.joints && Object.keys(mao.joints).length) {
+        const modeloInicial = criarModeloArticuladoMaoVR(mao);
+        modelo.userData = modeloInicial.userData;
+        modelo.add(...modeloInicial.children);
+    }
+    mao.add(modelo);
     vrScene.add(mao);
     const info = {
-        mao, indice, habilitada: false, rastreada: false,
+        mao, modelo, indice, habilitada: false, rastreada: false,
         pincaAtiva: false, pincaFecharDesde: 0, pincaAbrirDesde: 0,
         pincaInicio: 0, candidato: null, candidatoDesde: 0,
         objetoAgarrado: null, ancora: null, inputSourceTemMao: false,
-        rastreioPerdidoDesde: 0,
+        inputSource: null, rastreioPerdidoDesde: 0,
         pontaIndicador: new THREE.Vector3(), baseIndicador: new THREE.Vector3(),
         pontaPolegar: new THREE.Vector3(), palmaMundo: new THREE.Vector3(),
         palmaLocal: new THREE.Vector3(), direcaoRaio: new THREE.Vector3(),
@@ -1115,12 +1125,189 @@ function criarMaoRastreadaVR(indice) {
         if (!info.habilitada) return;
         info.pincaFecharDesde = info.pincaFecharDesde || performance.now();
     });
+    mao.addEventListener("connected", evento => {
+        associarInputSourceMaoVR(info, evento.data);
+    });
     mao.addEventListener("disconnected", () => {
+        info.inputSource = null;
         info.inputSourceTemMao = false;
+        if (info.modelo) info.modelo.visible = false;
         reiniciarEstadoMaoVR(info);
+        atualizarVisibilidadeMaoVR(info);
     });
     vrMaosInfo.push(info);
     return info;
+}
+
+function associarInputSourceMaoVR(info, inputSource) {
+    info.inputSource = inputSource || null;
+    info.inputSourceTemMao = !!(info.inputSource && info.inputSource.hand);
+    if (info.inputSourceTemMao && vrSessaoAtiva) info.habilitada = true;
+    if (info.inputSourceTemMao && (!info.modelo.userData.juntas
+        || info.modelo.userData.juntas.size === 0)
+        && Object.keys(info.mao.joints || {}).length > 0) {
+        const modeloArticulado = criarModeloArticuladoMaoVR(info.mao);
+        info.modelo.clear();
+        info.modelo.userData = modeloArticulado.userData;
+        info.modelo.add(...modeloArticulado.children);
+    }
+    atualizarVisibilidadeMaoVR(info);
+}
+
+function criarModeloArticuladoMaoVR(mao) {
+    const modelo = new THREE.Group();
+    modelo.name = "modelo-articulado-mao-vr";
+    const juntasModelo = new Map();
+
+    const materialPalma = new THREE.MeshBasicMaterial({
+        color: 0x8db9d8, side: THREE.DoubleSide, toneMapped: false
+    });
+    const materialDedos = new THREE.MeshBasicMaterial({
+        color: 0xb7d9ee, side: THREE.DoubleSide, toneMapped: false
+    });
+    const materialJuntas = new THREE.MeshBasicMaterial({
+        color: 0xd7edfa, side: THREE.DoubleSide, toneMapped: false
+    });
+    const esfera = new THREE.SphereGeometry(1, 12, 10);
+    const cilindro = new THREE.CylinderGeometry(1, 1, 1, 8, 1, false);
+    cilindro.rotateX(Math.PI / 2);
+    cilindro.computeVertexNormals();
+    const verticePonta = new THREE.Vector3();
+    const verticeFim = new THREE.Vector3();
+    const direcaoLocal = new THREE.Vector3();
+    const meioLocal = new THREE.Vector3();
+    const eixoZLocal = new THREE.Vector3(0, 0, 1);
+    const malhaPalma = new THREE.Mesh(esfera, materialPalma);
+    malhaPalma.scale.set(0.045, 0.014, 0.05);
+    malhaPalma.frustumCulled = false;
+    modelo.add(malhaPalma);
+    const matrizMaoInversa = new THREE.Matrix4();
+    const quaternionMaoInversa = new THREE.Quaternion();
+    const posicaoMao = new THREE.Vector3();
+    const escalaMao = new THREE.Vector3();
+    const nomes = ["wrist", "thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip"];
+    for (const dedo of ["index", "middle", "ring", "pinky"]) {
+        nomes.push(`${dedo}-finger-metacarpal`, `${dedo}-finger-phalanx-proximal`,
+            `${dedo}-finger-phalanx-intermediate`, `${dedo}-finger-phalanx-distal`, `${dedo}-finger-tip`);
+    }
+    for (const nome of nomes) {
+        const articulacao = mao.joints[nome];
+        if (!articulacao) continue;
+        const raio = nome === "wrist" || nome === "palm" ? 0.03
+            : nome === "thumb-metacarpal" || nome.endsWith("finger-metacarpal") ? 0.012
+                : nome.endsWith("tip") ? 0.01 : 0.012;
+        const material = nome === "palm" || nome === "wrist" ? materialPalma
+            : nome.endsWith("tip") ? materialJuntas : materialDedos;
+        const malha = new THREE.Mesh(esfera, material);
+        malha.scale.setScalar(raio);
+        malha.frustumCulled = false;
+        modelo.add(malha);
+
+        const segmentos = [];
+        const nomePai = paiJuntaMaoVR(nome);
+        if (nomePai) {
+            const segmento = new THREE.Mesh(cilindro, material);
+            segmento.frustumCulled = false;
+            modelo.add(segmento);
+            segmentos.push(segmento);
+        }
+        juntasModelo.set(nome, { articulacao, malha, segmentos, raio, nomePai });
+    }
+
+    const quaternionJunta = new THREE.Quaternion();
+    modelo.userData.atualizar = () => {
+        mao.updateMatrixWorld(true);
+        matrizMaoInversa.copy(mao.matrixWorld).invert();
+        mao.matrixWorld.decompose(posicaoMao, quaternionMaoInversa, escalaMao);
+        quaternionMaoInversa.invert();
+        const juntas = juntasModelo;
+        for (const [nome, item] of juntas) {
+            const articulacao = item.articulacao;
+            const visivel = articulacao.visible && articulacao.parent;
+            item.malha.visible = !!visivel;
+            for (const segmento of item.segmentos) segmento.visible = !!visivel;
+            if (!visivel) continue;
+            articulacao.getWorldPosition(verticePonta);
+            item.malha.position.copy(verticePonta).applyMatrix4(matrizMaoInversa);
+            articulacao.getWorldQuaternion(quaternionJunta);
+            item.malha.quaternion.copy(quaternionMaoInversa).multiply(quaternionJunta);
+            for (const segmento of item.segmentos) {
+                const pai = item.nomePai && juntas.get(item.nomePai);
+                if (!pai || !pai.articulacao.visible) {
+                    segmento.visible = false;
+                    continue;
+                }
+                pai.articulacao.getWorldPosition(verticeFim);
+                articulacao.getWorldPosition(verticePonta);
+                verticeFim.applyMatrix4(matrizMaoInversa);
+                verticePonta.applyMatrix4(matrizMaoInversa);
+                direcaoLocal.subVectors(verticePonta, verticeFim);
+                const comprimento = direcaoLocal.length();
+                if (comprimento < 0.001) {
+                    segmento.visible = false;
+                    continue;
+                }
+                meioLocal.addVectors(verticeFim, verticePonta).multiplyScalar(0.5);
+                segmento.position.copy(meioLocal);
+                segmento.quaternion.setFromUnitVectors(eixoZLocal, direcaoLocal.normalize());
+                segmento.scale.set(item.raio * 0.72, item.raio * 0.72, comprimento);
+            }
+        }
+
+        const pulso = juntas.get("wrist");
+        if (pulso && pulso.articulacao.visible) {
+            pulso.articulacao.getWorldPosition(verticePonta);
+            meioLocal.copy(verticePonta).applyMatrix4(matrizMaoInversa);
+            let quantidade = 1;
+            for (const dedo of ["index", "middle", "ring", "pinky"]) {
+                const metacarpo = juntas.get(`${dedo}-finger-metacarpal`);
+                if (!metacarpo || !metacarpo.articulacao.visible) continue;
+                metacarpo.articulacao.getWorldPosition(verticeFim);
+                meioLocal.add(verticeFim.applyMatrix4(matrizMaoInversa));
+                quantidade++;
+            }
+            malhaPalma.position.copy(meioLocal.multiplyScalar(1 / quantidade));
+            pulso.articulacao.getWorldQuaternion(quaternionJunta);
+            malhaPalma.quaternion.copy(quaternionMaoInversa).multiply(quaternionJunta);
+            malhaPalma.visible = true;
+        } else {
+            malhaPalma.visible = false;
+        }
+    };
+    modelo.userData.juntas = juntasModelo;
+    return modelo;
+}
+
+function paiJuntaMaoVR(nome) {
+    if (nome === "thumb-metacarpal") return "wrist";
+    if (nome === "thumb-phalanx-proximal") return "thumb-metacarpal";
+    if (nome === "thumb-phalanx-distal") return "thumb-phalanx-proximal";
+    if (nome === "thumb-tip") return "thumb-phalanx-distal";
+    const correspondencia = nome.match(/^(index|middle|ring|pinky)-finger-(metacarpal|phalanx-proximal|phalanx-intermediate|phalanx-distal|tip)$/);
+    if (!correspondencia) return null;
+    const [, dedo, parte] = correspondencia;
+    if (parte === "metacarpal") return "wrist";
+    if (parte === "phalanx-proximal") return `${dedo}-finger-metacarpal`;
+    if (parte === "phalanx-intermediate") return `${dedo}-finger-phalanx-proximal`;
+    if (parte === "phalanx-distal") return `${dedo}-finger-phalanx-intermediate`;
+    return `${dedo}-finger-phalanx-distal`;
+}
+
+function atualizarVisibilidadeMaoVR(info) {
+    if (!info || !info.mao) return;
+    const fonteComMao = !!(info.inputSourceTemMao || (info.inputSource && info.inputSource.hand));
+    const ativa = !!(info.habilitada && fonteComMao);
+    info.mao.visible = ativa;
+    if (info.modelo) info.modelo.visible = ativa && info.modelo.userData.juntas instanceof Map
+        && info.modelo.userData.juntas.size > 0;
+    if (info.infoInput && info.infoInput.laser) info.infoInput.laser.visible = !fonteComMao;
+}
+
+function articularJuntasMaoVR(info) {
+    if (!info || !info.modelo) return;
+    const rastreioValido = maoEstaRastreadaVR(info);
+    info.modelo.visible = rastreioValido;
+    if (rastreioValido && info.modelo.userData.atualizar) info.modelo.userData.atualizar();
 }
 
 function articulacaoMaoVR(info, nomes) {
@@ -1209,14 +1396,16 @@ function atualizarMaosVR(deltaTime) {
     for (const info of vrMaosInfo) {
         if (!info.habilitada) continue;
         if (!maoEstaRastreadaVR(info)) {
-            // Uma perda confirmada do tracking liberta o astro preservando a
-            // pose atual. Um grab do controller não é afetado por esta mão.
+            // Esconde imediatamente o último modelo, evitando congelar a mão
+            // numa pose antiga; a perda também liberta qualquer astro agarrado.
+            if (info.modelo) info.modelo.visible = false;
             if (info.rastreada || info.objetoAgarrado) reiniciarEstadoMaoVR(info);
             continue;
         }
         info.rastreioPerdidoDesde = 0;
         info.rastreada = true;
         if (info.mao.updateMatrixWorld) info.mao.updateMatrixWorld(true);
+        articularJuntasMaoVR(info);
         if (vrGrabAtivo && vrGrabAtivo.info !== info) {
             // Outro input controla já um objeto: não conservar uma pinça
             // pendente que pudesse ser promovida a seleção/grab mais tarde.
@@ -1378,17 +1567,30 @@ async function iniciarSessaoVR() {
         }
         vrSessaoXR = sessao;
         const funcionalidadesAtivas = sessao.enabledFeatures;
-        const trackingDisponivel = funcionalidadesAtivas
+        const trackingDeclarado = funcionalidadesAtivas
             ? (typeof funcionalidadesAtivas.has === "function"
                 ? funcionalidadesAtivas.has("hand-tracking")
                 : Array.from(funcionalidadesAtivas).includes("hand-tracking"))
-            : !!(sessao.inputSources && Array.from(sessao.inputSources).some(input => input.hand));
+            : null;
+        const fontesMaoDisponiveis = sessao.inputSources
+            ? Array.from(sessao.inputSources).some(source => !!source.hand)
+            : false;
+        const trackingDisponivel = trackingDeclarado !== false || fontesMaoDisponiveis;
         vrMaosInfo.forEach(info => {
+            // O WebXRManager identifica a mão ao emitir `connected` com
+            // XRInputSource.hand; a fonte real prevalece sobre a lista de features.
             info.habilitada = trackingDisponivel && !!info.mao;
-            if (info.mao) info.mao.visible = info.habilitada && info.inputSourceTemMao;
+            if (info.inputSource && !info.inputSource.hand) info.inputSource = null;
+            info.inputSourceTemMao = !!(info.inputSource && info.inputSource.hand);
+            if (info.inputSourceTemMao) info.habilitada = true;
+            atualizarVisibilidadeMaoVR(info);
         });
         vrControladoresInfo.forEach(info => {
-            if (info.maoInfo && !info.maoInfo.inputSourceTemMao && info.laser) info.laser.visible = true;
+            if (!info.maoInfo || !info.maoInfo.inputSourceTemMao) {
+                if (info.laser) info.laser.visible = true;
+            } else {
+                atualizarVisibilidadeMaoVR(info.maoInfo);
+            }
         });
 
         // Qualquer que seja o caminho de saída (botão 3D, DOM Overlay, sistema
@@ -1450,15 +1652,19 @@ function restaurarInterfaceAposSessao() {
     vrMaosInfo.forEach(info => {
         reiniciarEstadoMaoVR(info, false);
         info.habilitada = false;
+        info.inputSource = null;
         info.inputSourceTemMao = false;
         if (info.mao) info.mao.visible = false;
+        if (info.modelo) info.modelo.visible = false;
     });
     vrControladoresInfo.forEach(info => {
         if (info.objetoAgarrado) soltarAstroVR(info);
         if (info.maoInfo) {
+            info.maoInfo.inputSource = null;
             info.maoInfo.inputSourceTemMao = false;
             info.maoInfo.habilitada = false;
             info.maoInfo.mao.visible = false;
+            if (info.maoInfo.modelo) info.maoInfo.modelo.visible = false;
         }
         if (info.laser) info.laser.visible = true;
         info.gatilhoPuxado = false;
