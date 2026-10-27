@@ -50,8 +50,24 @@ const ESCALA_DESTAQUE_MAO_VR = 1.055;
 const SUBDIVISOES_DEDO_MAO_VR = 5;
 const SEGMENTOS_RADIAIS_DEDO_MAO_VR = 8;
 const vrDestaquesPinça = new Map();
-// Estado transitório do grabbing. A posição astronómica continua nos dados da
-// API; só se reparenta temporariamente o objeto visual ao controller.
+
+// ── Apresentação na palma (exclusivo do modo mãos) ──────────────────────────
+// A pinça funciona como CLICK (uma seleção por gesto). O astro selecionado
+// voa até ~2 cm acima da palma e passa a seguî-la — SEM «agarrar»:
+// não precisar de manter a pinça e nunca fica preso ao controlador.
+let vrApresentado = null;                // { info, objeto }
+const vrVoosApresentacaoVR = [];         // voos céu → palma em curso
+const DURACAO_VOAR_PALMA_VR_MS = 850;    // transição suave do céu à palma
+const ALTURA_PALMA_APRESENTACAO_VR_M = 0.021; // ~2 cm acima da superfície
+const MEIA_ESPESSURA_PALMA_VR_M = 0.008;      // metade da espessura visual
+const DIAMETRO_APRESENTACAO_VR_M = 0.085;
+const SUAVIZAR_SEGUIMENTO_PALMA_VR_S = 0.10;
+const LIMIAR_PRE_PINCA_VR = 0.04;       // congela o raio ANTES da flexão completa
+const LIMIAR_LIBERTAR_RAIO_VR = 0.07;   // histerese: só descongela bem aberto
+
+// Estado transitório do grabbing (controladores). A posição astronómica
+// continua nos dados da API; só se reparenta temporariamente o objeto visual
+// ao controller. As mãos NÃO fazem grabbing — ver o estado de apresentação.
 let vrGrabAtivo = null;
 let vrObjetosRegressando = [];
 let vrAstroRebuildPendente = false;
@@ -67,6 +83,11 @@ let vrAlvosCache = null;
 let vrTempOrigem = null;
 let vrTempDirecao = null;
 let vrTempQuat = null;
+let vrTempPalmaPos = null;       // temporários da apresentação (sem alocações)
+let vrTempPalmaDir = null;
+let vrTempPalmaMundo = null;
+let vrTempPalmaQuat = null;
+let geometriaPalmaCompartilhadaVR = null; // palma esculpida criada uma vez
 
 // Garante que o THREE está disponível, independentemente de outros scripts
 // o terem carregado ou não. Se já existir globalmente, usa-o; senão, carrega o CDN.
@@ -132,6 +153,10 @@ function iniciarCenaVR() {
     vrTempOrigem = new THREE.Vector3();
     vrTempDirecao = new THREE.Vector3();
     vrTempQuat = new THREE.Quaternion();
+    vrTempPalmaPos = new THREE.Vector3();
+    vrTempPalmaDir = new THREE.Vector3();
+    vrTempPalmaMundo = new THREE.Vector3();
+    vrTempPalmaQuat = new THREE.Quaternion();
 
     // Iluminação proveniente do Sol + luz ambiente ténue (para as esferas)
     criarIluminacaoVR();
@@ -748,7 +773,7 @@ function reconstruirAstrosVR() {
     // manipulada (e os seus recursos GPU). Atualiza já as posições dos outros
     // astros com os dados mais recentes; o rebuild completo fica pendente até
     // terminar o regresso, usando sempre a astronomia mais recente como alvo.
-    if (vrGrabAtivo || vrObjetosRegressando.length) {
+    if (vrGrabAtivo || vrObjetosRegressando.length || vrApresentado) {
         vrAstroRebuildPendente = true;
         sincronizarPosicoesAstrosVR();
         return;
@@ -1123,7 +1148,7 @@ function criarMaoRastreadaVR(indice) {
         mao, modelo, indice, habilitada: false, rastreada: false,
         pincaAtiva: false, pincaFecharDesde: 0, pincaAbrirDesde: 0,
         pincaInicio: 0, candidato: null, candidatoDesde: 0,
-        objetoAgarrado: null, ancora: null, inputSourceTemMao: false,
+        objetoAgarrado: null, ancora: null, inputSourceTemMao: false, ladoHand: "right",
         inputSource: null, rastreioPerdidoDesde: 0, cliquePinçaEmitido: false,
         alvoRaio: null, interseçãoRaio: null, distanciaRaio: ALCANCE_RAIO_MAO_VR,
         origemRaio: new THREE.Vector3(), direcaoRaioSuave: new THREE.Vector3(),
@@ -1163,6 +1188,10 @@ function criarMaoRastreadaVR(indice) {
 function associarInputSourceMaoVR(info, inputSource) {
     info.inputSource = inputSource || null;
     info.inputSourceTemMao = !!(info.inputSource && info.inputSource.hand);
+    // Lado da mão: desambigua o «acima da palma» (a normal da palma aponta
+    // para lados opostos de +Z/-Z do referencial da malha, ver
+    // pontoApresentacaoLocalVR).
+    info.ladoHand = (info.inputSource?.handedness === "left") ? "left" : "right";
     if (info.inputSourceTemMao && vrSessaoAtiva) info.habilitada = true;
     if (info.inputSourceTemMao && (!info.modelo.userData.juntas
         || info.modelo.userData.juntas.size === 0)
@@ -1175,14 +1204,84 @@ function associarInputSourceMaoVR(info, inputSource) {
     atualizarVisibilidadeMaoVR(info);
 }
 
+// ── Geometria da palma (gerada uma vez, partilhada por ambas as mãos) ───────
+// Palma «esculpida»: secções em superelipse ao longo do comprimento — mais
+// estreita junto ao pulso, a toda a largura junto aos nós — com bordas bem
+// arredondadas, espessura que afina para os nós e um copo subtil na face da
+// palma (como os dedos pousados a receber o planeta). Coordenadas locais:
+// X transversal (Índice → Mindinho), Y do pulso para os nós, Z de espessura;
+// a face +Z é o lado da palma. A pose real (posição, orientação e escala) é
+// aplicada por frame ao redor do referencial calculado das juntas do pulso,
+// da base do indicador e da base do mindinho.
+function criarGeometriaPalmaVR() {
+    const aneis = 20;        // ao longo do comprimento (pulso → nós)
+    const colunas = 28;      // contorno transversal (θ)
+    const expoente = 3.4;    // silhueta «retangular» com cantos bem redondos
+    const leiPotencia = 2 / expoente;
+    const potAssim = t => Math.sign(t) * Math.pow(Math.abs(t), leiPotencia);
+    const posicoes = [];
+    const indices = [];
+
+    for (let anel = 0; anel <= aneis; anel++) {
+        const v = anel / aneis;              // 0 = pulso, 1 = nós
+        const largura = 0.34 + 0.16 * Math.pow(v, 0.85);   // meia-largura em X
+        const espessura = 0.17 + 0.08
+            * Math.sin(Math.PI * Math.min(1, v * 0.82 + 0.14)); // meia-espessura em Z
+        for (let col = 0; col < colunas; col++) {
+            const ang = col / colunas * Math.PI * 2;
+            const c = Math.cos(ang), s = Math.sin(ang);
+            const x = largura * potAssim(c);
+            let z = espessura * potAssim(s);
+            // Copo da palma (face +Z): ligeira concavidade ao centro da mão.
+            if (z > 0) {
+                const alcanceLateral = Math.max(0, 1 - (x / largura) * (x / largura) * 1.15);
+                const aoLongo = Math.max(0, (v - 0.12) / 0.78);
+                z -= 0.085 * alcanceLateral
+                    * Math.sin(Math.PI * Math.min(1, aoLongo));
+            }
+            posicoes.push(x, v - 0.5, z);
+        }
+    }
+    for (let anel = 0; anel < aneis; anel++) {
+        for (let col = 0; col < colunas; col++) {
+            const atual = anel * colunas + col;
+            const seguinte = anel * colunas + (col + 1) % colunas;
+            const acima = (anel + 1) * colunas + col;
+            const acimaSeguinte = (anel + 1) * colunas + (col + 1) % colunas;
+            // Winding com os triângulos «a subir» primeiro: qualquer aqui
+            // sob (0..1) é imediatamente residido (normais exteriores).
+            indices.push(atual, acima, seguinte, seguinte, acima, acimaSeguinte);
+        }
+    }
+    // Tampas no pulso e nos nós (leques com um vértice central).
+    const centroPulso = posicoes.length / 3;
+    posicoes.push(0, -0.5, 0);
+    const centroNos = posicoes.length / 3;
+    posicoes.push(0, 0.5, 0);
+    for (let col = 0; col < colunas; col++) {
+        const seguinte = (col + 1) % colunas;
+        indices.push(centroPulso, col, seguinte);
+        const baseNos = aneis * colunas;
+        indices.push(centroNos, baseNos + col, baseNos + seguinte);
+    }
+    const geometria = new THREE.BufferGeometry();
+    geometria.setAttribute("position", new THREE.Float32BufferAttribute(posicoes, 3));
+    geometria.setIndex(indices);
+    geometria.computeVertexNormals();
+    return geometria;
+}
+
 function criarModeloArticuladoMaoVR(mao) {
     const modelo = new THREE.Group();
     modelo.name = "modelo-articulado-mao-vr";
     const juntasModelo = new Map();
 
     const materialPalma = new THREE.MeshStandardMaterial({
-        color: 0x27364b, roughness: 0.48, metalness: 0.08,
-        emissive: 0x081321, emissiveIntensity: 0.2
+        color: 0x2c3f5a, roughness: 0.38, metalness: 0.14,
+        emissive: 0x0a1a2e, emissiveIntensity: 0.3,
+        // DoubleSide: a mão esquerda espelha a peça (escala Z negativa, ver
+        // o atualizar()) e o material não pode depender da face.
+        side: THREE.DoubleSide
     });
     const materialDedos = new THREE.MeshStandardMaterial({
         color: 0x29384c, roughness: 0.32, metalness: 0.2,
@@ -1206,47 +1305,18 @@ function criarModeloArticuladoMaoVR(mao) {
     const eixoPalmaZ = new THREE.Vector3();
     const pulsoLocal = new THREE.Vector3();
     const matrizPalma = new THREE.Matrix4();
-    const geometriaPalma = new THREE.BufferGeometry();
-    const segmentosComprimentoPalma = 14;
-    const segmentosRadiaisPalma = 20;
-    const verticesPalma = [];
-    const indicesPalma = [];
-    for (let anel = 0; anel <= segmentosComprimentoPalma; anel++) {
-        const t = anel / segmentosComprimentoPalma;
-        const arco = Math.sin(Math.PI * t);
-        const raioLargura = 0.018 + 0.482 * Math.pow(arco, 0.55) * (0.8 + 0.2 * t);
-        const raioEspessura = 0.12 + 0.12 * arco;
-        for (let lado = 0; lado < segmentosRadiaisPalma; lado++) {
-            const angulo = lado / segmentosRadiaisPalma * Math.PI * 2;
-            verticesPalma.push(Math.cos(angulo) * raioLargura, t - 0.5,
-                Math.sin(angulo) * raioEspessura);
-        }
-    }
-    for (let anel = 0; anel < segmentosComprimentoPalma; anel++) {
-        for (let lado = 0; lado < segmentosRadiaisPalma; lado++) {
-            const atual = anel * segmentosRadiaisPalma + lado;
-            const seguinte = anel * segmentosRadiaisPalma + (lado + 1) % segmentosRadiaisPalma;
-            const abaixo = (anel + 1) * segmentosRadiaisPalma + lado;
-            const abaixoSeguinte = (anel + 1) * segmentosRadiaisPalma + (lado + 1) % segmentosRadiaisPalma;
-            indicesPalma.push(atual, abaixo, seguinte, seguinte, abaixo, abaixoSeguinte);
-        }
-    }
-    const indiceCentroInferior = verticesPalma.length / 3;
-    verticesPalma.push(0, -0.5, 0);
-    const indiceCentroSuperior = verticesPalma.length / 3;
-    verticesPalma.push(0, 0.5, 0);
-    for (let lado = 0; lado < segmentosRadiaisPalma; lado++) {
-        const seguinte = (lado + 1) % segmentosRadiaisPalma;
-        const inicioSuperior = segmentosComprimentoPalma * segmentosRadiaisPalma;
-        indicesPalma.push(indiceCentroInferior, lado, seguinte);
-        indicesPalma.push(indiceCentroSuperior, inicioSuperior + seguinte, inicioSuperior + lado);
-    }
-    geometriaPalma.setAttribute("position", new THREE.Float32BufferAttribute(verticesPalma, 3));
-    geometriaPalma.setIndex(indicesPalma);
-    geometriaPalma.computeVertexNormals();
-    const malhaPalma = new THREE.Mesh(geometriaPalma, materialPalma);
+    // Peça única esculpida: superelipse varrida ao longo da mão, com copo
+    // subtil na face da palma e bordas bem arredondadas — gerada UMA vez e
+    // partilhada pelas duas mãos. Por frame muda apenas a pose: nenhum
+    // vértice é recalculado, custo zero no ciclo de renderização.
+    if (!geometriaPalmaCompartilhadaVR) geometriaPalmaCompartilhadaVR = criarGeometriaPalmaVR();
+    const malhaPalma = new THREE.Mesh(geometriaPalmaCompartilhadaVR, materialPalma);
     malhaPalma.frustumCulled = false;
+    // Decorativa: a palma nunca pode interferir com raycasting/colisões —
+    // os alvos de seleção são sempre os astros e os botões do painel.
+    malhaPalma.raycast = () => {};
     modelo.add(malhaPalma);
+    modelo.userData.malhaPalma = malhaPalma;
     const matrizMaoInversa = new THREE.Matrix4();
     const quaternionMaoInversa = new THREE.Quaternion();
     const posicaoMao = new THREE.Vector3();
@@ -1383,7 +1453,7 @@ function criarModeloArticuladoMaoVR(mao) {
             malhaPalma.scale.set(
                 baseIndicadorLocal.distanceTo(baseMindinhoLocal) * 1.24,
                 comprimentoPalma * 1.08,
-                0.035
+                (modelo.userData.sentidoPalma || 1) * 0.035
             );
             malhaPalma.visible = true;
         } else {
@@ -1486,11 +1556,11 @@ function atualizarRaioMaoVR(info, deltaTime) {
         }
         return null;
     }
-    // Mantém a direção e o alvo do último apontamento válido enquanto o
-    // indicador dobra para a pinça; assim o gesto não desloca o clique.
-    if (info.raioPinçaTrancado && info.raioMao && info.raioMao.visible) {
-        return info.interseçãoRaio;
-    }
+    // Enquanto a pinça se aproxima (pré-pinça) ou está fechada, o raio fica
+    // CONGELADO: origem, direção, linha desenhada e alvo mantêm-se exatamente
+    // como estavam. A ligeira flexão do indicador para juntar-se ao polegar
+    // gesto nunca desloca o apontamento nem perde o alvo de seleção.
+    if (info.raioPinçaTrancado) return info.interseçãoRaio;
     const juntas = info.mao.joints;
     const nomes = [
         "index-finger-metacarpal", "index-finger-phalanx-proximal",
@@ -1548,9 +1618,11 @@ function atualizarRaioMaoVR(info, deltaTime) {
     vrRaycaster.near = nearAnterior;
     vrRaycaster.far = farAnterior;
     const escolhido = alvoSobRaioVR(intersecoes);
-    info.alvoRaio = escolhido
-        ? portadorDeDadosVR(escolhido.object, "astro") || portadorDeDadosVR(escolhido.object, "acao")
-        : null;
+    // As mãos só interagem com ASTROS: os botões de ação do painel 3D
+    // («SAIR DO VR», «Vista geral»,…) continuam exclusivos do comando —
+    // uma pinça destinada a um planeta, ou qualquer passagem fugaz pelo
+    // painel, nunca pode acionar UI externa nem terminar a sessão.
+    info.alvoRaio = escolhido ? portadorDeDadosVR(escolhido.object, "astro") : null;
     info.interseçãoRaio = escolhido;
     info.distanciaRaio = escolhido ? escolhido.distance : ALCANCE_RAIO_MAO_VR;
     const alcance = escolhido ? Math.max(0, escolhido.distance - 0.01) : ALCANCE_RAIO_MAO_VR;
@@ -1593,7 +1665,11 @@ function articularJuntasMaoVR(info) {
     if (!info || !info.modelo) return;
     const rastreioValido = maoEstaRastreadaVR(info);
     info.modelo.visible = rastreioValido;
-    if (rastreioValido && info.modelo.userData.atualizar) info.modelo.userData.atualizar();
+    if (rastreioValido) {
+        // Lado da mão espelha a palma (peça definida para a mão direita).
+        info.modelo.userData.sentidoPalma = info.ladoHand === "left" ? -1 : 1;
+        if (info.modelo.userData.atualizar) info.modelo.userData.atualizar();
+    }
 }
 
 function articulacaoMaoVR(info, nomes) {
@@ -1616,7 +1692,12 @@ function maoEstaRastreadaVR(info) {
 
 function reiniciarEstadoMaoVR(info, libertar = true) {
     if (!info) return;
-    if (libertar && info.objetoAgarrado) soltarAstroVR(info);
+    if (libertar) {
+        if (info.objetoAgarrado) soltarAstroVR(info);
+        // Mãos nunca fazem grabbing, mas podem ter o planeta apresentado na
+        // palma: perda de tracking/disconexão devolve-o suavemente ao céu.
+        if (vrApresentado && vrApresentado.info === info) libertarApresentacaoVR();
+    }
     if (info.infoInput) {
         info.infoInput.gatilhoPuxado = false;
         info.infoInput.astroSelecionavel = null;
@@ -1669,7 +1750,7 @@ function atualizarMaosVR(deltaTime) {
         if (!info.habilitada) continue;
         if (!maoEstaRastreadaVR(info)) {
             // Esconde imediatamente o último modelo, evitando congelar a mão
-            // numa pose antiga; a perda também liberta qualquer astro agarrado.
+            // numa pose antiga; a perda liberta qualquer astro em palma.
             if (info.modelo) info.modelo.visible = false;
             ocultarRaioMaoVR(info);
             if (info.rastreada || info.objetoAgarrado) reiniciarEstadoMaoVR(info);
@@ -1679,23 +1760,15 @@ function atualizarMaosVR(deltaTime) {
         info.rastreada = true;
         if (info.mao.updateMatrixWorld) info.mao.updateMatrixWorld(true);
         articularJuntasMaoVR(info);
+        atualizarRaioMaoVR(info, deltaTime);
         const polegar = articulacaoMaoVR(info, ["thumb-tip"]);
         const indicador = articulacaoMaoVR(info, ["index-finger-tip"]);
         polegar.getWorldPosition(info.pontaPolegar);
         indicador.getWorldPosition(info.pontaIndicador);
         const distanciaPinça = info.pontaPolegar.distanceTo(info.pontaIndicador);
-        // Captura o raio do frame anterior antes de o indicador flexionado o
-        // ocultar ou redirecionar. Este alvo fica estável durante o gesto todo.
-        if (!info.pincaAtiva && distanciaPinça <= LIMIAR_PINCA_FECHAR_VR && !info.pincaFecharDesde) {
-            info.pincaFecharDesde = agora;
-            info.candidato = raycastMaoVR(info);
-            info.candidatoDesde = info.candidato ? agora : 0;
-            info.raioPinçaTrancado = !!(info.raioMao && info.raioMao.visible);
-        }
-        atualizarRaioMaoVR(info, deltaTime);
         if (vrGrabAtivo && vrGrabAtivo.info !== info) {
-            // Outro input controla já um objeto: não conservar uma pinça
-            // pendente que pudesse ser promovida a seleção/grab mais tarde.
+            // O controlador controla já um objeto: a mão fica em pausa —
+            // sem pinças pendentes que pudessem disparar cliques depois.
             info.pincaAtiva = false;
             info.pincaFecharDesde = 0;
             info.pincaAbrirDesde = 0;
@@ -1704,48 +1777,47 @@ function atualizarMaosVR(deltaTime) {
             info.candidatoDesde = 0;
             continue;
         }
+
+        // ── Máquina de estados da pinça (IDLE → POINTING → PINCH → CLICK) ──
+        // PRÉ-PINÇA: as pontas aproximam-se — congela o raio (direção, origem
+        // e alvo) ANTES de o indicador dobrar, para o gesto não «arrastar»
+        // o apontamento para baixo.
+        // FECHAR LIMIAR: estabilizada, dispara UM clique (intenção: seleção);
+        // clicar nunca depende de manter a pinça fechada.
+        // ABRIR LIMIAR: termina imediatamente a interação e rearma o gesto —
+        // o debounce (estabilização de abrir + transição de fechar) impede
+        // cliques repetidos com os dedos juntos.
+        // As mãos NUNCA acionam botões de ação do painel (que são do comando)
+        // e NUNCA fazem grabbing: ver disparaCliquePincaVR.
         if (!info.pincaAtiva) {
-            if (distanciaPinça <= LIMIAR_PINCA_FECHAR_VR) {
-                if (!info.pincaFecharDesde) {
-                    info.pincaFecharDesde = agora;
-                    // Captura o alvo sob o raio quando a pinça começa; a ligeira
-                    // flexão necessária ao gesto não perde o alvo de seleção.
-                    info.candidato = raycastMaoVR(info);
-                    info.candidatoDesde = info.candidato ? agora : 0;
-                }
-                if (agora - info.pincaFecharDesde >= ESTABILIZAR_PINCA_VR_MS) {
+            if (!info.raioPinçaTrancado && distanciaPinça <= LIMIAR_PRE_PINCA_VR) {
+                info.raioPinçaTrancado = true;
+                info.pincaFecharDesde = agora;
+                // Alvo capturado com a mão quase estendida — o raio da pré-pinça
+                // estava ainda no último update válido; o gesto não o desloca.
+                info.candidato = raycastMaoVR(info);
+                info.candidatoDesde = info.candidato ? agora : 0;
+            }
+            if (info.raioPinçaTrancado && distanciaPinça <= LIMIAR_PINCA_FECHAR_VR) {
+                if (agora - info.pincaFecharDesde >= ESTABILIZAR_PINCA_VR_MS
+                    && !info.cliquePinçaEmitido) {
                     info.pincaAtiva = true;
                     info.pincaInicio = info.pincaFecharDesde;
                     info.pincaAbrirDesde = 0;
-                    info.cliquePinçaEmitido = false;
-                    if (info.objetoAgarrado) {
-                        // A pinça seguinte devolve o astro à sua posição no céu.
-                        soltarAstroVR(info);
-                        info.candidato = null;
-                        info.candidatoDesde = 0;
-                        info.cliquePinçaEmitido = true;
-                    }
+                    disparaCliquePincaVR(info);
+                    info.cliquePinçaEmitido = true;
                 }
-            } else {
-                info.pincaFecharDesde = 0;
+            } else if (info.raioPinçaTrancado && distanciaPinça > LIMIAR_LIBERTAR_RAIO_VR) {
+                // Afastou-se sem fechar: descongela o raio e cancela tudo.
                 info.raioPinçaTrancado = false;
+                info.pincaFecharDesde = 0;
+                info.candidato = null;
+                info.candidatoDesde = 0;
             }
         } else if (distanciaPinça >= LIMIAR_PINCA_ABRIR_VR) {
             if (!info.pincaAbrirDesde) info.pincaAbrirDesde = agora;
             if (agora - info.pincaAbrirDesde >= ESTABILIZAR_ABERTURA_VR_MS) {
-                if (!info.objetoAgarrado && info.candidato && info.candidato.userData.astro && !vrGrabAtivo
-                    && info.pincaAbrirDesde - info.pincaInicio < ATRASO_GRAB_VR_MS
-                    && !info.cliquePinçaEmitido) {
-                    selecionarAstroVR(info.candidato.userData.astro);
-                    info.cliquePinçaEmitido = true;
-                }
-                const controladorInfo = info.infoInput;
-                if (controladorInfo) {
-                    controladorInfo.gatilhoPuxado = false;
-                    controladorInfo.astroSelecionavel = null;
-                    controladorInfo.astroParaAgarrar = null;
-                    cancelarHoldBotaoVR(controladorInfo);
-                }
+                // PINCH RELEASE — termina a interação do gesto.
                 info.pincaAtiva = false;
                 info.pincaFecharDesde = 0;
                 info.pincaAbrirDesde = 0;
@@ -1757,49 +1829,25 @@ function atualizarMaosVR(deltaTime) {
         } else {
             info.pincaAbrirDesde = 0;
         }
-
-        // O objeto é filho do pulso, mas o ponto de apoio local da palma varia
-        // com a pinça. Filtra-se esse pequeno ruído com deltaTime, sem atrasar
-        // o seguimento global da mão.
-        if (info.objetoAgarrado && info.ancora) {
-            const palma = posicaoPalmaLocalVR(info);
-            if (palma) {
-                const alpha = 1 - Math.exp(-Math.min(deltaTime, 0.1) / SUAVIZAR_SEGUIMENTO_MAO_VR_S);
-                info.objetoAgarrado.position.lerp(palma, alpha);
-                info.objetoAgarrado.quaternion.slerp(info.rotacaoAlvo, alpha);
-            }
-        }
-
-        if (!info.pincaAtiva || info.objetoAgarrado || vrGrabAtivo) continue;
-        const candidato = raycastMaoVR(info);
-        if (candidato) {
-            if (candidato !== info.candidato) {
-                info.candidato = candidato;
-                info.candidatoDesde = agora;
-            }
-        } else if (info.raioMao && info.raioMao.visible && info.candidato) {
-            // Se o raio continua válido mas já não atinge nada, não ativar um
-            // alvo antigo. Preserva-o apenas quando a pinça flexiona o dedo e
-            // o raio é ocultado para evitar uma direção anatómica enganadora.
-            info.candidato = null;
-            info.candidatoDesde = 0;
-        }
-        if (info.candidato && info.candidato.userData.acao && !info.cliquePinçaEmitido
-            && agora - info.candidatoDesde >= HOLD_BOTAO_MS) {
-            // As ações 3D mantêm a mesma proteção de pressão prolongada dos
-            // controladores; uma pinça breve nunca pode, por exemplo, sair do VR.
-            executarAcaoVR(info.candidato.userData.acao);
-            info.cliquePinçaEmitido = true;
-        }
-        if (info.candidato && info.candidato.userData.astro && !info.pincaAbrirDesde
-            && !info.cliquePinçaEmitido
-            && agora - info.candidatoDesde >= ATRASO_GRAB_VR_MS) {
-            info.ancora = articulacaoMaoVR(info, ["wrist"]);
-            agarrarAstroVR(info, info.candidato);
-            if (info.objetoAgarrado) info.cliquePinçaEmitido = true;
-        }
-
     }
+
+    // O astro apresentado na palma é atualizado fora do loop de mãos —
+    // disparaCliquePincaVR/atualizarApresentacaoVR cuidam do tracking
+    // perdido e da adaptação fina à orientação da palma.
+    atualizarApresentacaoVR(deltaTime);
+}
+
+// ── CLICK da pinça ─────────────────────────────────────────────────────────
+// Dispara UMA vez por gesto, no instante em que a pinça estabiliza fechada.
+// Seleciona o astro que estava NO raio naquele instante (capturado na
+// pré-pinça). Espaço vazio / botão de ação: simplesmente IGNORA — sem
+// seleção, sem mover, sem sair do Observatório, sem tocar na UI externa.
+function disparaCliquePincaVR(info) {
+    const alvo = info.candidato || raycastMaoVR(info);
+    if (!alvo || !alvo.userData || !alvo.userData.astro) return;
+    if (alvo.parent !== vrGrupoAstros) return;
+    if (alvo.userData.vrRegressando) interromperRegressoAstroVR(alvo);
+    selecionarAstroVR(alvo.userData.astro, { apresentarEmMao: true, infoMao: info });
 }
 
 function criarLaser(cor) {
@@ -1963,6 +2011,9 @@ function sairSessaoVRDoOverlay(evento) {
 // (botão «SAIR DO VR», DOM Overlay, sistema do Quest, erro). Idempotente:
 // pode ser chamada várias vezes sem efeitos laterais.
 function restaurarInterfaceAposSessao() {
+    // Liberta primeiro a apresentação na palma (se existir): o astro regressa
+    // ao céu em vez de ficar preso a uma pose congelada da mão fora de VR.
+    if (vrApresentado) libertarApresentacaoVR();
     if (vrGrabAtivo) soltarAstroVR(vrGrabAtivo.info);
     vrMaosInfo.forEach(info => {
         reiniciarEstadoMaoVR(info, false);
@@ -2309,6 +2360,17 @@ function astroAtualVR(astro) {
     return dadosVRAtuais.astros.find(a => a.nome === astro.nome && a.tipo === astro.tipo) || astro;
 }
 
+// Diâmetro visual de um astro redimensionado para «tamanhoSegurado».
+// Compartilhado pelo grabbing do comando e pela apresentação na palma.
+function fatorEscalaParaTamanhoVR(astro, tamanhoSegurado) {
+    const cfg = astroCfg(astro && astro.nome);
+    const diametro = !cfg ? 30
+        : astro.nome === "ISS" ? cfg.size * 3 * FATOR_ESCALA_VR
+            : astro.nome === "Saturno" ? cfg.size * 2.2 * FATOR_ESCALA_VR
+                : cfg.size * 2 * FATOR_ESCALA_VR;
+    return tamanhoSegurado / Math.max(diametro, 0.001);
+}
+
 function sincronizarPosicoesAstrosVR() {
     if (!dadosVRAtuais || !Array.isArray(dadosVRAtuais.astros)) return;
     const sincronizar = objeto => {
@@ -2322,6 +2384,7 @@ function sincronizarPosicoesAstrosVR() {
     };
     if (vrGrupoAstros) vrGrupoAstros.children.forEach(sincronizar);
     if (vrGrabAtivo) sincronizar(vrGrabAtivo.objeto);
+    if (vrApresentado) sincronizar(vrApresentado.objeto);
     vrObjetosRegressando.forEach(item => sincronizar(item.objeto));
     const sol = dadosVRAtuais.astros.find(a => a.tipo === "sol");
     if (vrLuzSol && sol) definirPosicaoAltAzVR(vrLuzSol.position, sol.altitude, sol.azimute, RAIO_CEU_VR);
@@ -2343,13 +2406,8 @@ function agarrarAstroVR(info, objeto) {
     // controller e reduz-se só a sua escala VISUAL; os valores base guardados
     // continuam intactos e serão restaurados suavemente ao largar.
     const astro = objeto.userData.astro;
-    const cfg = astroCfg(astro && astro.nome);
-    const diametro = !cfg ? 30
-        : astro.nome === "ISS" ? cfg.size * 3 * FATOR_ESCALA_VR
-            : astro.nome === "Saturno" ? cfg.size * 2.2 * FATOR_ESCALA_VR
-                : cfg.size * 2 * FATOR_ESCALA_VR;
     const tamanhoSegurado = seguradoComMao ? 0.1 : 0.28;
-    const fatorVisual = tamanhoSegurado / Math.max(diametro, 0.001);
+    const fatorVisual = fatorEscalaParaTamanhoVR(astro, tamanhoSegurado);
     if (seguradoComMao) {
         // Começa diretamente na palma (sem salto desde a origem astronómica),
         // com orientação local alinhada à mão; a continuação é filtrada no loop.
@@ -2401,6 +2459,143 @@ function soltarAstroVR(info) {
     vrAlvosCache = null;
 }
 
+// ── Apresentação na palma (exclusivo do modo mãos) ─────────────────────────
+// O planeta selecionado por pinça voa suavemente até ficar ~2 cm acima da
+// palma (NUNCA colado à mão e NUNCA preso ao dedo), e passa a seguir a
+// transformação da palma: a mão vira-se e o planeta acompanha. Não há grab:
+// não é preciso manter a pinça fechada, o objeto não fica «agarrado» ao
+// controller, e a pose segue a orientação real da mão (juntas do pulso,
+// base do indicador e base do mindinho).
+
+// Referencial da palma: centro e normal do lado da palma, em espaço local do
+// modelo da mão (o mesmo em que a malhaPalma é posicionada por frame).
+function pontoApresentacaoLocalVR(info, destino) {
+    const malhaPalma = info.modelo && info.modelo.userData.malhaPalma;
+    if (!malhaPalma) return null;
+    destino.copy(malhaPalma.position);
+    // A peça é desenhada com a face da palma em +Z; a mão esquerda espelha a
+    // pose (escala Z negativa, ver articularJuntasMaoVR), invertendo também a
+    // direção da normal no espaço local — por isso o sinal vem do lado.
+    const s = info.ladoHand === "left" ? -1 : 1;
+    vrTempPalmaDir.set(0, 0, s).applyQuaternion(malhaPalma.quaternion);
+    destino.addScaledVector(vrTempPalmaDir,
+        ALTURA_PALMA_APRESENTACAO_VR_M + MEIA_ESPESSURA_PALMA_VR_M);
+    return destino;
+}
+
+// O mesmo ponto, mas em coordenadas de mundo (durante o voo céu → palma).
+function pontoApresentacaoMundoVR(info, destino) {
+    const malhaPalma = info.modelo && info.modelo.userData.malhaPalma;
+    if (!malhaPalma) return null;
+    malhaPalma.getWorldPosition(destino);
+    malhaPalma.getWorldQuaternion(vrTempPalmaQuat);
+    const s = info.ladoHand === "left" ? -1 : 1;
+    vrTempPalmaDir.set(0, 0, s).applyQuaternion(vrTempPalmaQuat);
+    destino.addScaledVector(vrTempPalmaDir,
+        ALTURA_PALMA_APRESENTACAO_VR_M + MEIA_ESPESSURA_PALMA_VR_M);
+    return destino;
+}
+
+// Astro visual (grupo em vrGrupoAstros) das dados astronómicos de um astro.
+function objetoDeAstroVR(astro) {
+    if (!vrGrupoAstros || !astro) return null;
+    return vrGrupoAstros.children.find(o => o.userData && o.userData.astro === astro) || null;
+}
+
+// Inicia a apresentação do astro na palma da mão (chamada pelo clique).
+function apresentarAstroVR(info, objeto) {
+    if (!vrSessaoAtiva || !info || !maoEstaRastreadaVR(info)) return;
+    if (!objeto || objeto.parent !== vrGrupoAstros || objeto.userData.vrAgarrado) return;
+    if (vrApresentado && vrApresentado.objeto === objeto) return;
+    if (vrVoosApresentacaoVR.some(voo => voo.objeto === objeto)) return;
+    // O astro anterior regressa suavemente ao céu (sempre por transição).
+    libertarApresentacaoVR();
+    if (objeto.userData.vrRegressando && !interromperRegressoAstroVR(objeto)) return;
+    vrApresentado = { info, objeto };
+    // Exclui o astro dos alvos de raio e do rebuild — como no grabbing, sem
+    // violar o estado do controlador.
+    objeto.userData.vrAgarrado = true;
+    vrAlvosCache = null;
+    const escalaAlvo = objeto.userData.vrEscalaOriginal.clone()
+        .multiplyScalar(fatorEscalaParaTamanhoVR(objeto.userData.astro, DIAMETRO_APRESENTACAO_VR_M));
+    vrVoosApresentacaoVR.push({
+        info, objeto, tempoDecorrido: 0,
+        posicaoInicio: objeto.position.clone(),
+        escalaInicio: objeto.scale.clone(),
+        escalaAlvo
+    });
+}
+
+// Termina a apresentação: reparent ao grupo dos astros mantendo a pose atual
+// e interpola (EaseInOutCubic, como o regresso do grabbing) até à posição
+// astronómica atual e à escala/orientação originais.
+function libertarApresentacaoVR() {
+    if (!vrApresentado) return;
+    const { objeto } = vrApresentado;
+    vrApresentado = null;
+    // Remove qualquer voo em curso do mesmo objeto.
+    const indiceVoo = vrVoosApresentacaoVR.findIndex(v => v.objeto === objeto);
+    if (indiceVoo >= 0) vrVoosApresentacaoVR.splice(indiceVoo, 1);
+    if (objeto.parent && objeto.parent !== vrGrupoAstros) vrGrupoAstros.attach(objeto);
+    objeto.userData.vrAgarrado = false;
+    objeto.userData.vrRegressando = true;
+    objeto.userData.astro = astroAtualVR(objeto.userData.astro);
+    vrObjetosRegressando.push({
+        objeto,
+        inicio: performance.now(),
+        tempoDecorrido: 0,
+        posicaoInicio: objeto.position.clone(),
+        rotacaoInicio: objeto.quaternion.clone(),
+        escalaInicio: objeto.scale.clone(),
+        posicaoAlvo: objeto.userData.vrPosicaoAstronomica.clone(),
+        rotacaoAlvo: objeto.userData.vrRotacaoOriginal.clone(),
+        escalaAlvo: objeto.userData.vrEscalaOriginal.clone()
+    });
+    vrAlvosCache = null;
+}
+
+// Voo céu → palma + seguimento fino da palma. Corre no ciclo de animação;
+// sem alocações por frame (temporários partilhados, alpha exponencial).
+function atualizarApresentacaoVR(deltaTime) {
+    for (let i = vrVoosApresentacaoVR.length - 1; i >= 0; i--) {
+        const voo = vrVoosApresentacaoVR[i];
+        if (!vrApresentado || vrApresentado.objeto !== voo.objeto
+            || !vrSessaoAtiva || !maoEstaRastreadaVR(voo.info)) {
+            // Substituído, sessão terminou ou tracking perdeu-se: a libertação
+            // devolve o astro ao céu a partir da pose em que estava.
+            libertarApresentacaoVR();
+            continue;
+        }
+        voo.tempoDecorrido += deltaTime * 1000;
+        const t = Math.min(1, voo.tempoDecorrido / DURACAO_VOAR_PALMA_VR_MS);
+        const suave = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        const alvoMundo = pontoApresentacaoMundoVR(voo.info, vrTempPalmaMundo);
+        if (alvoMundo) voo.objeto.position.lerpVectors(voo.posicaoInicio, alvoMundo, suave);
+        voo.objeto.scale.lerpVectors(voo.escalaInicio, voo.escalaAlvo, suave);
+        if (t >= 1) {
+            // Chegada: passa a seguir a transformação da palma. O attach
+            // preserva a pose mundial; a seguir, a posição local só é
+            // refinada suavemente (sem jitter nem teleportes).
+            voo.info.modelo.attach(voo.objeto);
+            const alvoLocal = pontoApresentacaoLocalVR(voo.info, vrTempPalmaPos);
+            if (alvoLocal) voo.objeto.position.copy(alvoLocal);
+            vrVoosApresentacaoVR.splice(i, 1);
+        }
+    }
+
+    if (!vrApresentado) return;
+    const { info, objeto } = vrApresentado;
+    if (objeto.parent !== info.modelo) return;
+    if (!vrSessaoAtiva || !maoEstaRastreadaVR(info)) {
+        libertarApresentacaoVR();
+        return;
+    }
+    const alvoLocal = pontoApresentacaoLocalVR(info, vrTempPalmaPos);
+    if (!alvoLocal) return;
+    const alpha = 1 - Math.exp(-Math.min(deltaTime, 0.1) / SUAVIZAR_SEGUIMENTO_PALMA_VR_S);
+    objeto.position.lerp(alvoLocal, alpha);
+}
+
 function interromperRegressoAstroVR(objeto) {
     const indice = vrObjetosRegressando.findIndex(item => item.objeto === objeto);
     if (indice < 0) return false;
@@ -2438,7 +2633,8 @@ function atualizarRegressosAstrosVR(deltaTime) {
             vrAlvosCache = null;
         }
     }
-    if (!vrGrabAtivo && !vrObjetosRegressando.length && vrAstroRebuildPendente) {
+    if (!vrGrabAtivo && !vrObjetosRegressando.length && !vrApresentado
+        && vrAstroRebuildPendente) {
         reconstruirAstrosVR();
     }
 }
@@ -2455,7 +2651,7 @@ function executarAcaoVR(acao) {
 }
 
 // ── Seleção de um astro ────────────────────────────────────────────────────
-function selecionarAstroVR(astro) {
+function selecionarAstroVR(astro, opcoes = null) {
     if (!astro || !vrScene) return;
     limparSelecaoVR();
     vrUltimaSelecao = astro;
@@ -2464,8 +2660,13 @@ function selecionarAstroVR(astro) {
     const cfg = astroCfg(astro.nome);
     const raio = cfg ? cfg.size * FATOR_ESCALA_VR : 20;
 
-    vrMarcadorSelecao = criarMarcadorSelecaoVR(posicao, raio);
-    vrScene.add(vrMarcadorSelecao);
+    // No modo mãos o astro é apresentado NA PALMA — o anel deixaria apenas um
+    // «buraco» luminoso no lugar em que ele estava. No resto (comando/rato)
+    // o anel marca o astro no céu como sempre.
+    if (!opcoes || !opcoes.apresentarEmMao) {
+        vrMarcadorSelecao = criarMarcadorSelecaoVR(posicao, raio);
+        vrScene.add(vrMarcadorSelecao);
+    }
 
     vrPainelInfo3D = criarPainelInfo3DVR(astro);
     vrScene.add(vrPainelInfo3D);
@@ -2473,12 +2674,25 @@ function selecionarAstroVR(astro) {
 
     mostrarInfoAstroVR(astro); // painel HTML (espelho no PC)
 
+    // Apresentação na palma (apenas no modo mãos; o comando/rato nunca a
+    // usam — ver disparaCliquePincaVR).
+    if (opcoes && opcoes.apresentarEmMao) {
+        const objeto = objetoDeAstroVR(astro);
+        if (objeto) apresentarAstroVR(opcoes.infoMao, objeto);
+    }
+
     // No headset a câmara é do utilizador — não se mexe nela. No modo PC a
     // aproximação é suave e o regresso faz-se pelo botão «Vista geral».
     if (!vrSessaoAtiva) aproximarCameraVR(astro);
 }
 
 function limparSelecaoVR() {
+    // A seleção do modo mãos (planeta na palma) também responde ao «Vista
+    // geral»/fechar: o astro regressa ao céu pelo mesmo mecanismo.
+    if (vrApresentado && (vrUltimaSelecao === vrApresentado.objeto.userData.astro
+            || !vrMarcadorSelecao)) {
+        libertarApresentacaoVR();
+    }
     vrUltimaSelecao = null;
     [vrMarcadorSelecao, vrPainelInfo3D].forEach(obj => {
         if (!obj) return;
