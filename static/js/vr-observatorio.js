@@ -1053,111 +1053,123 @@ function criarHaloSolarVR(raio) {
 }
 
 // ── Controladores VR (Meta Quest Touch) com laser pointer ───────────────────
+// O Three.js só tem dois slots internos de WebXRController e, com hand
+// tracking ativo, as duas mãos podem ocupá-los antes de os comandos
+// aparecerem. Nesse caso os comandos ficam sem slot e nunca recebem o
+// "connected". Por isso a deteção dos comandos é feita sobre a lista real
+// session.inputSources; a pose vem do XRFrame e de inputSource.targetRaySpace.
+// Não há posições simuladas: é a mesma pose que o runtime WebXR publica.
+// As mãos continuam a usar renderer.xr.getHand(), sem alterações.
 function criarControladoresVR() {
     for (let i = 0; i < 2; i++) {
-        const controlador = vrRenderer.xr.getController(i);
+        // Grupo posicionado por frame a partir da pose real do targetRaySpace.
+        const controlador = new THREE.Group();
+        controlador.name = i === 0 ? "controller-xr-left" : "controller-xr-right";
+        controlador.visible = false;
 
         // Linha de laser — aponta ao longo de -Z (direção do ray) do
         // controlador. É o raio, e só ele, o verdadeiro ponteiro: o astro
-        // deteta-se onde o raio intersecta a sua geometria. (A antiga "bola"
-        // da ponta foi removida — só atrapalhava a vista.)
+        // deteta-se onde o raio intersecta a sua geometria.
         const laser = criarLaser(0x6eb8ff);
         laser.visible = false;
+        // O comprimento muda em todos os frames; não deve ser abatido por
+        // uma bounding sphere antiga.
+        laser.frustumCulled = false;
         controlador.add(laser);
 
         const maoInfo = criarMaoRastreadaVR(i);
         const info = {
             controlador, laser, maoInfo, inputSource: null,
+            lado: i === 0 ? "left" : "right",
             hover: null, holdBotao: null, holdInicio: 0,
             gatilhoPuxado: false, gatilhoInicio: 0,
-            astroSelecionavel: null, astroParaAgarrar: null,            objetoAgarrado: null, rastreioPerdidoDesde: 0,
+            astroSelecionavel: null, astroParaAgarrar: null,
+            objetoAgarrado: null, rastreioPerdidoDesde: 0,
             rastreioPoseValido: false
         };
         if (maoInfo) maoInfo.infoInput = info;
         vrControladoresInfo.push(info);
 
-        // Toque rápido seleciona e abre a informação. Manter o gatilho ~0,28s
-        // no mesmo astro agarra-o ao controller; a soltura devolve-o suavemente
-        // ao estado astronómico atual. O espaço vazio continua sem ação.
         if (maoInfo) maoInfo.mao.visible = false;
-        controlador.addEventListener("connected", evento => {
-            info.inputSource = evento.data || null;
-            if (maoInfo) {
-                associarInputSourceMaoVR(maoInfo, info.inputSource);
-            }
-            if (info.inputSource && info.inputSource.hand) {
-                // Um source de mão nunca deve reaproveitar um trigger/grab que
-                // tenha ficado pendente do comando anterior.
-                if (info.objetoAgarrado) soltarAstroVR(info);
-                info.gatilhoPuxado = false;
-                info.astroSelecionavel = null;
-                info.astroParaAgarrar = null;
-                cancelarHoldBotaoVR(info);
-            }
-            atualizarVisibilidadeInteracaoVR();
-        });
-        controlador.addEventListener("disconnected", () => {
-            info.inputSource = null;
-            if (info.objetoAgarrado) soltarAstroVR(info);
-            if (maoInfo) {
-                reiniciarEstadoMaoVR(maoInfo);
-                maoInfo.inputSource = null;
-                maoInfo.inputSourceTemMao = false;
-                maoInfo.habilitada = false;
-                atualizarVisibilidadeMaoVR(maoInfo);
-            }
-            atualizarVisibilidadeInteracaoVR();
-        });
-        controlador.addEventListener("selectstart", () => {
-            if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER
-                || !controllerTemTrackingValidoVR(info)) return;
-            laser.material.color.setHex(0xffffff);
-            if (!info.gatilhoPuxado) iniciarGatilhoControllerVR(info);
-        });
-        controlador.addEventListener("selectend", () => {
-            laser.material.color.setHex(0x6eb8ff);
-            if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER) return;
-            if (!controllerTemTrackingValidoVR(info)) {
-                info.gatilhoPuxado = false;
-                info.gatilhoInicio = 0;
-                info.astroSelecionavel = null;
-                info.astroParaAgarrar = null;
-                cancelarHoldBotaoVR(info);
-                return;
-            }
-            terminarGatilhoControllerVR(info);
-            // Soltar o gatilho antes do tempo cancela a pressão mantida do botão.
-            cancelarHoldBotaoVR(info);
-        });
-
-        // Grip (botão de aperto) = SAIR DO VR, mas só com uma pressão DECIDIDA
-        // (~0,7s mantida). Era saída instantânea "para nunca ficar preso", mas
-        // um aperto acidental — ao erguer o braço para apontar ao céu —
-        // terminava a sessão em qualquer direção. Soltar antes do tempo não
-        // faz nada; e os outros caminhos de saída continuam todos (botão 3D,
-        // controlos do sistema do Quest).
-        controlador.addEventListener("squeezestart", () => {
-            // O squeeze também pode ser emitido pela pinça em input sources de
-            // mão. Não o interpretes como o atalho de saída do comando.
-            if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER
-                || !controllerTemTrackingValidoVR(info)) return;
-            if (vrGripTemporizador) clearTimeout(vrGripTemporizador);
-            vrGripTemporizador = setTimeout(() => {
-                vrGripTemporizador = null;
-                if (vrModoInteracao === MODO_INTERACAO_VR.CONTROLLER
-                    && controllerTemTrackingValidoVR(info)) sairSessaoVR();
-            }, 700);
-        });
-        controlador.addEventListener("squeezeend", () => {
-            if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER) return;
-            if (vrGripTemporizador) {
-                clearTimeout(vrGripTemporizador);
-                vrGripTemporizador = null;
-            }
-        });
-
         vrScene.add(controlador);
     }
+}
+
+// O evento WebXR identifica a fonte que o originou; a correspondência é feita
+// por identidade (nunca pela posição na lista de inputSources).
+function infoControladorDoEventoVR(evento) {
+    const fonte = evento && evento.inputSource;
+    if (!fonte || fonte.hand) return null;
+    return vrControladoresInfo.find(info => info.inputSource === fonte) || null;
+}
+
+function tratarSelectStartControllerVR(info) {
+    if (!info || vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER
+        || !controllerTemTrackingValidoVR(info)) return;
+    info.laser.material.color.setHex(0xffffff);
+    if (!info.gatilhoPuxado) iniciarGatilhoControllerVR(info);
+}
+
+function tratarSelectEndControllerVR(info) {
+    if (!info) return;
+    info.laser.material.color.setHex(0x6eb8ff);
+    if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER) return;
+    if (!controllerTemTrackingValidoVR(info)) {
+        info.gatilhoPuxado = false;
+        info.gatilhoInicio = 0;
+        info.astroSelecionavel = null;
+        info.astroParaAgarrar = null;
+        cancelarHoldBotaoVR(info);
+        return;
+    }
+    terminarGatilhoControllerVR(info);
+    // Soltar o gatilho antes do tempo cancela a pressão mantida do botão.
+    cancelarHoldBotaoVR(info);
+}
+
+// Grip (botão de aperto) = SAIR DO VR, mas só com uma pressão DECIDIDA
+// (~0,7s mantida). Um aperto acidental — ao erguer o braço para apontar ao
+// céu — não pode terminar a sessão. Soltar antes do tempo não faz nada.
+function tratarSqueezeStartControllerVR(info) {
+    if (!info || vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER
+        || !controllerTemTrackingValidoVR(info)) return;
+    if (vrGripTemporizador) clearTimeout(vrGripTemporizador);
+    vrGripTemporizador = setTimeout(() => {
+        vrGripTemporizador = null;
+        if (vrModoInteracao === MODO_INTERACAO_VR.CONTROLLER
+            && controllerTemTrackingValidoVR(info)) sairSessaoVR();
+    }, 700);
+}
+
+function tratarSqueezeEndControllerVR(info) {
+    if (!info || vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER) return;
+    if (vrGripTemporizador) {
+        clearTimeout(vrGripTemporizador);
+        vrGripTemporizador = null;
+    }
+}
+
+// Os eventos de seleção são da sessão (XRInputSourceEvent), não de um slot
+// interno do Three. Filtrar por inputSource garante que a pinça de uma mão
+// nunca é interpretada como gatilho do comando.
+function configurarEventosControllerSessaoVR(sessao) {
+    if (!sessao || typeof sessao.addEventListener !== "function") return;
+    sessao.addEventListener("inputsourceschange", () => {
+        sincronizarFontesEntradaVR(sessao);
+        atualizarVisibilidadeInteracaoVR();
+    });
+    sessao.addEventListener("selectstart", evento => {
+        tratarSelectStartControllerVR(infoControladorDoEventoVR(evento));
+    });
+    sessao.addEventListener("selectend", evento => {
+        tratarSelectEndControllerVR(infoControladorDoEventoVR(evento));
+    });
+    sessao.addEventListener("squeezestart", evento => {
+        tratarSqueezeStartControllerVR(infoControladorDoEventoVR(evento));
+    });
+    sessao.addEventListener("squeezeend", evento => {
+        tratarSqueezeEndControllerVR(infoControladorDoEventoVR(evento));
+    });
 }
 
 function criarMaoRastreadaVR(indice) {
@@ -1266,16 +1278,30 @@ function atualizarRastreioControllersVR() {
     const espacoReferencia = xr.getReferenceSpace && xr.getReferenceSpace();
     for (const info of vrControladoresInfo) {
         const fonte = info.inputSource;
-        let poseValida = false;
+        let pose = null;
         if (frame && espacoReferencia && fonte && fonte.targetRaySpace
             && typeof frame.getPose === "function") {
             try {
-                poseValida = !!frame.getPose(fonte.targetRaySpace, espacoReferencia);
+                pose = frame.getPose(fonte.targetRaySpace, espacoReferencia);
             } catch (_) {
-                poseValida = false;
+                pose = null;
             }
         }
-        info.rastreioPoseValido = poseValida;
+        info.rastreioPoseValido = !!pose;
+        if (!info.controlador) continue;
+        if (pose && pose.transform) {
+            // Aplica a pose real do targetRaySpace (o mesmo espaço que o
+            // runtime usa para o raio do comando).
+            const t = pose.transform;
+            info.controlador.position.set(t.position.x, t.position.y, t.position.z);
+            info.controlador.quaternion.set(t.orientation.x, t.orientation.y,
+                t.orientation.z, t.orientation.w);
+            info.controlador.scale.set(1, 1, 1);
+            info.controlador.visible = true;
+            info.controlador.updateMatrixWorld(true);
+        } else {
+            info.controlador.visible = false;
+        }
     }
 }
 
@@ -1287,18 +1313,56 @@ function fontesControllersRastreadasVR() {
     return vrControladoresInfo.some(info => controllerTemTrackingValidoVR(info));
 }
 
+function definirFonteControllerVR(info, fonte) {
+    if (!info || info.inputSource === fonte) return false;
+    // Um comando que desaparece não pode deixar um gesto ou um objeto preso.
+    if (info.objetoAgarrado) soltarAstroVR(info);
+    info.gatilhoPuxado = false;
+    info.gatilhoInicio = 0;
+    info.astroSelecionavel = null;
+    info.astroParaAgarrar = null;
+    info.rastreioPerdidoDesde = 0;
+    cancelarHoldBotaoVR(info);
+    if (info.laser) {
+        info.laser.visible = false;
+        info.laser.material.color.setHex(0x6eb8ff);
+    }
+    if (info.controlador) info.controlador.visible = false;
+    info.inputSource = fonte || null;
+    info.rastreioPoseValido = false;
+    return true;
+}
+
 function sincronizarFontesEntradaVR(sessao) {
     if (!sessao || !sessao.inputSources) return;
-    const fontes = sessao.inputSources;
-    let alteradas = false;
-    for (let i = 0; i < vrControladoresInfo.length; i++) {
-        const info = vrControladoresInfo[i];
-        const fonte = fontes[i] || null;
-        if (info.inputSource !== fonte) {
-            alteradas = true;
-            info.inputSource = fonte;
-            if (info.maoInfo) associarInputSourceMaoVR(info.maoInfo, fonte);
+    const fontes = Array.from(sessao.inputSources);
+    // Só comandos físicos. As mãos têm o seu próprio fluxo (XRHand) e não
+    // entram nesta lista.
+    const disponiveis = fontes.filter(fonte => fonte && !fonte.hand
+        && fonte.targetRayMode === "tracked-pointer");
+    const usadas = new Set();
+    const atribuicoes = new Map();
+    // A handedness é o identificador estável do comando; a ordem de
+    // session.inputSources não é (o runtime pode intercalar mãos e comandos).
+    for (const info of vrControladoresInfo) {
+        const fonte = disponiveis.find(f => !usadas.has(f) && f.handedness === info.lado);
+        if (fonte) {
+            usadas.add(fonte);
+            atribuicoes.set(info, fonte);
         }
+    }
+    // Runtimes que reportam handedness "none": usa o primeiro comando livre.
+    for (const info of vrControladoresInfo) {
+        if (atribuicoes.has(info)) continue;
+        const fonte = disponiveis.find(f => !usadas.has(f));
+        if (fonte) {
+            usadas.add(fonte);
+            atribuicoes.set(info, fonte);
+        }
+    }
+    let alteradas = false;
+    for (const info of vrControladoresInfo) {
+        if (definirFonteControllerVR(info, atribuicoes.get(info) || null)) alteradas = true;
     }
     if (alteradas) atualizarVisibilidadeInteracaoVR();
 }
@@ -2387,12 +2451,19 @@ async function iniciarSessaoVR() {
         const funcionalidadesAtivas = sessao.enabledFeatures;
         // enabledFeatures apenas declara capacidade; a fonte XRInputSource
         // com hand e as juntas visíveis é que provam tracking efetivo.
-        for (const info of vrMaosInfo) {
-            info.habilitada = false;
-            info.inputSource = null;
-            info.inputSourceTemMao = false;
+        // Os comandos escutam os eventos da própria sessão e reconstroem a
+        // correspondência a partir de session.inputSources.
+        configurarEventosControllerSessaoVR(sessao);
+        for (const info of vrControladoresInfo) {
+            info.rastreioPoseValido = false;
+            if (info.controlador) info.controlador.visible = false;
         }
-        for (const info of vrControladoresInfo) info.inputSource = null;
+        // As mãos podem ter recebido o "connected" antes de vrSessaoAtiva
+        // ficar true; reavalia-se a fonte já associada agora que a sessão
+        // existe. Não se inventa nem se remapeia por índice.
+        for (const info of vrMaosInfo) {
+            if (info.inputSource) associarInputSourceMaoVR(info, info.inputSource);
+        }
         vrModoInteracao = MODO_INTERACAO_VR.NENHUM;
         vrModoInteracaoCandidato = null;
         vrModoInteracaoCandidatoDesde = 0;
@@ -2485,6 +2556,8 @@ function restaurarInterfaceAposSessao() {
         }
         if (info.laser) info.laser.visible = false;
         if (info.laser) info.laser.material.color.setHex(0x6eb8ff);
+        if (info.controlador) info.controlador.visible = false;
+        info.inputSource = null;
         info.rastreioPoseValido = false;
         info.gatilhoPuxado = false;
         info.gatilhoInicio = 0;
@@ -3756,9 +3829,12 @@ function atualizarMiradoresVR() {
         const hitVisual = astroEscolhido ? escolhido
             : (intersecoes.length ? intersecoes[0] : null);
         const verticesLaser = info.laser.geometry.attributes.position;
+        // O primeiro vértice fica fixo na origem local do comando (0,0,0).
+        // Só o segundo se move; reescrever o primeiro com setXYZ(0, 0, 0)
+        // deixava o z a undefined (NaN) e podia cortar o laser/culling.
         const comprimentoLaser = hitVisual
-            ? Math.min(120, vrTempOrigem.distanceTo(hitVisual.point)) : 120;
-        verticesLaser.setXYZ(0, 0, 0);
+            ? Math.max(0, Math.min(120, vrTempOrigem.distanceTo(hitVisual.point)))
+            : 120;
         verticesLaser.setXYZ(1, 0, 0, -comprimentoLaser);
         verticesLaser.needsUpdate = true;
         info.laser.geometry.computeBoundingSphere();
