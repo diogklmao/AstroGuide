@@ -71,14 +71,23 @@ const vrDestaquesPinça = new Map();
 
 // ── Apresentação na palma (exclusivo do modo mãos) ──────────────────────────
 // A pinça funciona como CLICK (uma seleção por gesto). O astro selecionado
-// voa alguns centímetros acima da palma e passa a segui-la — SEM «agarrar»:
-// não precisar de manter a pinça e nunca fica preso ao controlador.
-let vrApresentado = null;                // { info, objeto }
+// passa por MOVING_TO_HAND → ON_HAND; um segundo pinch inicia RETURNING e
+// devolve-o ao céu. SEM «agarrar»: não é preciso manter a pinça, e nunca fica
+// preso ao controlador. Durante as transições não são aceites novas ações.
+const ESTADO_APRESENTACAO_VR = Object.freeze({
+    NORMAL: "normal",
+    MOVING_TO_HAND: "moving-to-hand",
+    ON_HAND: "on-hand",
+    RETURNING: "returning"
+});
+let estadoApresentacaoVR = ESTADO_APRESENTACAO_VR.NORMAL;
+let vrApresentado = null;                // { info, objeto, posicaoOriginal, rotacaoOriginal, escalaOriginal }
 let vrAstroVisualSelecionado = null;
 const vrEscalasSelecaoVR = new Map();       // inclui o fade-out do astro anteriormente selecionado
 const vrVoosApresentacaoVR = [];         // voos céu → palma em curso
 const DURACAO_DESTAQUE_PRE_VOO_VR_MS = 220; // pequena antecipação de scale
 const DURACAO_VOAR_PALMA_VR_MS = 1450;      // voo deliberado, fácil de acompanhar
+const DURACAO_REGRESSO_PALMA_VR_MS = 1450;  // regresso simétrico ao voo de ida
 const MEIA_ESPESSURA_PALMA_VR_M = 0.010;    // superfície convexa da palma (~1 cm)
 const SEPARACAO_PALMA_PLANETA_VR_M = 0.032; // intervalo visível entre palma e planeta
 const DIAMETRO_APRESENTACAO_VR_M = 0.14;
@@ -2259,13 +2268,33 @@ function atualizarMaosVR(deltaTime) {
 
 // ── CLICK da pinça ─────────────────────────────────────────────────────────
 // Dispara UMA vez por gesto, no instante em que a pinça estabiliza fechada.
-// Seleciona o astro guardado no PINCH_START. Espaço vazio / botão de ação:
-// simplesmente IGNORA — sem seleção, sem mover, sem sair do Observatório,
-// sem tocar na UI externa.
+// Sem planeta na palma, seleciona o astro guardado no PINCH_START. Com um
+// planeta ON_HAND, o mesmo gesto devolve-o (RETURNING). Espaço vazio / botão
+// de ação: simplesmente IGNORA — sem seleção, sem mover, sem sair do
+// Observatório, sem tocar na UI externa.
 function disparaCliquePincaVR(info) {
     if (vrModoInteracao !== MODO_INTERACAO_VR.MAOS
         || info.estadoPinca !== ESTADO_PINCA_VR.PINCHADO
         || !maoEstaRastreadaVR(info)) return;
+    // MOVING_TO_HAND e RETURNING estão bloqueados: o planeta está a caminho
+    // ou a voltar, e um pinch acidental não pode trocar/substituir o alvo.
+    if (estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.MOVING_TO_HAND
+        || estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.RETURNING) return;
+    // Com o planeta já na palma, um NOVO pinch (não o que o selecionou) é o
+    // gesto de devolver. Vale mesmo que o raio não esteja sobre um astro: o
+    // planeta apresentado está fora dos alvos de raycast.
+    if (estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.ON_HAND) {
+        if (vrApresentado) {
+            limparSelecaoVR();
+            // Defensivo: limparSelecaoVR pode não chegar ao astro apresentado
+            // se houver uma seleção de comando concorrente; o segundo pinch
+            // tem sempre de o devolver.
+            if (vrApresentado) libertarApresentacaoVR();
+        } else {
+            estadoApresentacaoVR = ESTADO_APRESENTACAO_VR.NORMAL;
+        }
+        return;
+    }
     // Só o alvo congelado no PINCH_START pode ser selecionado. Não há
     // fallback para o raio atual: uma pinça no vazio nunca escolhe nada.
     const alvo = info.alvoPinch;
@@ -2435,6 +2464,7 @@ function restaurarInterfaceAposSessao() {
     // Liberta primeiro a apresentação na palma (se existir): o astro regressa
     // ao céu em vez de ficar preso a uma pose congelada da mão fora de VR.
     if (vrApresentado) libertarApresentacaoVR();
+    estadoApresentacaoVR = ESTADO_APRESENTACAO_VR.NORMAL;
     if (vrGrabAtivo) soltarAstroVR(vrGrabAtivo.info);
     vrMaosInfo.forEach(info => {
         reiniciarEstadoMaoVR(info, false);
@@ -3067,14 +3097,12 @@ function definirDestaqueSelecaoVR(objeto) {
 
 // Inicia a apresentação do astro na palma da mão (chamada pelo clique).
 function apresentarAstroVR(info, objeto) {
+    if (estadoApresentacaoVR !== ESTADO_APRESENTACAO_VR.NORMAL) return;
     if (!vrSessaoAtiva || !info || !maoEstaRastreadaVR(info)) return;
     const malhaPalma = info.modelo && info.modelo.userData.malhaPalma;
     if (!malhaPalma || !malhaPalma.visible) return;
     if (!objeto || objeto.parent !== vrGrupoAstros || objeto.userData.vrAgarrado) return;
-    if (vrApresentado && vrApresentado.objeto === objeto) return;
-    if (vrVoosApresentacaoVR.some(voo => voo.objeto === objeto)) return;
-    // O astro anterior regressa suavemente ao céu (sempre por transição).
-    libertarApresentacaoVR();
+    if (vrApresentado || vrVoosApresentacaoVR.length) return;
     if (vrAstroVisualSelecionado && vrAstroVisualSelecionado !== objeto) {
         animarRegressoDestaqueAstroVR(vrAstroVisualSelecionado);
     }
@@ -3089,12 +3117,18 @@ function apresentarAstroVR(info, objeto) {
     vrEscalasSelecaoVR.delete(objeto);
     if (vrAstroVisualSelecionado === objeto) vrAstroVisualSelecionado = null;
     if (objeto.userData.vrRegressando && !interromperRegressoAstroVR(objeto)) return;
-    vrApresentado = { info, objeto };
+    // Snapshot tirado no primeiro pinch. O regresso usa ESTES valores, não a
+    // pose atual da mão nem uma posição fixa no mundo.
+    const posicaoOriginal = (objeto.userData.vrPosicaoAstronomica || objeto.position).clone();
+    const rotacaoOriginal = (objeto.userData.vrRotacaoOriginal || objeto.quaternion).clone();
+    const escalaOriginal = (objeto.userData.vrEscalaOriginal || objeto.scale).clone();
+    vrApresentado = { info, objeto, posicaoOriginal, rotacaoOriginal, escalaOriginal };
+    estadoApresentacaoVR = ESTADO_APRESENTACAO_VR.MOVING_TO_HAND;
     // Exclui o astro dos alvos de raio e do rebuild — como no grabbing, sem
     // violar o estado do controlador.
     objeto.userData.vrAgarrado = true;
     vrAlvosCache = null;
-    const escalaAlvo = objeto.userData.vrEscalaOriginal.clone()
+    const escalaAlvo = escalaOriginal.clone()
         .multiplyScalar(fatorEscalaComumApresentacaoVR() * FATOR_DESTAQUE_SELECAO_VR);
     const escalaBase = objeto.scale.clone();
     const escalaInicio = escalaBase.clone().multiplyScalar(FATOR_DESTAQUE_SELECAO_VR);
@@ -3106,12 +3140,13 @@ function apresentarAstroVR(info, objeto) {
 }
 
 // Termina a apresentação: reparent ao grupo dos astros mantendo a pose atual
-// e interpola (EaseInOutCubic, como o regresso do grabbing) até à posição
-// astronómica atual e à escala/orientação originais.
+// e interpola (EaseInOutCubic, como o regresso do grabbing) até à posição,
+// rotação e escala ORIGINAIS guardadas no primeiro pinch.
 function libertarApresentacaoVR() {
     if (!vrApresentado) return;
-    const { objeto } = vrApresentado;
+    const { objeto, posicaoOriginal, rotacaoOriginal, escalaOriginal } = vrApresentado;
     vrApresentado = null;
+    estadoApresentacaoVR = ESTADO_APRESENTACAO_VR.RETURNING;
     // Remove qualquer voo em curso do mesmo objeto.
     const indiceVoo = vrVoosApresentacaoVR.findIndex(v => v.objeto === objeto);
     if (indiceVoo >= 0) vrVoosApresentacaoVR.splice(indiceVoo, 1);
@@ -3124,14 +3159,16 @@ function libertarApresentacaoVR() {
     if (vrAstroVisualSelecionado === objeto) vrAstroVisualSelecionado = null;
     vrObjetosRegressando.push({
         objeto,
+        deApresentacao: true,
+        duracaoMs: DURACAO_REGRESSO_PALMA_VR_MS,
         inicio: performance.now(),
         tempoDecorrido: 0,
         posicaoInicio: objeto.position.clone(),
         rotacaoInicio: objeto.quaternion.clone(),
         escalaInicio: objeto.scale.clone(),
-        posicaoAlvo: objeto.userData.vrPosicaoAstronomica.clone(),
-        rotacaoAlvo: objeto.userData.vrRotacaoOriginal.clone(),
-        escalaAlvo: objeto.userData.vrEscalaOriginal.clone()
+        posicaoAlvo: posicaoOriginal.clone(),
+        rotacaoAlvo: rotacaoOriginal.clone(),
+        escalaAlvo: escalaOriginal.clone()
     });
     vrAlvosCache = null;
 }
@@ -3182,6 +3219,7 @@ function atualizarApresentacaoVR(deltaTime) {
             }
             voo.objeto.position.copy(alvoLocal);
             vrVoosApresentacaoVR.splice(i, 1);
+            estadoApresentacaoVR = ESTADO_APRESENTACAO_VR.ON_HAND;
         }
     }
 
@@ -3206,8 +3244,13 @@ function atualizarApresentacaoVR(deltaTime) {
 function interromperRegressoAstroVR(objeto) {
     const indice = vrObjetosRegressando.findIndex(item => item.objeto === objeto);
     if (indice < 0) return false;
+    const item = vrObjetosRegressando[indice];
     vrObjetosRegressando.splice(indice, 1);
     objeto.userData.vrRegressando = false;
+    if (item.deApresentacao
+        && estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.RETURNING) {
+        estadoApresentacaoVR = ESTADO_APRESENTACAO_VR.NORMAL;
+    }
     vrAlvosCache = null;
     return true;
 }
@@ -3217,13 +3260,19 @@ function atualizarRegressosAstrosVR(deltaTime) {
         const item = vrObjetosRegressando[i];
         const astro = astroAtualVR(item.objeto.userData.astro);
         item.objeto.userData.astro = astro;
-        definirPosicaoAltAzVR(item.posicaoAlvo, astro.altitude, astro.azimute, RAIO_CEU_VR);
+        // O regresso da palma usa a posição ORIGINAL guardada no primeiro
+        // pinch. Só os regressos do grabbing seguem a posição astronómica
+        // mais recente (o objeto foi largado no espaço, não apresentado).
+        if (!item.deApresentacao) {
+            definirPosicaoAltAzVR(item.posicaoAlvo, astro.altitude, astro.azimute, RAIO_CEU_VR);
+        }
 
         // Usa deltaTime limitado do render loop, para a transição manter a
         // mesma duração independentemente da taxa de frames. EaseInOutCubic
         // abranda naturalmente no início e no fim da transição.
         item.tempoDecorrido += deltaTime * 1000;
-        const t = Math.min(1, item.tempoDecorrido / DURACAO_REGRESSO_GRAB_VR_MS);
+        const duracao = item.duracaoMs || DURACAO_REGRESSO_GRAB_VR_MS;
+        const t = Math.min(1, item.tempoDecorrido / duracao);
         const suave = t < 0.5
             ? 4 * t * t * t
             : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -3237,6 +3286,10 @@ function atualizarRegressosAstrosVR(deltaTime) {
             item.objeto.scale.copy(item.escalaAlvo);
             item.objeto.userData.vrRegressando = false;
             vrObjetosRegressando.splice(i, 1);
+            if (item.deApresentacao
+                && estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.RETURNING) {
+                estadoApresentacaoVR = ESTADO_APRESENTACAO_VR.NORMAL;
+            }
             vrAlvosCache = null;
         }
     }
@@ -3260,6 +3313,12 @@ function executarAcaoVR(acao) {
 // ── Seleção de um astro ────────────────────────────────────────────────────
 function selecionarAstroVR(astro, opcoes = null) {
     if (!astro || !vrScene) return;
+    // A seleção por mão não pode abrir um segundo alvo a meio de MOVING_TO_HAND
+    // ou RETURNING; nesses estados o planeta atual é o único dono do gesto.
+    if (opcoes && opcoes.apresentarEmMao
+        && (estadoApresentacaoVR !== ESTADO_APRESENTACAO_VR.NORMAL || vrApresentado)) {
+        return;
+    }
     const objetoSelecionado = objetoDeAstroVR(astro);
     limparSelecaoVR();
     if (objetoSelecionado && objetoSelecionado.userData.vrRegressando) {
