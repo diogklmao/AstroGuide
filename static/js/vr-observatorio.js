@@ -48,7 +48,18 @@ const TOLERANCIA_PERDA_INPUT_VR_MS = 240;
 const LIMIAR_PINCA_FECHAR_VR = 0.025;
 const LIMIAR_PINCA_ABRIR_VR = 0.05;
 const ESTABILIZAR_PINCA_VR_MS = 100;
+const ESTABILIZAR_FECHO_VR_MS = 60;
 const ESTABILIZAR_ABERTURA_VR_MS = 120;
+const MEMORIA_ALVO_PINCA_VR_MS = 700; // cobre um pinch lento mesmo que o raio desapareça primeiro
+// Máquina explícita do gesto. PINCH_START guarda o alvo; PINCHADO nunca volta
+// a disparar enquanto os dedos não abrirem o suficiente (LIBERTAR).
+const ESTADO_PINCA_VR = Object.freeze({
+    ABERTO: "aberto",
+    APONTANDO: "apontando",
+    PINCH_START: "pinch-start",
+    PINCHADO: "pinchado",
+    LIBERTAR: "libertar"
+});
 const SUAVIZAR_SEGUIMENTO_MAO_VR_S = 0.045;
 const DURACAO_REGRESSO_GRAB_VR_MS = 3500;
 const ALCANCE_RAIO_MAO_VR = 1200;
@@ -73,9 +84,6 @@ const SEPARACAO_PALMA_PLANETA_VR_M = 0.032; // intervalo visível entre palma e 
 const DIAMETRO_APRESENTACAO_VR_M = 0.14;
 const FATOR_DESTAQUE_SELECAO_VR = 1.12; // destaque subtil, multiplicativo sobre o scale original
 const SUAVIZAR_SEGUIMENTO_PALMA_VR_S = 0.10;
-const LIMIAR_PRE_PINCA_VR = 0.04;       // congela o raio ANTES da flexão completa
-const LIMIAR_LIBERTAR_RAIO_VR = 0.07;   // histerese: só descongela bem aberto
-const TEMPO_PRE_PINCA_VR_MS = 90;       // captura estável do alvo antes do pinch
 
 // Estado transitório do grabbing (controladores). A posição astronómica
 // continua nos dados da API; só se reparenta temporariamente o objeto visual
@@ -1172,12 +1180,12 @@ function criarMaoRastreadaVR(indice) {
     vrScene.add(mao);
     const info = {
         mao, modelo, indice, habilitada: false, rastreada: false,
-        pincaAtiva: false, pincaFecharDesde: 0, pincaAbrirDesde: 0,
-        pincaInicio: 0, candidato: null, candidatoDesde: 0,
+        estadoPinca: ESTADO_PINCA_VR.ABERTO,
+        pincaFecharDesde: 0, pincaFechadoDesde: 0, pincaAbrirDesde: 0,
         objetoAgarrado: null, ancora: null, inputSourceTemMao: false, ladoHand: "right",
-        inputSource: null, rastreioPerdidoDesde: 0, cliquePinçaEmitido: false,
+        inputSource: null, rastreioPerdidoDesde: 0,
         alvoRaio: null, interseçãoRaio: null, distanciaRaio: ALCANCE_RAIO_MAO_VR,
-        alvoPinch: null, inicioRaioPinch: false,
+        alvoPinch: null, alvoHover: null, alvoHoverTempo: 0,
         origemRaio: new THREE.Vector3(), direcaoRaioSuave: new THREE.Vector3(),
         raioInicializado: false, raioPinçaTrancado: false, raioMao: null, indicadorPinça: null,
         fimRaioMundo: new THREE.Vector3(), baseIndicador: new THREE.Vector3(),
@@ -1188,18 +1196,13 @@ function criarMaoRastreadaVR(indice) {
         rotacaoAlvo: new THREE.Quaternion(), escalaAlvo: new THREE.Vector3()
     };
     mao.addEventListener("pinchstart", () => {
-        // O evento WebXR antecede a flexão final do indicador: captura aqui o
-        // ray/astro e congela a direção antes de o gesto começar a afetá-lo.
+        // O evento WebXR antecede a flexão final do indicador. Congela JÁ o
+        // alvo que estava sob o raio — mesmo que o raio fique oculto nesta
+        // frame por o indicador começar a fletir. O gesto não pode escolher
+        // um alvo novo a meio da pinça.
         if (vrModoInteracao !== MODO_INTERACAO_VR.MAOS
-            || !info.habilitada || !maoEstaRastreadaVR(info)
-            || info.raioPinçaTrancado) return;
-        if (info.raioMao && info.raioMao.visible) {
-            info.raioPinçaTrancado = true;
-            info.inicioRaioPinch = true;
-            info.pincaFecharDesde = performance.now();
-            info.candidato = raycastMaoVR(info);
-            info.candidatoDesde = info.candidato ? info.pincaFecharDesde : 0;
-        }
+            || !info.habilitada || !maoEstaRastreadaVR(info)) return;
+        iniciarPincaVR(info, performance.now());
     });
     mao.addEventListener("connected", evento => {
         associarInputSourceMaoVR(info, evento.data);
@@ -1369,16 +1372,7 @@ function definirModoInteracaoVR(modo) {
         for (const info of vrMaosInfo) {
             info.rastreada = true;
             info.rastreioPerdidoDesde = 0;
-            info.pincaAtiva = false;
-            info.pincaFecharDesde = 0;
-            info.pincaAbrirDesde = 0;
-            info.pincaInicio = 0;
-            info.cliquePinçaEmitido = false;
-            info.candidato = null;
-            info.candidatoDesde = 0;
-            info.alvoPinch = null;
-            info.inicioRaioPinch = false;
-            info.raioPinçaTrancado = false;
+            cancelarPincaVR(info);
             info.raioInicializado = false;
         }
     }
@@ -1884,6 +1878,100 @@ function ocultarRaioMaoVR(info) {
     definirDestaquePinçaVR(info, null, null);
 }
 
+// ── Máquina do pinch (CLICK, não GRAB) ─────────────────────────────────────
+// O alvo é capturado no início do gesto e nunca é recalculado durante a
+// pinça. Uma pinça no vazio entra na mesma máquina, mas termina sem seleção.
+function alvoHoverPincaVR(info, agora) {
+    const alvo = info && info.alvoHover;
+    if (!alvo || !alvo.userData || !alvo.userData.astro) return null;
+    if (alvo.parent !== vrGrupoAstros) return null;
+    if (!info.alvoHoverTempo
+        || agora - info.alvoHoverTempo > MEMORIA_ALVO_PINCA_VR_MS) return null;
+    return alvo;
+}
+
+function iniciarPincaVR(info, agora = performance.now()) {
+    if (!info) return;
+    if (info.estadoPinca !== ESTADO_PINCA_VR.ABERTO
+        && info.estadoPinca !== ESTADO_PINCA_VR.APONTANDO) return;
+    info.estadoPinca = ESTADO_PINCA_VR.PINCH_START;
+    info.pincaFecharDesde = agora;
+    info.pincaFechadoDesde = 0;
+    info.pincaAbrirDesde = 0;
+    // Guarda o astro do último frame de pointing. O raio fica congelado e o
+    // movimento natural do indicador durante o gesto não muda este alvo.
+    info.alvoPinch = alvoHoverPincaVR(info, agora);
+    info.raioPinçaTrancado = true;
+}
+
+function cancelarPincaVR(info) {
+    if (!info) return;
+    info.estadoPinca = ESTADO_PINCA_VR.ABERTO;
+    info.pincaFecharDesde = 0;
+    info.pincaFechadoDesde = 0;
+    info.pincaAbrirDesde = 0;
+    info.alvoPinch = null;
+    info.alvoHover = null;
+    info.alvoHoverTempo = 0;
+    info.raioPinçaTrancado = false;
+}
+
+function finalizarPincaVR(info) {
+    cancelarPincaVR(info);
+}
+
+function atualizarMaquinaPincaVR(info, distanciaPinca, agora) {
+    if (!info) return;
+    const estado = info.estadoPinca;
+    if (estado === ESTADO_PINCA_VR.ABERTO || estado === ESTADO_PINCA_VR.APONTANDO) {
+        // O evento pinchstart é a via principal. Este fallback só entra com a
+        // pinça realmente fechada — uma mão relaxada com o polegar perto do
+        // indicador (3–4 cm) não pode congelar o raio sem intenção de click.
+        if (distanciaPinca <= LIMIAR_PINCA_FECHAR_VR) iniciarPincaVR(info, agora);
+        return;
+    }
+    if (estado === ESTADO_PINCA_VR.PINCH_START) {
+        // Abriu antes de fechar: o gesto não é um click. Exige abertura
+        // estável para não cancelar com o ruído natural da pré-pinça.
+        if (distanciaPinca >= LIMIAR_PINCA_ABRIR_VR) {
+            if (info.pincaAbrirDesde === 0) info.pincaAbrirDesde = agora;
+            if (agora - info.pincaAbrirDesde >= ESTABILIZAR_ABERTURA_VR_MS) {
+                cancelarPincaVR(info);
+            }
+            return;
+        }
+        info.pincaAbrirDesde = 0;
+        if (distanciaPinca <= LIMIAR_PINCA_FECHAR_VR) {
+            if (info.pincaFechadoDesde === 0) info.pincaFechadoDesde = agora;
+        } else {
+            info.pincaFechadoDesde = 0;
+        }
+        if (info.pincaFechadoDesde === 0) return;
+        if (agora - info.pincaFecharDesde < ESTABILIZAR_PINCA_VR_MS) return;
+        if (agora - info.pincaFechadoDesde < ESTABILIZAR_FECHO_VR_MS) return;
+        info.estadoPinca = ESTADO_PINCA_VR.PINCHADO;
+        info.pincaAbrirDesde = 0;
+        disparaCliquePincaVR(info);
+        return;
+    }
+    if (estado === ESTADO_PINCA_VR.PINCHADO || estado === ESTADO_PINCA_VR.LIBERTAR) {
+        if (distanciaPinca >= LIMIAR_PINCA_ABRIR_VR) {
+            if (info.pincaAbrirDesde === 0) info.pincaAbrirDesde = agora;
+            info.estadoPinca = ESTADO_PINCA_VR.LIBERTAR;
+            if (agora - info.pincaAbrirDesde >= ESTABILIZAR_ABERTURA_VR_MS) {
+                finalizarPincaVR(info);
+            }
+        } else {
+            // Fechou de novo antes da libertação confirmada: continua o mesmo
+            // gesto, sem emitir um segundo click.
+            info.pincaAbrirDesde = 0;
+            if (estado === ESTADO_PINCA_VR.LIBERTAR) {
+                info.estadoPinca = ESTADO_PINCA_VR.PINCHADO;
+            }
+        }
+    }
+}
+
 function atualizarRaioMaoVR(info, deltaTime) {
     if (!info || !info.habilitada || !maoEstaRastreadaVR(info)) {
         if (info) {
@@ -1892,10 +1980,10 @@ function atualizarRaioMaoVR(info, deltaTime) {
         }
         return null;
     }
-    // Enquanto a pinça se aproxima (pré-pinça) ou está fechada, o raio fica
-    // CONGELADO: origem, direção, linha desenhada e alvo mantêm-se exatamente
-    // como estavam. A ligeira flexão do indicador para juntar-se ao polegar
-    // gesto nunca desloca o apontamento nem perde o alvo de seleção.
+    // Enquanto a pinça está em curso (PINCH_START/PINCHADO/LIBERTAR), o raio
+    // fica CONGELADO: origem, direção, linha desenhada e alvo mantêm-se
+    // exatamente como estavam. A ligeira flexão do indicador para juntar-se
+    // ao polegar nunca desloca o apontamento nem perde o alvo de seleção.
     if (info.raioPinçaTrancado) return info.interseçãoRaio;
     const juntas = info.mao.joints;
     const nomes = [
@@ -1961,6 +2049,24 @@ function atualizarRaioMaoVR(info, deltaTime) {
     info.alvoRaio = escolhido ? portadorDeDadosVR(escolhido.object, "astro") : null;
     info.interseçãoRaio = escolhido;
     info.distanciaRaio = escolhido ? escolhido.distance : ALCANCE_RAIO_MAO_VR;
+    // Memória curta do alvo de pointing. Se o indicador fletir e o raio
+    // desaparecer antes de o evento pinchstart chegar, este é o alvo que o
+    // gesto captura. Apontar para o vazio limpa-a imediatamente.
+    if (info.alvoRaio) {
+        info.alvoHover = info.alvoRaio;
+        info.alvoHoverTempo = performance.now();
+        if (info.estadoPinca === ESTADO_PINCA_VR.ABERTO
+            || info.estadoPinca === ESTADO_PINCA_VR.APONTANDO) {
+            info.estadoPinca = ESTADO_PINCA_VR.APONTANDO;
+        }
+    } else {
+        info.alvoHover = null;
+        info.alvoHoverTempo = 0;
+        if (info.estadoPinca === ESTADO_PINCA_VR.ABERTO
+            || info.estadoPinca === ESTADO_PINCA_VR.APONTANDO) {
+            info.estadoPinca = ESTADO_PINCA_VR.ABERTO;
+        }
+    }
     const alcance = escolhido ? Math.max(0, escolhido.distance - 0.01) : ALCANCE_RAIO_MAO_VR;
     const fim = info.fimRaioMundo.copy(info.direcaoRaio).multiplyScalar(alcance).add(info.origemRaio);
     const vertices = info.raioMao.geometry.attributes.position;
@@ -2061,18 +2167,9 @@ function reiniciarEstadoMaoVR(info, libertar = true) {
         cancelarHoldBotaoVR(info.infoInput);
     }
     info.rastreada = false;
-    info.pincaAtiva = false;
-    info.pincaFecharDesde = 0;
-    info.pincaAbrirDesde = 0;
-    info.pincaInicio = 0;
     info.rastreioPerdidoDesde = 0;
     info.raioInicializado = false;
-    info.raioPinçaTrancado = false;
-    info.cliquePinçaEmitido = false;
-    info.candidato = null;
-    info.alvoPinch = null;
-    info.inicioRaioPinch = false;
-    info.candidatoDesde = 0;
+    cancelarPincaVR(info);
 }
 
 function raycastMaoVR(info) {
@@ -2145,76 +2242,13 @@ function atualizarMaosVR(deltaTime) {
         if (vrGrabAtivo && vrGrabAtivo.info !== info) {
             // O controlador controla já um objeto: a mão fica em pausa —
             // sem pinças pendentes que pudessem disparar cliques depois.
-            info.pincaAtiva = false;
-            info.pincaFecharDesde = 0;
-            info.pincaAbrirDesde = 0;
-            info.raioPinçaTrancado = false;
-            info.candidato = null;
-            info.candidatoDesde = 0;
+            cancelarPincaVR(info);
             continue;
         }
 
-        // Máquina OPEN → PINCH → RELEASE: congela o raio e o planeta-alvo no
-        // pré-pinch; só um clique é emitido até a abertura ficar estável.
-        if (!info.pincaAtiva) {
-            if (info.inicioRaioPinch && distanciaPinça > LIMIAR_LIBERTAR_RAIO_VR) {
-                // pinchstart terminou sem fechar o gesto: cancela o lock oficial.
-                info.raioPinçaTrancado = false;
-                info.inicioRaioPinch = false;
-                info.pincaFecharDesde = 0;
-                info.candidato = null;
-                info.candidatoDesde = 0;
-            }
-            if (!info.raioPinçaTrancado && distanciaPinça <= LIMIAR_PRE_PINCA_VR) {
-                info.raioPinçaTrancado = true;
-                info.inicioRaioPinch = false;
-                info.pincaFecharDesde = agora;
-                info.candidato = raycastMaoVR(info);
-                info.candidatoDesde = info.candidato ? agora : 0;
-            }
-            if (info.raioPinçaTrancado && distanciaPinça <= LIMIAR_PINCA_FECHAR_VR) {
-                const tempoFechar = info.inicioRaioPinch
-                    ? ESTABILIZAR_PINCA_VR_MS : TEMPO_PRE_PINCA_VR_MS;
-                if (agora - info.pincaFecharDesde >= tempoFechar && !info.cliquePinçaEmitido) {
-                    if (info.inicioRaioPinch
-                        && info.candidato !== raycastMaoVR(info)) {
-                        info.raioPinçaTrancado = false;
-                        info.inicioRaioPinch = false;
-                        info.candidato = null;
-                        info.candidatoDesde = 0;
-                        info.pincaFecharDesde = 0;
-                        continue;
-                    }
-                    info.pincaAtiva = true;
-                    info.pincaInicio = info.pincaFecharDesde;
-                    info.pincaAbrirDesde = 0;
-                    info.alvoPinch = info.candidato;
-                    disparaCliquePincaVR(info);
-                    info.cliquePinçaEmitido = true;
-                }
-            } else if (info.raioPinçaTrancado && distanciaPinça > LIMIAR_LIBERTAR_RAIO_VR) {
-                info.raioPinçaTrancado = false;
-                info.pincaFecharDesde = 0;
-                info.candidato = null;
-                info.candidatoDesde = 0;
-                info.inicioRaioPinch = false;
-            }
-        } else if (distanciaPinça >= LIMIAR_PINCA_ABRIR_VR) {
-            if (!info.pincaAbrirDesde) info.pincaAbrirDesde = agora;
-            if (agora - info.pincaAbrirDesde >= ESTABILIZAR_ABERTURA_VR_MS) {
-                info.pincaAtiva = false;
-                info.pincaFecharDesde = 0;
-                info.pincaAbrirDesde = 0;
-                info.raioPinçaTrancado = false;
-                info.cliquePinçaEmitido = false;
-                info.candidato = null;
-                info.alvoPinch = null;
-                info.inicioRaioPinch = false;
-                info.candidatoDesde = 0;
-            }
-        } else {
-            info.pincaAbrirDesde = 0;
-        }
+        // A máquina trata o gesto como CLICK: o alvo é congelado no
+        // PINCH_START e não muda com o movimento natural do indicador.
+        atualizarMaquinaPincaVR(info, distanciaPinça, agora);
     }
 
     // O astro apresentado na palma é atualizado fora do loop de mãos —
@@ -2225,12 +2259,16 @@ function atualizarMaosVR(deltaTime) {
 
 // ── CLICK da pinça ─────────────────────────────────────────────────────────
 // Dispara UMA vez por gesto, no instante em que a pinça estabiliza fechada.
-// Seleciona o astro que estava NO raio naquele instante (capturado na
-// pré-pinça). Espaço vazio / botão de ação: simplesmente IGNORA — sem
-// seleção, sem mover, sem sair do Observatório, sem tocar na UI externa.
+// Seleciona o astro guardado no PINCH_START. Espaço vazio / botão de ação:
+// simplesmente IGNORA — sem seleção, sem mover, sem sair do Observatório,
+// sem tocar na UI externa.
 function disparaCliquePincaVR(info) {
-    if (vrModoInteracao !== MODO_INTERACAO_VR.MAOS || !maoEstaRastreadaVR(info)) return;
-    const alvo = info.alvoPinch || info.candidato || raycastMaoVR(info);
+    if (vrModoInteracao !== MODO_INTERACAO_VR.MAOS
+        || info.estadoPinca !== ESTADO_PINCA_VR.PINCHADO
+        || !maoEstaRastreadaVR(info)) return;
+    // Só o alvo congelado no PINCH_START pode ser selecionado. Não há
+    // fallback para o raio atual: uma pinça no vazio nunca escolhe nada.
+    const alvo = info.alvoPinch;
     if (!alvo || !alvo.userData || !alvo.userData.astro) return;
     if (alvo.parent !== vrGrupoAstros) return;
     if (alvo.userData.vrRegressando) interromperRegressoAstroVR(alvo);
