@@ -1482,15 +1482,11 @@ function criarModeloArticuladoMaoVR(mao) {
     modelo.name = "modelo-articulado-mao-vr";
     const juntasModelo = new Map();
 
-    const materialPalma = new THREE.MeshStandardMaterial({
-        color: 0x2c3f5a, roughness: 0.38, metalness: 0.14,
-        emissive: 0x0a1a2e, emissiveIntensity: 0.3,
-        // A normal é calculada das juntas; DoubleSide evita cortes por winding.
+    const materialMao = new THREE.MeshStandardMaterial({
+        color: 0x354b69, roughness: 0.36, metalness: 0.16,
+        emissive: 0x10243d, emissiveIntensity: 0.36,
+        // O mesmo acabamento em palma e dedos evita que pareçam peças distintas.
         side: THREE.DoubleSide
-    });
-    const materialDedos = new THREE.MeshStandardMaterial({
-        color: 0x29384c, roughness: 0.32, metalness: 0.2,
-        emissive: 0x08182b, emissiveIntensity: 0.24, side: THREE.DoubleSide
     });
     const direcaoLocal = new THREE.Vector3();
     const eixoReferenciaLocal = new THREE.Vector3(0, 0, 1);
@@ -1501,6 +1497,7 @@ function criarModeloArticuladoMaoVR(mao) {
     const centroAntes = new THREE.Vector3();
     const centroDepois = new THREE.Vector3();
     const pulsoLocal = new THREE.Vector3();
+    const inicioPulsoPalma = new THREE.Vector3();
     const raizesPalma = ["index-finger-metacarpal", "middle-finger-metacarpal",
         "ring-finger-metacarpal", "pinky-finger-metacarpal"].map(nome => mao.joints[nome] || null);
     const pontosRaizesPalma = raizesPalma.map(() => new THREE.Vector3());
@@ -1526,7 +1523,7 @@ function criarModeloArticuladoMaoVR(mao) {
     modelo.userData.palmaCentro = centroPalmaLocal;
     modelo.userData.palmaNormal = normalPalmaLocal;
     modelo.userData.palmaDirecaoLongitudinal = longitudinalPalmaLocal;
-    const malhaPalma = new THREE.Mesh(geometriaPalma, materialPalma);
+    const malhaPalma = new THREE.Mesh(geometriaPalma, materialMao);
     malhaPalma.frustumCulled = false;
     // Decorativa: a palma nunca pode interferir com raycasting/colisões —
     // os alvos de seleção são sempre os astros e os botões do painel.
@@ -1545,11 +1542,11 @@ function criarModeloArticuladoMaoVR(mao) {
 
     const dedos = [
         { nomes: ["thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip"],
-            raios: [0.010, 0.0085, 0.007, 0.0035], material: materialDedos },
+            raios: [0.0095, 0.008, 0.0068, 0.0035], material: materialMao },
         ...["index", "middle", "ring", "pinky"].map(nome => ({
             nomes: [`${nome}-finger-metacarpal`, `${nome}-finger-phalanx-proximal`,
                 `${nome}-finger-phalanx-intermediate`, `${nome}-finger-phalanx-distal`, `${nome}-finger-tip`],
-            raios: [0.010, 0.0085, 0.0075, 0.006, 0.0035], material: materialDedos
+            raios: [0.0095, 0.0085, 0.0075, 0.006, 0.0035], material: materialMao
         }))
     ];
     const malhasDedos = [];
@@ -1557,10 +1554,15 @@ function criarModeloArticuladoMaoVR(mao) {
         const articulacoes = dedo.nomes.map(nome => mao.joints[nome]);
         if (articulacoes.some(articulacao => !articulacao)) continue;
         const subdivisions = SUBDIVISOES_DEDO_MAO_VR;
-        const anéis = (articulacoes.length - 1) * subdivisions + 1;
+        // Um anel adicional começa alguns milímetros dentro da palma. As
+        // malhas continuam a ser guiadas pelos joints reais, mas a base deixa
+        // de terminar exatamente na superfície e parecer um dedo separado.
+        const anéis = articulacoes.length * subdivisions + 1;
         const lados = SEGMENTOS_RADIAIS_DEDO_MAO_VR;
         const geometria = new THREE.BufferGeometry();
-        const posicoes = new Float32Array(anéis * lados * 3);
+        const indicePonta = anéis * lados;
+        const indiceBase = indicePonta + 1;
+        const posicoes = new Float32Array((anéis * lados + 2) * 3);
         const indice = [];
         for (let anel = 0; anel < anéis - 1; anel++) {
             for (let lado = 0; lado < lados; lado++) {
@@ -1572,13 +1574,20 @@ function criarModeloArticuladoMaoVR(mao) {
                 indice.push(atual, seguinte, abaixo, seguinte, abaixoSeguinte, abaixo);
             }
         }
+        const anelFinal = (anéis - 1) * lados;
+        for (let lado = 0; lado < lados; lado++) {
+            const seguinte = (lado + 1) % lados;
+            indice.push(indiceBase, seguinte, lado);
+            indice.push(indicePonta, anelFinal + lado, anelFinal + seguinte);
+        }
         geometria.setAttribute("position", new THREE.BufferAttribute(posicoes, 3).setUsage(THREE.DynamicDrawUsage));
         geometria.setIndex(indice);
         const malha = new THREE.Mesh(geometria, dedo.material);
         malha.frustumCulled = false;
         modelo.add(malha);
         malhasDedos.push({ articulacoes, centros: articulacoes.map(() => new THREE.Vector3()),
-            raios: dedo.raios, geometria, posicoes, malha, subdivisions, anéis, lados });
+            centroBase: new THREE.Vector3(), raios: [dedo.raios[0] * 1.12, ...dedo.raios],
+            geometria, posicoes, malha, subdivisions, anéis, lados, indicePonta, indiceBase });
     }
 
     function centroCurvaDedo(dedo, segmento, t, destino) {
@@ -1599,7 +1608,6 @@ function criarModeloArticuladoMaoVR(mao) {
         mao.updateMatrixWorld(true);
         matrizMaoInversa.copy(mao.matrixWorld).invert();
         for (const dedo of malhasDedos) {
-            const subdivisions = dedo.subdivisions;
             let visivel = true;
             for (let i = 0; i < dedo.articulacoes.length; i++) {
                 const articulacao = dedo.articulacoes[i];
@@ -1612,37 +1620,79 @@ function criarModeloArticuladoMaoVR(mao) {
             }
             dedo.malha.visible = visivel;
             if (!visivel) continue;
+
+            const raiz = dedo.centros[0];
+            const seguinte = dedo.centros[1];
+            const direcaoRaiz = centroDepois.subVectors(seguinte, raiz).normalize();
+            dedo.centroBase.copy(raiz).addScaledVector(direcaoRaiz, -0.016);
             for (let anel = 0; anel < dedo.anéis; anel++) {
                 const valor = anel / dedo.subdivisions;
-                const segmento = Math.min(dedo.articulacoes.length - 2, Math.floor(valor));
-                const t = Math.min(1, valor - segmento);
-                centroCurvaDedo(dedo, segmento, t, centroAmostra);
-                centroCurvaDedo(dedo, segmento, Math.max(0, t - 0.04), centroAntes);
-                centroCurvaDedo(dedo, segmento, Math.min(1, t + 0.04), centroDepois);
-                direcaoLocal.subVectors(centroDepois, centroAntes).normalize();
+                let centro;
+                let raioSegmento;
+                if (valor < 1) {
+                    const t = valor;
+                    centroAmostra.copy(dedo.centroBase).lerp(raiz, t);
+                    raioSegmento = dedo.raios[0]
+                        + (dedo.raios[1] - dedo.raios[0]) * t;
+                    direcaoLocal.copy(direcaoRaiz);
+                } else {
+                    const valorDedo = valor - 1;
+                    const segmento = Math.min(dedo.articulacoes.length - 2,
+                        Math.floor(valorDedo));
+                    const t = Math.min(1, valorDedo - segmento);
+                    centroCurvaDedo(dedo, segmento, t, centroAmostra);
+                    raioSegmento = dedo.raios[segmento + 1]
+                        + (dedo.raios[segmento + 2] - dedo.raios[segmento + 1]) * t;
+                }
+                centro = centroAmostra;
+                if (valor >= 1) {
+                    const valorDedo = valor - 1;
+                    const segmento = Math.min(dedo.articulacoes.length - 2, Math.floor(valorDedo));
+                    const t = Math.min(1, valorDedo - segmento);
+                    centroCurvaDedo(dedo, segmento, Math.max(0, t - 0.04), centroAntes);
+                    centroCurvaDedo(dedo, segmento, Math.min(1, t + 0.04), centroDepois);
+                    direcaoLocal.subVectors(centroDepois, centroAntes).normalize();
+                }
                 vetorLateral.crossVectors(direcaoLocal, eixoReferenciaLocal);
                 if (vetorLateral.lengthSq() < 0.0001) vetorLateral.crossVectors(direcaoLocal, eixoAlternativoLocal);
                 vetorLateral.normalize();
                 vetorNormal.crossVectors(vetorLateral, direcaoLocal).normalize();
-                const raioSegmento = dedo.raios[segmento]
-                    + (dedo.raios[segmento + 1] - dedo.raios[segmento]) * t;
                 for (let lado = 0; lado < dedo.lados; lado++) {
                     const angulo = lado / dedo.lados * Math.PI * 2;
                     const offsetLateral = Math.cos(angulo) * raioSegmento;
                     const offsetNormal = Math.sin(angulo) * raioSegmento * 0.88;
                     const indiceVertice = (anel * dedo.lados + lado) * 3;
-                    dedo.posicoes[indiceVertice] = centroAmostra.x + vetorLateral.x * offsetLateral + vetorNormal.x * offsetNormal;
-                    dedo.posicoes[indiceVertice + 1] = centroAmostra.y + vetorLateral.y * offsetLateral + vetorNormal.y * offsetNormal;
-                    dedo.posicoes[indiceVertice + 2] = centroAmostra.z + vetorLateral.z * offsetLateral + vetorNormal.z * offsetNormal;
+                    dedo.posicoes[indiceVertice] = centro.x + vetorLateral.x * offsetLateral + vetorNormal.x * offsetNormal;
+                    dedo.posicoes[indiceVertice + 1] = centro.y + vetorLateral.y * offsetLateral + vetorNormal.y * offsetNormal;
+                    dedo.posicoes[indiceVertice + 2] = centro.z + vetorLateral.z * offsetLateral + vetorNormal.z * offsetNormal;
                 }
             }
+            const ponta = dedo.centros[dedo.centros.length - 1];
+            const anteriorPonta = dedo.centros[dedo.centros.length - 2];
+            direcaoLocal.subVectors(ponta, anteriorPonta).normalize();
+            centroAmostra.copy(ponta).addScaledVector(direcaoLocal, 0.001);
+            const fimAmostra = dedo.anéis - 1;
+            for (let lado = 0; lado < dedo.lados; lado++) {
+                const indiceVertice = (fimAmostra * dedo.lados + lado) * 3;
+                dedo.posicoes[indiceVertice] = centroAmostra.x;
+                dedo.posicoes[indiceVertice + 1] = centroAmostra.y;
+                dedo.posicoes[indiceVertice + 2] = centroAmostra.z;
+            }
+            const indicePonta = dedo.indicePonta * 3;
+            dedo.posicoes[indicePonta] = ponta.x;
+            dedo.posicoes[indicePonta + 1] = ponta.y;
+            dedo.posicoes[indicePonta + 2] = ponta.z;
+            const indiceBase = dedo.indiceBase * 3;
+            dedo.posicoes[indiceBase] = dedo.centroBase.x;
+            dedo.posicoes[indiceBase + 1] = dedo.centroBase.y;
+            dedo.posicoes[indiceBase + 2] = dedo.centroBase.z;
             dedo.geometria.attributes.position.needsUpdate = true;
             dedo.geometria.computeVertexNormals();
         }
 
         // Palma orgânica em coordenadas locais da mão. Pulso e quatro bases
         // metacarpianas definem o contorno; a base do polegar cria a eminência
-        // tenar. A topologia é fixa e só atualiza 432 vértices por mão/frame.
+        // tenar. A topologia é fixa e só atualiza 434 vértices por mão/frame.
         const pulsoPalma = mao.joints.wrist;
         const polegarPalma = mao.joints["thumb-metacarpal"];
         const juntasRaizesValidas = raizesPalma.every(j => j && j.visible)
@@ -1661,6 +1711,10 @@ function criarModeloArticuladoMaoVR(mao) {
             if (comprimento > 0.001 && lateralPalma.lengthSq() > 0.001) {
                 longitudinalPalma.addScaledVector(lateralPalma,
                     -longitudinalPalma.dot(lateralPalma)).normalize();
+                // Continua a palma alguns centímetros pelo pulso, formando um
+                // antebraço curto e afunilado ligado à mesma superfície.
+                inicioPulsoPalma.copy(pulsoLocal)
+                    .addScaledVector(longitudinalPalma, -0.038);
                 polegarPalma.getWorldPosition(basePolegarLocal).applyMatrix4(matrizMaoInversa);
                 const projecaoPolegar = deltaPolegarLocal
                     .subVectors(basePolegarLocal, centroNosPalma).dot(lateralPalma);
@@ -1673,7 +1727,7 @@ function criarModeloArticuladoMaoVR(mao) {
                 longitudinalPalmaLocal.copy(longitudinalPalma);
                 const largura = Math.max(0.085,
                     pontosRaizesPalma[3].distanceTo(pontosRaizesPalma[0]) * 1.18);
-                const meiaEspessura = Math.max(0.006, Math.min(0.012, largura * 0.055));
+                const meiaEspessura = Math.max(0.008, Math.min(0.016, largura * 0.075));
                 for (let anel = 0; anel < aneisPalma; anel++) {
                     const t = anel / (aneisPalma - 1);
                     const expoente = 2 / 3.2;
@@ -1689,13 +1743,14 @@ function criarModeloArticuladoMaoVR(mao) {
                         const x = xNorm * largura * 0.5 * formaLongitudinal + tenar;
                         const concavidade = s > 0
                             ? 0.003 * Math.max(0, 1 - xNorm * xNorm) * Math.sin(Math.PI * t) : 0;
-                        secaoPalma.copy(pulsoLocal).lerp(centroNosPalma, t)
+                        secaoPalma.copy(inicioPulsoPalma).lerp(centroNosPalma, t)
                             .addScaledVector(lateralPalma, x)
                             .addScaledVector(normalPalma, zNorm * meiaEspessura - concavidade);
                         posicoesPalma.setXYZ(anel * colunasPalma + col, secaoPalma.x, secaoPalma.y, secaoPalma.z);
                     }
                 }
-                posicoesPalma.setXYZ(centroPulsoPalma, pulsoLocal.x, pulsoLocal.y, pulsoLocal.z);
+                posicoesPalma.setXYZ(centroPulsoPalma,
+                    inicioPulsoPalma.x, inicioPulsoPalma.y, inicioPulsoPalma.z);
                 posicoesPalma.setXYZ(centroNosPalmaIndice, centroNosPalma.x, centroNosPalma.y, centroNosPalma.z);
                 posicoesPalma.needsUpdate = true;
                 geometriaPalma.computeVertexNormals();
