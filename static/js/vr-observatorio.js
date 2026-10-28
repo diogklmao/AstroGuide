@@ -38,6 +38,13 @@ let vrUltimoTempoMs = 0;
 // pode manipular um astro de cada vez.
 let vrControladoresInfo = [];
 let vrMaosInfo = [];
+const MODO_INTERACAO_VR = Object.freeze({ NENHUM: "nenhum", MAOS: "maos", CONTROLLER: "controller" });
+let vrModoInteracao = MODO_INTERACAO_VR.NENHUM;
+let vrModoInteracaoCandidato = null;
+let vrModoInteracaoCandidatoDesde = 0;
+const CONFIRMAR_HAND_TRACKING_VR_MS = 110;
+const CONFIRMAR_CONTROLLER_VR_MS = 140;
+const TOLERANCIA_PERDA_INPUT_VR_MS = 240;
 const LIMIAR_PINCA_FECHAR_VR = 0.025;
 const LIMIAR_PINCA_ABRIR_VR = 0.05;
 const ESTABILIZAR_PINCA_VR_MS = 100;
@@ -1038,13 +1045,16 @@ function criarControladoresVR() {
         // deteta-se onde o raio intersecta a sua geometria. (A antiga "bola"
         // da ponta foi removida — só atrapalhava a vista.)
         const laser = criarLaser(0x6eb8ff);
+        laser.visible = false;
         controlador.add(laser);
 
         const maoInfo = criarMaoRastreadaVR(i);
         const info = {
-            controlador, laser, maoInfo, hover: null, holdBotao: null, holdInicio: 0,
+            controlador, laser, maoInfo, inputSource: null,
+            hover: null, holdBotao: null, holdInicio: 0,
             gatilhoPuxado: false, gatilhoInicio: 0,
-            astroSelecionavel: null, astroParaAgarrar: null, objetoAgarrado: null
+            astroSelecionavel: null, astroParaAgarrar: null,            objetoAgarrado: null, rastreioPerdidoDesde: 0,
+            rastreioPoseValido: false
         };
         if (maoInfo) maoInfo.infoInput = info;
         vrControladoresInfo.push(info);
@@ -1054,10 +1064,11 @@ function criarControladoresVR() {
         // ao estado astronómico atual. O espaço vazio continua sem ação.
         if (maoInfo) maoInfo.mao.visible = false;
         controlador.addEventListener("connected", evento => {
-            if (!maoInfo) return;
-            associarInputSourceMaoVR(maoInfo, evento.data);
-            laser.visible = !maoInfo.inputSourceTemMao;
-            if (maoInfo.inputSourceTemMao) {
+            info.inputSource = evento.data || null;
+            if (maoInfo) {
+                associarInputSourceMaoVR(maoInfo, info.inputSource);
+            }
+            if (info.inputSource && info.inputSource.hand) {
                 // Um source de mão nunca deve reaproveitar um trigger/grab que
                 // tenha ficado pendente do comando anterior.
                 if (info.objetoAgarrado) soltarAstroVR(info);
@@ -1066,28 +1077,37 @@ function criarControladoresVR() {
                 info.astroParaAgarrar = null;
                 cancelarHoldBotaoVR(info);
             }
+            atualizarVisibilidadeInteracaoVR();
         });
         controlador.addEventListener("disconnected", () => {
-            if (info.objetoAgarrado && !maoInfo?.inputSourceTemMao) soltarAstroVR(info);
+            info.inputSource = null;
+            if (info.objetoAgarrado) soltarAstroVR(info);
             if (maoInfo) {
                 reiniciarEstadoMaoVR(maoInfo);
                 maoInfo.inputSource = null;
                 maoInfo.inputSourceTemMao = false;
                 maoInfo.habilitada = false;
                 atualizarVisibilidadeMaoVR(maoInfo);
-                laser.visible = true;
             }
+            atualizarVisibilidadeInteracaoVR();
         });
         controlador.addEventListener("selectstart", () => {
-            if (maoInfo && maoInfo.habilitada
-                && (maoInfo.inputSourceTemMao || maoEstaRastreadaVR(maoInfo))) return;
+            if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER
+                || !controllerTemTrackingValidoVR(info)) return;
             laser.material.color.setHex(0xffffff);
             if (!info.gatilhoPuxado) iniciarGatilhoControllerVR(info);
         });
         controlador.addEventListener("selectend", () => {
-            if (maoInfo && maoInfo.habilitada
-                && (maoInfo.inputSourceTemMao || maoInfo.rastreada)) return;
             laser.material.color.setHex(0x6eb8ff);
+            if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER) return;
+            if (!controllerTemTrackingValidoVR(info)) {
+                info.gatilhoPuxado = false;
+                info.gatilhoInicio = 0;
+                info.astroSelecionavel = null;
+                info.astroParaAgarrar = null;
+                cancelarHoldBotaoVR(info);
+                return;
+            }
             terminarGatilhoControllerVR(info);
             // Soltar o gatilho antes do tempo cancela a pressão mantida do botão.
             cancelarHoldBotaoVR(info);
@@ -1102,17 +1122,17 @@ function criarControladoresVR() {
         controlador.addEventListener("squeezestart", () => {
             // O squeeze também pode ser emitido pela pinça em input sources de
             // mão. Não o interpretes como o atalho de saída do comando.
-            if (maoInfo && maoInfo.habilitada
-                && (maoInfo.inputSourceTemMao || maoEstaRastreadaVR(maoInfo))) return;
+            if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER
+                || !controllerTemTrackingValidoVR(info)) return;
             if (vrGripTemporizador) clearTimeout(vrGripTemporizador);
             vrGripTemporizador = setTimeout(() => {
                 vrGripTemporizador = null;
-                sairSessaoVR();
+                if (vrModoInteracao === MODO_INTERACAO_VR.CONTROLLER
+                    && controllerTemTrackingValidoVR(info)) sairSessaoVR();
             }, 700);
         });
         controlador.addEventListener("squeezeend", () => {
-            if (maoInfo && maoInfo.habilitada
-                && (maoInfo.inputSourceTemMao || maoEstaRastreadaVR(maoInfo))) return;
+            if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER) return;
             if (vrGripTemporizador) {
                 clearTimeout(vrGripTemporizador);
                 vrGripTemporizador = null;
@@ -1170,7 +1190,9 @@ function criarMaoRastreadaVR(indice) {
     mao.addEventListener("pinchstart", () => {
         // O evento WebXR antecede a flexão final do indicador: captura aqui o
         // ray/astro e congela a direção antes de o gesto começar a afetá-lo.
-        if (!info.habilitada || info.raioPinçaTrancado) return;
+        if (vrModoInteracao !== MODO_INTERACAO_VR.MAOS
+            || !info.habilitada || !maoEstaRastreadaVR(info)
+            || info.raioPinçaTrancado) return;
         if (info.raioMao && info.raioMao.visible) {
             info.raioPinçaTrancado = true;
             info.inicioRaioPinch = true;
@@ -1197,10 +1219,10 @@ function criarMaoRastreadaVR(indice) {
 function associarInputSourceMaoVR(info, inputSource) {
     info.inputSource = inputSource || null;
     info.inputSourceTemMao = !!(info.inputSource && info.inputSource.hand);
+    info.habilitada = !!(vrSessaoAtiva && info.inputSourceTemMao);
     // As juntas dão o plano e a orientação; handedness escolhe qual face do
     // plano corresponde à palma em ambas as mãos.
     info.ladoHand = (info.inputSource?.handedness === "left") ? "left" : "right";
-    if (info.inputSourceTemMao && vrSessaoAtiva) info.habilitada = true;
     if (info.inputSourceTemMao && (!info.modelo.userData.juntas
         || info.modelo.userData.juntas.size === 0)
         && Object.keys(info.mao.joints || {}).length > 0) {
@@ -1213,6 +1235,188 @@ function associarInputSourceMaoVR(info, inputSource) {
         info.modelo.userData.sentidoPalma = info.ladoHand === "left" ? -1 : 1;
     }
     atualizarVisibilidadeMaoVR(info);
+}
+
+function inputSourceControllerValidaVR(info) {
+    const fonte = info && info.inputSource;
+    return !!(fonte && !fonte.hand && fonte.targetRayMode === "tracked-pointer");
+}
+
+function controllerTemTrackingValidoVR(info) {
+    return !!(vrSessaoAtiva && inputSourceControllerValidaVR(info)
+        && info.controlador && info.controlador.visible && info.rastreioPoseValido);
+}
+
+function atualizarRastreioControllersVR() {
+    if (!vrSessaoAtiva || !vrRenderer || !vrRenderer.xr) return;
+    const xr = vrRenderer.xr;
+    const frame = xr.getFrame && xr.getFrame();
+    const espacoReferencia = xr.getReferenceSpace && xr.getReferenceSpace();
+    for (const info of vrControladoresInfo) {
+        const fonte = info.inputSource;
+        let poseValida = false;
+        if (frame && espacoReferencia && fonte && fonte.targetRaySpace
+            && typeof frame.getPose === "function") {
+            try {
+                poseValida = !!frame.getPose(fonte.targetRaySpace, espacoReferencia);
+            } catch (_) {
+                poseValida = false;
+            }
+        }
+        info.rastreioPoseValido = poseValida;
+    }
+}
+
+function fontesMaosRastreadaVR() {
+    return vrMaosInfo.some(info => maoEstaRastreadaVR(info));
+}
+
+function fontesControllersRastreadasVR() {
+    return vrControladoresInfo.some(info => controllerTemTrackingValidoVR(info));
+}
+
+function sincronizarFontesEntradaVR(sessao) {
+    if (!sessao || !sessao.inputSources) return;
+    const fontes = sessao.inputSources;
+    let alteradas = false;
+    for (let i = 0; i < vrControladoresInfo.length; i++) {
+        const info = vrControladoresInfo[i];
+        const fonte = fontes[i] || null;
+        if (info.inputSource !== fonte) {
+            alteradas = true;
+            info.inputSource = fonte;
+            if (info.maoInfo) associarInputSourceMaoVR(info.maoInfo, fonte);
+        }
+    }
+    if (alteradas) atualizarVisibilidadeInteracaoVR();
+}
+
+function atualizarArbitragemInteracaoVR(agora = performance.now()) {
+    if (!vrSessaoAtiva) return;
+    const controllers = fontesControllersRastreadasVR();
+    const maos = fontesMaosRastreadaVR();
+    // O controller tem prioridade quando está realmente a fornecer pose. Se
+    // desaparecer, a mão só reassume depois da janela de perda confirmada.
+    const desejado = controllers ? MODO_INTERACAO_VR.CONTROLLER
+        : maos ? MODO_INTERACAO_VR.MAOS : MODO_INTERACAO_VR.NENHUM;
+    if (desejado === vrModoInteracao) {
+        vrModoInteracaoCandidato = null;
+        vrModoInteracaoCandidatoDesde = 0;
+        return;
+    }
+    if (vrModoInteracao !== MODO_INTERACAO_VR.NENHUM
+        && desejado === MODO_INTERACAO_VR.NENHUM) {
+        if (desejado !== vrModoInteracaoCandidato) {
+            vrModoInteracaoCandidato = desejado;
+            vrModoInteracaoCandidatoDesde = agora;
+        }
+        const metodoAtualDisponivel = vrModoInteracao === MODO_INTERACAO_VR.CONTROLLER
+            ? controllers : maos;
+        if (metodoAtualDisponivel) {
+            vrModoInteracaoCandidato = null;
+            vrModoInteracaoCandidatoDesde = 0;
+            return;
+        }
+        if (agora - vrModoInteracaoCandidatoDesde < TOLERANCIA_PERDA_INPUT_VR_MS) return;
+        definirModoInteracaoVR(MODO_INTERACAO_VR.NENHUM);
+        return;
+    }
+    if (vrModoInteracao === MODO_INTERACAO_VR.CONTROLLER
+        && desejado === MODO_INTERACAO_VR.MAOS) {
+        if (desejado !== vrModoInteracaoCandidato) {
+            vrModoInteracaoCandidato = desejado;
+            vrModoInteracaoCandidatoDesde = agora;
+            return;
+        }
+        if (controllers || agora - vrModoInteracaoCandidatoDesde < TOLERANCIA_PERDA_INPUT_VR_MS) return;
+        definirModoInteracaoVR(MODO_INTERACAO_VR.MAOS);
+        return;
+    }
+    if (desejado !== vrModoInteracaoCandidato) {
+        vrModoInteracaoCandidato = desejado;
+        vrModoInteracaoCandidatoDesde = agora;
+        return;
+    }
+    const metodoAtualDisponivel = vrModoInteracao === MODO_INTERACAO_VR.CONTROLLER
+        ? controllers : vrModoInteracao === MODO_INTERACAO_VR.MAOS ? maos : false;
+    const confirmaMs = desejado === MODO_INTERACAO_VR.CONTROLLER
+        ? CONFIRMAR_CONTROLLER_VR_MS : CONFIRMAR_HAND_TRACKING_VR_MS;
+    const janela = Math.max(confirmaMs,
+        vrModoInteracao !== MODO_INTERACAO_VR.NENHUM && !metodoAtualDisponivel
+            ? TOLERANCIA_PERDA_INPUT_VR_MS : 0);
+    if (agora - vrModoInteracaoCandidatoDesde < janela) return;
+    definirModoInteracaoVR(desejado);
+}
+
+function definirModoInteracaoVR(modo) {
+    if (modo === vrModoInteracao) return;
+    const anterior = vrModoInteracao;
+    vrModoInteracao = modo;
+    vrModoInteracaoCandidato = null;
+    vrModoInteracaoCandidatoDesde = 0;
+
+    if (anterior === MODO_INTERACAO_VR.MAOS) {
+        for (const info of vrMaosInfo) {
+            ocultarRaioMaoVR(info);
+            reiniciarEstadoMaoVR(info, false);
+            if (info.modelo) info.modelo.visible = false;
+        }
+        // Uma apresentação já iniciada continua a seguir os joints da palma,
+        // mas a mão deixa de emitir ray/pinch enquanto o controller é primário.
+    }
+    if (anterior === MODO_INTERACAO_VR.CONTROLLER
+        && modo === MODO_INTERACAO_VR.MAOS) {
+        for (const info of vrMaosInfo) {
+            info.rastreada = true;
+            info.rastreioPerdidoDesde = 0;
+            info.pincaAtiva = false;
+            info.pincaFecharDesde = 0;
+            info.pincaAbrirDesde = 0;
+            info.pincaInicio = 0;
+            info.cliquePinçaEmitido = false;
+            info.candidato = null;
+            info.candidatoDesde = 0;
+            info.alvoPinch = null;
+            info.inicioRaioPinch = false;
+            info.raioPinçaTrancado = false;
+            info.raioInicializado = false;
+        }
+    }
+    if (anterior === MODO_INTERACAO_VR.CONTROLLER) {
+        for (const info of vrControladoresInfo) {
+            if (info.objetoAgarrado) soltarAstroVR(info);
+            info.gatilhoPuxado = false;
+            info.gatilhoInicio = 0;
+            if (info.laser) info.laser.material.color.setHex(0x6eb8ff);
+            info.astroSelecionavel = null;
+            info.astroParaAgarrar = null;
+            cancelarHoldBotaoVR(info);
+            if (info.hover && !info.hover.userData.vrEscalaOriginal) info.hover.scale.setScalar(1);
+            info.hover = null;
+        }
+        if (vrGripTemporizador) {
+            clearTimeout(vrGripTemporizador);
+            vrGripTemporizador = null;
+        }
+    }
+    atualizarVisibilidadeInteracaoVR();
+}
+
+function atualizarVisibilidadeInteracaoVR() {
+    for (const info of vrControladoresInfo) {
+        if (info.laser) {
+            info.laser.visible = vrModoInteracao === MODO_INTERACAO_VR.CONTROLLER
+                && controllerTemTrackingValidoVR(info);
+        }
+    }
+    for (const info of vrMaosInfo) {
+        const apresentar = !!(vrApresentado && vrApresentado.info === info);
+        const rastreada = maoEstaRastreadaVR(info);
+        const ativa = vrModoInteracao === MODO_INTERACAO_VR.MAOS && rastreada;
+        if (info.modelo) info.modelo.visible = rastreada && (ativa || apresentar);
+        if (info.modelo) mostrarModeloDaMaoVR(info);
+        if (!ativa && info.raioMao) info.raioMao.visible = false;
+    }
 }
 
 // ── Geometria da palma (topologia fixa, vértices atualizados por mão) ──────
@@ -1507,6 +1711,7 @@ function criarModeloArticuladoMaoVR(mao) {
         }
     };
     modelo.userData.juntas = juntasModelo;
+    modelo.userData.malhasDedos = malhasDedos.map(dedo => dedo.malha);
     return modelo;
 }
 
@@ -1730,19 +1935,41 @@ function paiJuntaMaoVR(nome) {
 function atualizarVisibilidadeMaoVR(info) {
     if (!info || !info.mao) return;
     const fonteComMao = !!(info.inputSourceTemMao || (info.inputSource && info.inputSource.hand));
-    const ativa = !!(info.habilitada && fonteComMao);
+    const ativa = !!(vrSessaoAtiva && info.habilitada && fonteComMao);
     info.mao.visible = ativa;
-    if (info.modelo) info.modelo.visible = ativa && info.modelo.userData.juntas instanceof Map
-        && info.modelo.userData.juntas.size > 0;
-    if (info.infoInput && info.infoInput.laser) info.infoInput.laser.visible = !fonteComMao;
+    const apresentar = !!(vrApresentado && vrApresentado.info === info);
+    if (info.modelo) {
+        info.modelo.visible = ativa && (vrModoInteracao === MODO_INTERACAO_VR.MAOS || apresentar)
+            && info.modelo.userData.juntas instanceof Map
+            && info.modelo.userData.juntas.size > 0;
+        mostrarModeloDaMaoVR(info);
+    }
+    if (info.infoInput && info.infoInput.laser) {
+        info.infoInput.laser.visible = vrModoInteracao === MODO_INTERACAO_VR.CONTROLLER
+            && controllerTemTrackingValidoVR(info.infoInput);
+    }
+}
+
+function mostrarModeloDaMaoVR(info) {
+    if (!info || !info.modelo) return;
+    const visivel = vrModoInteracao === MODO_INTERACAO_VR.MAOS && info.rastreada;
+    if (info.modelo.userData.malhaPalma) {
+        info.modelo.userData.malhaPalma.visible = visivel;
+    }
+    if (info.modelo.userData.malhasDedos) {
+        for (const malha of info.modelo.userData.malhasDedos) malha.visible = visivel;
+    }
 }
 
 function articularJuntasMaoVR(info) {
     if (!info || !info.modelo) return;
     const rastreioValido = maoEstaRastreadaVR(info);
-    info.modelo.visible = rastreioValido;
-    if (rastreioValido) {
-        if (info.modelo.userData.atualizar) info.modelo.userData.atualizar();
+    const apresentar = !!(vrApresentado && vrApresentado.info === info);
+    info.modelo.visible = rastreioValido
+        && (vrModoInteracao === MODO_INTERACAO_VR.MAOS || apresentar);
+    if (rastreioValido && info.modelo.userData.atualizar) {
+        info.modelo.userData.atualizar();
+        mostrarModeloDaMaoVR(info);
     }
 }
 
@@ -1823,13 +2050,31 @@ function atualizarMaosVR(deltaTime) {
     for (const estado of vrDestaquesPinça.values()) estado.ativo = false;
     const agora = performance.now();
     for (const info of vrMaosInfo) {
-        if (!info.habilitada) continue;
+        if (vrModoInteracao !== MODO_INTERACAO_VR.MAOS || !info.habilitada) {
+            if (info.raioMao) info.raioMao.visible = false;
+            if (vrApresentado && vrApresentado.info === info && maoEstaRastreadaVR(info)) {
+                // Atualiza só a transformação da palma para o objeto já
+                // apresentado continuar a acompanhá-la; sem raycast/pinch.
+                articularJuntasMaoVR(info);
+            } else if (info.modelo) {
+                info.modelo.visible = false;
+            }
+            continue;
+        }
         if (!maoEstaRastreadaVR(info)) {
-            // Esconde imediatamente o último modelo, evitando congelar a mão
-            // numa pose antiga; a perda liberta qualquer astro em palma.
-            if (info.modelo) info.modelo.visible = false;
+            // Esconde imediatamente a pose e o ray stale, mas tolera uma breve
+            // perda de joints sem cancelar pinch/apresentação por oscilação.
+            if (info.modelo) {
+                info.modelo.visible = !!(vrApresentado && vrApresentado.info === info);
+                mostrarModeloDaMaoVR(info);
+            }
             ocultarRaioMaoVR(info);
-            if (info.rastreada || info.objetoAgarrado) reiniciarEstadoMaoVR(info);
+            if (!info.rastreioPerdidoDesde) info.rastreioPerdidoDesde = agora;
+            if (agora - info.rastreioPerdidoDesde >= TOLERANCIA_PERDA_INPUT_VR_MS
+                && (info.rastreada || info.objetoAgarrado
+                    || (vrApresentado && vrApresentado.info === info))) {
+                reiniciarEstadoMaoVR(info);
+            }
             continue;
         }
         info.rastreioPerdidoDesde = 0;
@@ -1929,6 +2174,7 @@ function atualizarMaosVR(deltaTime) {
 // pré-pinça). Espaço vazio / botão de ação: simplesmente IGNORA — sem
 // seleção, sem mover, sem sair do Observatório, sem tocar na UI externa.
 function disparaCliquePincaVR(info) {
+    if (vrModoInteracao !== MODO_INTERACAO_VR.MAOS || !maoEstaRastreadaVR(info)) return;
     const alvo = info.alvoPinch || info.candidato || raycastMaoVR(info);
     if (!alvo || !alvo.userData || !alvo.userData.astro) return;
     if (alvo.parent !== vrGrupoAstros) return;
@@ -2017,31 +2263,19 @@ async function iniciarSessaoVR() {
         }
         vrSessaoXR = sessao;
         const funcionalidadesAtivas = sessao.enabledFeatures;
-        const trackingDeclarado = funcionalidadesAtivas
-            ? (typeof funcionalidadesAtivas.has === "function"
-                ? funcionalidadesAtivas.has("hand-tracking")
-                : Array.from(funcionalidadesAtivas).includes("hand-tracking"))
-            : null;
-        const fontesMaoDisponiveis = sessao.inputSources
-            ? Array.from(sessao.inputSources).some(source => !!source.hand)
-            : false;
-        const trackingDisponivel = trackingDeclarado !== false || fontesMaoDisponiveis;
-        vrMaosInfo.forEach(info => {
-            // O WebXRManager identifica a mão ao emitir `connected` com
-            // XRInputSource.hand; a fonte real prevalece sobre a lista de features.
-            info.habilitada = trackingDisponivel && !!info.mao;
-            if (info.inputSource && !info.inputSource.hand) info.inputSource = null;
-            info.inputSourceTemMao = !!(info.inputSource && info.inputSource.hand);
-            if (info.inputSourceTemMao) info.habilitada = true;
-            atualizarVisibilidadeMaoVR(info);
-        });
-        vrControladoresInfo.forEach(info => {
-            if (!info.maoInfo || !info.maoInfo.inputSourceTemMao) {
-                if (info.laser) info.laser.visible = true;
-            } else {
-                atualizarVisibilidadeMaoVR(info.maoInfo);
-            }
-        });
+        // enabledFeatures apenas declara capacidade; a fonte XRInputSource
+        // com hand e as juntas visíveis é que provam tracking efetivo.
+        for (const info of vrMaosInfo) {
+            info.habilitada = false;
+            info.inputSource = null;
+            info.inputSourceTemMao = false;
+        }
+        for (const info of vrControladoresInfo) info.inputSource = null;
+        vrModoInteracao = MODO_INTERACAO_VR.NENHUM;
+        vrModoInteracaoCandidato = null;
+        vrModoInteracaoCandidatoDesde = 0;
+        sincronizarFontesEntradaVR(sessao);
+        atualizarVisibilidadeInteracaoVR();
 
         // Qualquer que seja o caminho de saída (botão 3D, DOM Overlay, sistema
         // do Quest), o evento "end" da sessão garante a recuperação da interface.
@@ -2098,6 +2332,13 @@ function sairSessaoVRDoOverlay(evento) {
 // (botão «SAIR DO VR», DOM Overlay, sistema do Quest, erro). Idempotente:
 // pode ser chamada várias vezes sem efeitos laterais.
 function restaurarInterfaceAposSessao() {
+    vrModoInteracao = MODO_INTERACAO_VR.NENHUM;
+    vrModoInteracaoCandidato = null;
+    vrModoInteracaoCandidatoDesde = 0;
+    if (vrGripTemporizador) {
+        clearTimeout(vrGripTemporizador);
+        vrGripTemporizador = null;
+    }
     // Liberta primeiro a apresentação na palma (se existir): o astro regressa
     // ao céu em vez de ficar preso a uma pose congelada da mão fora de VR.
     if (vrApresentado) libertarApresentacaoVR();
@@ -2119,7 +2360,9 @@ function restaurarInterfaceAposSessao() {
             info.maoInfo.mao.visible = false;
             if (info.maoInfo.modelo) info.maoInfo.modelo.visible = false;
         }
-        if (info.laser) info.laser.visible = true;
+        if (info.laser) info.laser.visible = false;
+        if (info.laser) info.laser.material.color.setHex(0x6eb8ff);
+        info.rastreioPoseValido = false;
         info.gatilhoPuxado = false;
         info.gatilhoInicio = 0;
         info.astroSelecionavel = null;
@@ -2233,6 +2476,9 @@ function vrAnimar() {
     // Input de mãos, controladores e transições usam o loop XR existente; os
     // grupos/articulações e listeners são preparados uma única vez.
     if (vrSessaoAtiva) {
+        sincronizarFontesEntradaVR(vrSessaoXR || vrRenderer.xr.getSession());
+        atualizarRastreioControllersVR();
+        atualizarArbitragemInteracaoVR(agoraMs);
         atualizarMaosVR(dt);
         atualizarMiradoresVR();
     }
@@ -2370,6 +2616,11 @@ function cancelarHoldBotaoVR(info) {
 }
 
 function selecionarComRaycastVR(origem, adiarSelecaoAstro = false) {
+    if (vrSessaoAtiva && origem !== vrCamera) {
+        const infoController = vrControladoresInfo.find(info => info.controlador === origem);
+        if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER
+            || !controllerTemTrackingValidoVR(infoController)) return null;
+    }
     const intersecoes = raycastVR(origem);
     const escolhido = alvoSobRaioVR(intersecoes);
     // Espaço vazio: não faz NADA — em particular não termina a sessão WebXR
@@ -2408,7 +2659,8 @@ function selecionarComRaycastVR(origem, adiarSelecaoAstro = false) {
 }
 
 function iniciarGatilhoControllerVR(info) {
-    if (vrGrabAtivo) return;
+    if (vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER
+        || !controllerTemTrackingValidoVR(info) || vrGrabAtivo) return;
     info.gatilhoPuxado = true;
     info.gatilhoInicio = performance.now();
     info.astroSelecionavel = null;
@@ -2797,7 +3049,9 @@ function atualizarApresentacaoVR(deltaTime) {
     for (let i = vrVoosApresentacaoVR.length - 1; i >= 0; i--) {
         const voo = vrVoosApresentacaoVR[i];
         if (!vrApresentado || vrApresentado.objeto !== voo.objeto
-            || !vrSessaoAtiva || !maoEstaRastreadaVR(voo.info)) {
+            || !vrSessaoAtiva || (!maoEstaRastreadaVR(voo.info)
+                && (!voo.info.rastreioPerdidoDesde
+                    || performance.now() - voo.info.rastreioPerdidoDesde >= TOLERANCIA_PERDA_INPUT_VR_MS))) {
             // Substituído, sessão terminou ou tracking perdeu-se: a libertação
             // devolve o astro ao céu a partir da pose em que estava.
             libertarApresentacaoVR();
@@ -2841,7 +3095,9 @@ function atualizarApresentacaoVR(deltaTime) {
     if (!vrApresentado) return;
     const { info, objeto } = vrApresentado;
     if (objeto.parent !== info.modelo) return;
-    if (!vrSessaoAtiva || !maoEstaRastreadaVR(info)) {
+    if (!vrSessaoAtiva || (!maoEstaRastreadaVR(info)
+        && (!info.rastreioPerdidoDesde
+            || performance.now() - info.rastreioPerdidoDesde >= TOLERANCIA_PERDA_INPUT_VR_MS))) {
         libertarApresentacaoVR();
         return;
     }
@@ -3309,10 +3565,29 @@ function removerPainelUI3D() {
 // sob o raio e a progressão da pressão mantida (que é o que, por fim, aciona
 // o botão — ver o selecionarComRaycastVR).
 function atualizarMiradoresVR() {
-    if (!vrRaycaster || !vrTempOrigem) return;
+    if (!vrRaycaster || !vrTempOrigem
+        || vrModoInteracao !== MODO_INTERACAO_VR.CONTROLLER) return;
 
     const agora = performance.now();
     for (const info of vrControladoresInfo) {
+        if (!controllerTemTrackingValidoVR(info)) {
+            if (info.laser) info.laser.visible = false;
+            if (!info.rastreioPerdidoDesde) info.rastreioPerdidoDesde = agora;
+            // Perda de pose cancela o gesto incompleto, mas preserva um astro
+            // já agarrado durante a breve janela de tolerância do tracking.
+            info.gatilhoPuxado = false;
+            info.gatilhoInicio = 0;
+            info.astroSelecionavel = null;
+            info.astroParaAgarrar = null;
+            cancelarHoldBotaoVR(info);
+            if (agora - info.rastreioPerdidoDesde >= TOLERANCIA_PERDA_INPUT_VR_MS) {
+                if (info.objetoAgarrado) soltarAstroVR(info);
+                info.rastreioPerdidoDesde = 0;
+            }
+            continue;
+        }
+        info.rastreioPerdidoDesde = 0;
+        if (info.laser) info.laser.visible = true;
         if (info.objetoAgarrado) continue;
         vrRaycaster.camera = vrCamera;
         vrTempOrigem.setFromMatrixPosition(info.controlador.matrixWorld);
@@ -3325,7 +3600,9 @@ function atualizarMiradoresVR() {
         // alterar o raycast usado pelo gatilho para selecionar.
         const intersecoes = vrRaycaster.intersectObjects(alvosDeSelecaoVR(), true);
         const escolhido = alvoSobRaioVR(intersecoes);
-        const hitVisual = intersecoes.length ? intersecoes[0] : null;
+        const astroEscolhido = escolhido && portadorDeDadosVR(escolhido.object, "astro");
+        const hitVisual = astroEscolhido ? escolhido
+            : (intersecoes.length ? intersecoes[0] : null);
         const verticesLaser = info.laser.geometry.attributes.position;
         const comprimentoLaser = hitVisual
             ? Math.min(120, vrTempOrigem.distanceTo(hitVisual.point)) : 120;
