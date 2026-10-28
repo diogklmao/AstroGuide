@@ -1555,8 +1555,8 @@ function criarModeloArticuladoMaoVR(mao) {
     const juntasModelo = new Map();
 
     const materialMao = new THREE.MeshStandardMaterial({
-        color: 0x304b6f, roughness: 0.42, metalness: 0.18,
-        emissive: 0x0b1d36, emissiveIntensity: 0.42,
+        color: 0x3a5c85, roughness: 0.40, metalness: 0.14,
+        emissive: 0x0a1a30, emissiveIntensity: 0.36,
         // O mesmo acabamento em palma e dedos evita que pareçam peças distintas.
         side: THREE.DoubleSide
     });
@@ -1596,8 +1596,6 @@ function criarModeloArticuladoMaoVR(mao) {
     const longitudinalPalma = new THREE.Vector3();
     const normalPalma = new THREE.Vector3();
     const secaoPalma = new THREE.Vector3();
-    const lateraisRaizesPalma = new Float32Array(raizesPalma.length);
-    const tmpRaizPalma = new THREE.Vector3();
     // Geometria da palma exclusiva desta mão para que as bases reais dos
     // cinco dedos possam esculpir o contorno sem partilhar vértices mutáveis.
     const geometriaPalma = criarGeometriaPalmaVR();
@@ -1640,11 +1638,11 @@ function criarModeloArticuladoMaoVR(mao) {
     const dedos = [
         { nomes: ["thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip"],
             raios: [0.0118, 0.0094, 0.0074, 0.0052], extensaoBase: 0.012,
-            fluxoBase: 1.16, material: materialMao },
+            fluxoBase: 1.14, material: materialMao },
         ...["index", "middle", "ring", "pinky"].map(nome => ({
             nomes: [`${nome}-finger-metacarpal`, `${nome}-finger-phalanx-proximal`,
                 `${nome}-finger-phalanx-intermediate`, `${nome}-finger-phalanx-distal`, `${nome}-finger-tip`],
-            raios: raiosDedos[nome], extensaoBase: 0.022, fluxoBase: 1.22, material: materialMao
+            raios: raiosDedos[nome], extensaoBase: 0.020, fluxoBase: 1.18, material: materialMao
         }))
     ];
     const malhasDedos = [];
@@ -1840,13 +1838,6 @@ function criarModeloArticuladoMaoVR(mao) {
                 const meiaEspessura = Math.max(0.010, Math.min(0.016, largura * 0.082));
                 const forcaTenar = Math.max(0,
                     Math.abs(projecaoPolegar) - largura * 0.18);
-                // Posição lateral de cada raiz real, para os quatro relevos dos
-                // nós aparecerem no sítio certo e a palma envolver os dedos.
-                for (let i = 0; i < raizesPalma.length; i++) {
-                    lateraisRaizesPalma[i] = tmpRaizPalma
-                        .subVectors(pontosRaizesPalma[i], centroNosPalma)
-                        .dot(lateralPalma);
-                }
                 for (let anel = 0; anel < aneisPalma; anel++) {
                     const t = anel / (aneisPalma - 1);
                     // Perfil longitudinal: pulso redondo e estreito, palma a
@@ -1860,7 +1851,6 @@ function criarModeloArticuladoMaoVR(mao) {
                         * (1 - curvaSuave(0.72, 0.98, t));
                     const perfilHipo = curvaSuave(0, 0.22, t)
                         * (1 - curvaSuave(0.55, 0.88, t));
-                    const pesoNos = curvaSuave(0.68, 0.98, t);
                     for (let col = 0; col < colunasPalma; col++) {
                         const a = col / colunasPalma * Math.PI * 2;
                         const c = Math.cos(a), s = Math.sin(a);
@@ -1874,42 +1864,25 @@ function criarModeloArticuladoMaoVR(mao) {
                         const tenar = ladoTenar * forcaTenar * 0.62 * perfilTenar
                             * pesoLadoTenar * pesoLadoTenar;
                         const pesoLadoHipo = Math.max(0, (1 - ladoTenar * xNorm) * 0.5);
-                        const hipo = -ladoTenar * 0.0032 * perfilHipo
+                        const hipo = -ladoTenar * 0.0022 * perfilHipo
                             * pesoLadoHipo * pesoLadoHipo;
                         const x = xBase + tenar + hipo;
-                        // Relevo dos nós: alarga a borda superior da palma em
-                        // direção a cada metacarpo, criando uma transição com
-                        // quatro lóbulos em vez de um corte plano.
-                        let lobulo = 0;
-                        if (pesoNos > 0) {
-                            const raioLobulo = largura * 0.16;
-                            for (let i = 0; i < raizesPalma.length; i++) {
-                                const d = (xBase - lateraisRaizesPalma[i]) / raioLobulo;
-                                if (d > -2 && d < 2) {
-                                    const g = 1 - 0.25 * d * d;
-                                    if (g > lobulo) lobulo = g * g;
-                                }
-                            }
-                        }
-                        const extensao = 0.011 * lobulo * pesoNos;
                         let z = zNorm * meiaEspessura * formaEspessura
                             * (palmar ? 0.86 : 1.08);
                         if (palmar) {
                             // Copo palmar discreto + cheio tenar.
-                            const concavidade = 0.0045 * Math.max(0, 1 - xNorm * xNorm)
+                            const concavidade = 0.0038 * Math.max(0, 1 - xNorm * xNorm)
                                 * Math.sin(Math.PI * Math.max(0, Math.min(1, (t - 0.08) / 0.80)));
                             z -= concavidade;
-                            z += 0.0030 * perfilTenar * pesoLadoTenar * pesoLadoTenar;
+                            z += 0.0028 * perfilTenar * pesoLadoTenar * pesoLadoTenar;
                         } else {
-                            // Dorso ligeiramente mais cheio e almofadas dos nós.
-                            z -= 0.0010 * Math.max(0, 1 - xNorm * xNorm)
-                                * Math.sin(Math.PI * t)
-                                + 0.0022 * lobulo * pesoNos;
+                            // Dorso ligeiramente mais cheio, sem relevos extra.
+                            z -= 0.0008 * Math.max(0, 1 - xNorm * xNorm)
+                                * Math.sin(Math.PI * t);
                         }
                         secaoPalma.copy(inicioPulsoPalma).lerp(centroNosPalma, t)
                             .addScaledVector(lateralPalma, x)
-                            .addScaledVector(normalPalma, z)
-                            .addScaledVector(longitudinalPalma, extensao);
+                            .addScaledVector(normalPalma, z);
                         posicoesPalma.setXYZ(anel * colunasPalma + col, secaoPalma.x, secaoPalma.y, secaoPalma.z);
                     }
                 }
