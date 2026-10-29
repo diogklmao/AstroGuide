@@ -1563,6 +1563,9 @@ function criarModeloArticuladoMaoVR(mao) {
     const pulso = pontos.get("wrist"), polegar = pontos.get("thumb-metacarpal");
 
     const cadeias = [
+        // Pulso integrado na palma: um osso curto do pulso ao metacarpo médio.
+        { nomes: ["wrist", "middle-finger-metacarpal"],
+            raios: [0.0190, 0.0140], uniaoBase: 0.024 },
         { nomes: ["thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip"],
             raios: [0.0140, 0.0120, 0.0092, 0.0058], uniaoBase: 0.020 },
         ...["index", "middle", "ring", "pinky"].map((dedo, i) => ({
@@ -1621,11 +1624,14 @@ function criarModeloArticuladoMaoVR(mao) {
     function avaliarCampo(x, y, z, palma) {
         let d = distanciaElipsoideMaoVR(x, y, z, palma.cx, palma.cy, 0,
             palma.rx, palma.ry, palma.rz);
+        // Corpo central da palma: arredonda os cantos e tira o aspeto de
+        // retângulo, sem alterar o tracking nem as juntas.
         d = smoothMinimoMaoVR(d,
-            distanciaElipsoideMaoVR(x, y, z, 0, -0.008, 0, 0.027, 0.036, 0.013), 0.014);
+            distanciaElipsoideMaoVR(x, y, z, 0, -0.010, 0, 0.030, 0.038, 0.014), 0.018);
+        // Polegar: sai lateralmente e com uma transição suave para a palma.
         d = smoothMinimoMaoVR(d,
             distanciaElipsoideMaoVR(x, y, z, palma.tx, palma.ty, palma.tz,
-                0.025, 0.032, 0.017), 0.017);
+                0.024, 0.030, 0.016), 0.022);
         for (const osso of ossos) {
             if (!osso.ativo) continue;
             const raioMax = Math.max(osso.raioA, osso.raioB);
