@@ -1486,43 +1486,51 @@ function atualizarVisibilidadeInteracaoVR() {
     }
 }
 
-// ── Malha volumétrica contínua da mão ──────────────────────────────────────
-// A palma, o pulso e os dedos são unidos num campo de distância suave. A
-// superfície é reconstruída por Surface Nets numa grelha de baixa resolução;
-// as poses continuam a vir exclusivamente dos XRJointSpace existentes.
-const PASSO_MALHA_MAO_VR = 0.011;
-const MAX_X_MALHA_MAO_VR = 32;
-const MAX_Y_MALHA_MAO_VR = 40;
-const MAX_Z_MALHA_MAO_VR = 18;
-const CANTOS_CUBO_MAO_VR = [
-    [0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0],
-    [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]
-];
-const ARESTAS_CUBO_MAO_VR = [
-    [0, 1], [2, 3], [4, 5], [6, 7],
-    [0, 2], [1, 3], [4, 6], [5, 7],
-    [0, 4], [1, 5], [2, 6], [3, 7]
-];
+// ── Modelo low-poly da mão ─────────────────────────────────────────────────
+// A mão é montada com peças rígidas posicionadas a partir dos XRJointSpace já
+// existentes: não há reconstrução de superfície nem skinning por frame. A
+// silhueta vem de uma palma trapezoidal arredondada e de dedos segmentados com
+// espessuras e comprimentos humanos, em vez de tubos uniformes.
+// Tudo é desenhado em três InstancedMesh por mão (palma, segmentos e juntas),
+// para continuar leve no Quest.
+const CADEIA_POLEGAR_MAO_VR = ["thumb-metacarpal", "thumb-phalanx-proximal",
+    "thumb-phalanx-distal", "thumb-tip"];
+const DEDOS_MAO_VR = Object.freeze([
+    { nome: "index", espessura: 1.00 },
+    { nome: "middle", espessura: 1.04 },
+    { nome: "ring", espessura: 0.97 },
+    { nome: "pinky", espessura: 0.88 }
+]);
+// Raios, em metros, para uma mão de ~9 cm de largura na palma.
+const RAIOS_DEDO_MAO_VR = [0.0118, 0.0107, 0.0098, 0.0086];
+const RAIOS_POLEGAR_MAO_VR = [0.0140, 0.0126, 0.0108];
+const TOTAL_SEGMENTOS_MAO_VR = 4 * 4 + 3; // 4 dedos com 4 troços + 3 do polegar
+const TOTAL_JUNTAS_MAO_VR = 4 * 4 + 3 + 1; // 4 dedos, 3 do polegar e a base do polegar
+const LARGURA_REFERENCIA_MAO_VR = 0.090;
 
-function smoothMinimoMaoVR(a, b, k) {
-    const h = Math.max(k - Math.abs(a - b), 0) / k;
-    return Math.min(a, b) - h * h * k * 0.25;
+let vrGeometriaPalmaMao = null;
+let vrGeometriaSegmentoMao = null;
+let vrGeometriaJuntaMao = null;
+
+function cadeiaDedoMaoVR(dedo) {
+    return [`${dedo}-finger-metacarpal`, `${dedo}-finger-phalanx-proximal`,
+        `${dedo}-finger-phalanx-intermediate`, `${dedo}-finger-phalanx-distal`,
+        `${dedo}-finger-tip`];
 }
 
-function distanciaElipsoideMaoVR(x, y, z, cx, cy, cz, rx, ry, rz) {
-    const qx = (x - cx) / rx, qy = (y - cy) / ry, qz = (z - cz) / rz;
-    const k0 = Math.sqrt(qx * qx + qy * qy + qz * qz);
-    if (k0 < 1e-6) return -Math.min(rx, ry, rz);
-    const k1 = Math.sqrt(qx * qx / (rx * rx) + qy * qy / (ry * ry) + qz * qz / (rz * rz));
-    return k0 * (k0 - 1) / Math.max(k1, 1e-6);
+function nomesJuntasMaoVR() {
+    const nomes = ["wrist"];
+    nomes.push(...CADEIA_POLEGAR_MAO_VR);
+    for (const dedo of DEDOS_MAO_VR) nomes.push(...cadeiaDedoMaoVR(dedo.nome));
+    return nomes;
 }
 
 function obterMaterialMaoVR() {
     if (vrMaterialMao) return vrMaterialMao;
     const material = new THREE.MeshStandardMaterial({
-        color: 0x4779a3, roughness: 0.42, metalness: 0.05,
-        transparent: true, opacity: 0.84, depthWrite: false,
-        emissive: 0x0c2746, emissiveIntensity: 0.85, side: THREE.FrontSide
+        color: 0x4a7cae, roughness: 0.40, metalness: 0.06,
+        transparent: true, opacity: 0.86, depthWrite: false,
+        emissive: 0x0c2746, emissiveIntensity: 0.80, side: THREE.FrontSide
     });
     material.onBeforeCompile = shader => {
         shader.fragmentShader = shader.fragmentShader.replace(
@@ -1539,430 +1547,267 @@ function obterMaterialMaoVR() {
     return material;
 }
 
+// Palma: trapézio de cantos arredondados, largo nos nós dos dedos e estreito no
+// pulso. É simétrica de propósito — a orientação vem toda dos joints e a mão
+// esquerda usa o mesmo modelo — e a base do polegar é uma peça à parte.
+function obterGeometriaPalmaMaoVR() {
+    if (vrGeometriaPalmaMao) return vrGeometriaPalmaMao;
+    const forma = new THREE.Shape();
+    const base = 0.30, topo = 0.465, meiaAltura = 0.5, canto = 0.20;
+    forma.moveTo(-base + canto, -meiaAltura);
+    forma.quadraticCurveTo(-base, -meiaAltura, -base, -meiaAltura + canto);
+    forma.lineTo(-topo, meiaAltura - canto);
+    forma.quadraticCurveTo(-topo, meiaAltura, -topo + canto, meiaAltura);
+    forma.lineTo(topo - canto, meiaAltura);
+    forma.quadraticCurveTo(topo, meiaAltura, topo, meiaAltura - canto);
+    forma.lineTo(base, -meiaAltura + canto);
+    forma.quadraticCurveTo(base, -meiaAltura, base - canto, -meiaAltura);
+    forma.closePath();
+    const geometria = new THREE.ExtrudeGeometry(forma, {
+        depth: 0.34, bevelEnabled: true, bevelThickness: 0.15,
+        bevelSize: 0.15, bevelSegments: 3, curveSegments: 6
+    });
+    geometria.translate(0, 0, -0.17);
+    geometria.computeVertexNormals();
+    vrGeometriaPalmaMao = geometria;
+    return geometria;
+}
+
+// Troço de dedo: cilindro de 8 lados já afilado na ponta (o topo é mais fino).
+function obterGeometriaSegmentoMaoVR() {
+    if (!vrGeometriaSegmentoMao) {
+        vrGeometriaSegmentoMao = new THREE.CylinderGeometry(0.88, 1, 1, 8, 1, false);
+    }
+    return vrGeometriaSegmentoMao;
+}
+
+function obterGeometriaJuntaMaoVR() {
+    if (!vrGeometriaJuntaMao) vrGeometriaJuntaMao = new THREE.SphereGeometry(1, 8, 6);
+    return vrGeometriaJuntaMao;
+}
+
 function criarModeloArticuladoMaoVR(mao) {
     const modelo = new THREE.Group();
-    modelo.name = "modelo-articulado-mao-vr";
+    modelo.name = "modelo-mao-vr";
     const juntasModelo = new Map();
-    const nomesJuntas = ["wrist", "thumb-metacarpal", "thumb-phalanx-proximal",
-        "thumb-phalanx-distal", "thumb-tip"];
-    for (const dedo of ["index", "middle", "ring", "pinky"]) {
-        nomesJuntas.push(`${dedo}-finger-metacarpal`, `${dedo}-finger-phalanx-proximal`,
-            `${dedo}-finger-phalanx-intermediate`, `${dedo}-finger-phalanx-distal`, `${dedo}-finger-tip`);
-    }
-    const pontos = new Map();
-    for (const nome of nomesJuntas) {
+    for (const nome of nomesJuntasMaoVR()) {
         const articulacao = mao.joints[nome];
-        if (articulacao) {
-            juntasModelo.set(nome, { articulacao });
-            pontos.set(nome, { articulacao, local: new THREE.Vector3(), x: 0, y: 0, z: 0, valido: false });
-        }
-    }
-    const nomesRaizes = ["index-finger-metacarpal", "middle-finger-metacarpal",
-        "ring-finger-metacarpal", "pinky-finger-metacarpal"];
-    const raizes = nomesRaizes.map(nome => pontos.get(nome));
-    const pulso = pontos.get("wrist"), polegar = pontos.get("thumb-metacarpal");
-
-    const cadeias = [
-        // Pulso integrado na palma: um osso curto do pulso ao metacarpo médio.
-        { nomes: ["wrist", "middle-finger-metacarpal"],
-            raios: [0.0190, 0.0140], uniaoBase: 0.024 },
-        { nomes: ["thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip"],
-            raios: [0.0140, 0.0120, 0.0092, 0.0058], uniaoBase: 0.020 },
-        ...["index", "middle", "ring", "pinky"].map((dedo, i) => ({
-            nomes: [`${dedo}-finger-metacarpal`, `${dedo}-finger-phalanx-proximal`,
-                `${dedo}-finger-phalanx-intermediate`, `${dedo}-finger-phalanx-distal`, `${dedo}-finger-tip`],
-            raios: [0.0112 - i * 0.0005, 0.0100 - i * 0.0004,
-                0.0086 - i * 0.0004, 0.0072 - i * 0.0003, 0.0052 - i * 0.0002],
-            uniaoBase: 0.014
-        }))
-    ];
-    const ossos = [];
-    for (const cadeia of cadeias) {
-        for (let i = 0; i < cadeia.nomes.length - 1; i++) {
-            const a = pontos.get(cadeia.nomes[i]), b = pontos.get(cadeia.nomes[i + 1]);
-            if (a && b) ossos.push({ a, b, raioA: cadeia.raios[i], raioB: cadeia.raios[i + 1],
-                suavidade: i === 0 ? cadeia.uniaoBase : 0.006, ativo: false });
-        }
+        if (articulacao) juntasModelo.set(nome, { articulacao });
     }
 
-    const geometria = new THREE.BufferGeometry();
-    geometria.setDrawRange(0, 0);
-    const malha = new THREE.Mesh(geometria, obterMaterialMaoVR());
-    malha.name = "malha-volumetrica-mao-vr";
-    malha.frustumCulled = false;
-    malha.raycast = () => {};
-    modelo.add(malha);
+    const material = obterMaterialMaoVR();
+    const malhaPalma = new THREE.Mesh(obterGeometriaPalmaMaoVR(), material);
+    malhaPalma.name = "palma-mao-vr";
+    malhaPalma.matrixAutoUpdate = false;
+    malhaPalma.frustumCulled = false;
+    const segmentos = new THREE.InstancedMesh(obterGeometriaSegmentoMaoVR(), material,
+        TOTAL_SEGMENTOS_MAO_VR);
+    segmentos.name = "dedos-mao-vr";
+    segmentos.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    segmentos.frustumCulled = false;
+    const juntas = new THREE.InstancedMesh(obterGeometriaJuntaMaoVR(), material,
+        TOTAL_JUNTAS_MAO_VR);
+    juntas.name = "articulacoes-mao-vr";
+    juntas.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    juntas.frustumCulled = false;
+    modelo.add(malhaPalma, segmentos, juntas);
 
-    const eixoX = new THREE.Vector3(), eixoY = new THREE.Vector3(), eixoZ = new THREE.Vector3();
-    const longitudinal = new THREE.Vector3(), lateral = new THREE.Vector3(), normal = new THREE.Vector3();
-    const centroNos = new THREE.Vector3(), pulsoLocal = new THREE.Vector3(), temporario = new THREE.Vector3();
+    // Posições locais são calculadas dentro do grupo da mão; o grupo continua a
+    // ser alimentado pelo tracking e permanece por baixo dos astros.
+    const cacheJuntas = new Map();
+    const vetorA = new THREE.Vector3(), vetorB = new THREE.Vector3();
+    const direcao = new THREE.Vector3(), lateral = new THREE.Vector3();
+    const longitudinal = new THREE.Vector3(), normal = new THREE.Vector3();
+    const eixoX = new THREE.Vector3(), centro = new THREE.Vector3();
+    const reservas = []; // posições interpoladas reutilizadas (sem alocar por frame)
+    const matrizTmp = new THREE.Matrix4();
+    const inversoMao = new THREE.Matrix4();
+    const quaternionTmp = new THREE.Quaternion();
+    const escalaTmp = new THREE.Vector3();
+    const posicaoTmp = new THREE.Vector3();
+    const cimaMao = new THREE.Vector3(0, 1, 0);
+
     const centroPalmaLocal = new THREE.Vector3();
-    const normalPalmaLocal = new THREE.Vector3();
-    const direcaoLongitudinalPalmaLocal = new THREE.Vector3();
+    const normalPalmaLocal = new THREE.Vector3(0, 0, 1);
+    const direcaoLongitudinalPalmaLocal = new THREE.Vector3(0, 1, 0);
+
+    function lerJunta(nome) {
+        const articulacao = mao.joints[nome];
+        if (articulacao && articulacao.visible) {
+            // As juntas são filhas diretas do grupo da mão e o mundo já foi
+            // atualizado uma vez por frame; a inversa é partilhada por todas.
+            const elementos = articulacao.matrixWorld.elements;
+            vetorA.set(elementos[12], elementos[13], elementos[14]).applyMatrix4(inversoMao);
+            if (Number.isFinite(vetorA.x) && Number.isFinite(vetorA.y)
+                && Number.isFinite(vetorA.z)) {
+                let guardada = cacheJuntas.get(nome);
+                if (!guardada) {
+                    guardada = new THREE.Vector3();
+                    cacheJuntas.set(nome, guardada);
+                }
+                guardada.copy(vetorA);
+                return guardada;
+            }
+        }
+        // Junta em falta neste frame: usa a última posição conhecida, para a
+        // mão não desaparecer nem saltar.
+        return cacheJuntas.get(nome) || null;
+    }
+
+    function anularInstancia(malha, indice) {
+        matrizTmp.makeScale(0, 0, 0);
+        malha.setMatrixAt(indice, matrizTmp);
+    }
+
+    function escreverSegmento(indice, a, b, raio) {
+        if (!a || !b) {
+            anularInstancia(segmentos, indice);
+            return;
+        }
+        direcao.subVectors(b, a);
+        const comprimento = direcao.length();
+        if (!(comprimento > 1e-5)) {
+            anularInstancia(segmentos, indice);
+            return;
+        }
+        direcao.divideScalar(comprimento);
+        quaternionTmp.setFromUnitVectors(cimaMao, direcao);
+        posicaoTmp.addVectors(a, b).multiplyScalar(0.5);
+        // Cada troço entra ligeiramente dentro do seguinte: a articulação do
+        // dedo fica redonda em vez de mostrar a costura das duas peças.
+        escalaTmp.set(raio, comprimento + raio * 0.7, raio);
+        matrizTmp.compose(posicaoTmp, quaternionTmp, escalaTmp);
+        segmentos.setMatrixAt(indice, matrizTmp);
+    }
+
+    function escreverJunta(indice, ponto, raio) {
+        if (!ponto) {
+            anularInstancia(juntas, indice);
+            return;
+        }
+        quaternionTmp.identity();
+        escalaTmp.set(raio, raio, raio);
+        matrizTmp.compose(ponto, quaternionTmp, escalaTmp);
+        juntas.setMatrixAt(indice, matrizTmp);
+    }
+
+    function atualizarCadeia(cadeia, baseSegmento, baseJunta, raios, fator, escalaMao) {
+        const pontos = cadeia.map(nome => lerJunta(nome));
+        // Junta opcional em falta: interpola entre as vizinhas em vez de cortar
+        // o dedo ao meio.
+        for (let i = 1; i < pontos.length - 1; i++) {
+            if (!pontos[i] && pontos[i - 1] && pontos[i + 1]) {
+                if (!reservas[i]) reservas[i] = new THREE.Vector3();
+                pontos[i] = reservas[i].addVectors(pontos[i - 1], pontos[i + 1])
+                    .multiplyScalar(0.5);
+            }
+        }
+        for (let i = 0; i + 1 < pontos.length; i++) {
+            const raio = (raios[i] || raios[raios.length - 1]) * fator * escalaMao;
+            escreverSegmento(baseSegmento + i, pontos[i], pontos[i + 1], raio);
+        }
+        for (let i = 1; i < pontos.length; i++) {
+            const raio = (raios[Math.min(i, raios.length - 1)] || 0.0095) * fator * escalaMao;
+            escreverJunta(baseJunta + i - 1, pontos[i], raio * 0.98);
+        }
+    }
+
+    modelo.userData.atualizar = () => {
+        // Uma atualização e uma inversão por frame; todas as juntas leem daqui.
+        mao.updateMatrixWorld(true);
+        inversoMao.copy(mao.matrixWorld).invert();
+        const pulso = lerJunta("wrist");
+        const baseIndice = lerJunta("index-finger-metacarpal");
+        const baseMedio = lerJunta("middle-finger-metacarpal");
+        const baseMindinho = lerJunta("pinky-finger-metacarpal");
+        const basePolegar = lerJunta("thumb-metacarpal");
+        if (!pulso) {
+            malhaPalma.visible = false;
+            segmentos.visible = false;
+            juntas.visible = false;
+            return;
+        }
+        malhaPalma.visible = true;
+        segmentos.visible = true;
+        juntas.visible = true;
+
+        const baseDedos = baseMedio
+            ? vetorB.copy(baseMedio)
+            : (baseIndice && baseMindinho
+                ? vetorB.addVectors(baseIndice, baseMindinho).multiplyScalar(0.5)
+                : null);
+        // A palma tem de chegar aos nós dos dedos: se ficasse mais curta, os
+        // primeiros troços apareciam como tubos pousados sobre ela.
+        const noMedio = lerJunta("middle-finger-phalanx-proximal");
+        const referenciaDedos = noMedio || baseDedos;
+
+        longitudinal.subVectors(referenciaDedos || pulso, pulso);
+        const comprimentoPalma = longitudinal.length();
+        if (!(comprimentoPalma > 1e-4)) {
+            malhaPalma.visible = false;
+            return;
+        }
+        longitudinal.divideScalar(comprimentoPalma);
+
+        if (baseIndice && baseMindinho) lateral.subVectors(baseMindinho, baseIndice);
+        else if (baseIndice) lateral.copy(baseIndice).sub(pulso);
+        else lateral.set(1, 0, 0);
+        if (lateral.lengthSq() < 1e-10) lateral.set(1, 0, 0);
+        lateral.normalize();
+
+        normal.crossVectors(longitudinal, lateral);
+        if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+        normal.normalize().multiplyScalar(modelo.userData.sentidoPalma || 1);
+        eixoX.crossVectors(longitudinal, normal).normalize();
+
+        const larguraDedos = baseIndice && baseMindinho
+            ? baseIndice.distanceTo(baseMindinho) : LARGURA_REFERENCIA_MAO_VR * 0.72;
+        const larguraPalma = larguraDedos * 1.55;
+        const escalaMao = THREE.MathUtils.clamp(larguraPalma / LARGURA_REFERENCIA_MAO_VR, 0.55, 1.7);
+        const espessuraPalma = 0.024 * escalaMao;
+        const comprimentoVisual = comprimentoPalma * 1.05;
+
+        centro.copy(pulso).addScaledVector(longitudinal, comprimentoVisual * 0.44);
+        matrizTmp.makeBasis(eixoX, longitudinal, normal);
+        matrizTmp.scale(escalaTmp.set(larguraPalma / 0.93, comprimentoVisual, espessuraPalma / 0.66));
+        matrizTmp.setPosition(centro);
+        malhaPalma.matrix.copy(matrizTmp);
+        malhaPalma.matrixWorldNeedsUpdate = true;
+
+        centroPalmaLocal.copy(centro);
+        normalPalmaLocal.copy(normal);
+        direcaoLongitudinalPalmaLocal.copy(longitudinal);
+
+        let baseSegmento = 0, baseJunta = 0;
+        for (const dedo of DEDOS_MAO_VR) {
+            atualizarCadeia(cadeiaDedoMaoVR(dedo.nome), baseSegmento, baseJunta,
+                RAIOS_DEDO_MAO_VR, dedo.espessura, escalaMao);
+            baseSegmento += 4;
+            baseJunta += 4;
+        }
+        atualizarCadeia(CADEIA_POLEGAR_MAO_VR, baseSegmento, baseJunta,
+            RAIOS_POLEGAR_MAO_VR, 1.08, escalaMao);
+        // Última instância de junta: a base do polegar, que liga a palma ao
+        // primeiro troço do polegar sem deixar um degrau visível.
+        escreverJunta(TOTAL_JUNTAS_MAO_VR - 1, basePolegar, 0.0175 * escalaMao);
+
+        segmentos.instanceMatrix.needsUpdate = true;
+        juntas.instanceMatrix.needsUpdate = true;
+    };
+
+    // Esconde as instâncias até a primeira atualização válida.
+    for (let i = 0; i < TOTAL_SEGMENTOS_MAO_VR; i++) anularInstancia(segmentos, i);
+    for (let i = 0; i < TOTAL_JUNTAS_MAO_VR; i++) anularInstancia(juntas, i);
+    segmentos.instanceMatrix.needsUpdate = true;
+    juntas.instanceMatrix.needsUpdate = true;
+
     modelo.userData.sentidoPalma = 1;
     modelo.userData.palmaCentro = centroPalmaLocal;
     modelo.userData.palmaNormal = normalPalmaLocal;
     modelo.userData.palmaDirecaoLongitudinal = direcaoLongitudinalPalmaLocal;
-    const matrizMaoInversa = new THREE.Matrix4();
-    const vetorAmostraMao = new THREE.Vector3();
-    const vetorNormalBindMao = new THREE.Vector3();
-    const vetorBaseEsqueletoMao = new THREE.Vector3();
-    const vetorOffsetEsqueletoMao = new THREE.Vector3();
-    const vetorCentroEsqueletoMao = new THREE.Vector3();
-    const valoresCampo = new Float32Array(MAX_X_MALHA_MAO_VR * MAX_Y_MALHA_MAO_VR * MAX_Z_MALHA_MAO_VR);
-    const indiceCelula = new Int32Array((MAX_X_MALHA_MAO_VR - 1)
-        * (MAX_Y_MALHA_MAO_VR - 1) * (MAX_Z_MALHA_MAO_VR - 1));
-    const valoresCantos = new Float32Array(8);
-    let deformacao = null;
-    let atributoPosicao = null, atributoNormal = null, atributoIndice = null;
-    const vetorRotacaoMao = new THREE.Vector3();
-    const quaternionDeformacaoMao = new THREE.Quaternion();
-    const posicaoBaseDeformacaoMao = new THREE.Vector3();
-    const identidadeSkinMao = new THREE.Matrix4().elements;
-    let capacidadeVertices = 0, capacidadeIndices = 0;
-
-    function avaliarCampo(x, y, z, palma) {
-        let d = distanciaElipsoideMaoVR(x, y, z, palma.cx, palma.cy, 0,
-            palma.rx, palma.ry, palma.rz);
-        // Corpo central da palma: arredonda os cantos e tira o aspeto de
-        // retângulo, sem alterar o tracking nem as juntas.
-        d = smoothMinimoMaoVR(d,
-            distanciaElipsoideMaoVR(x, y, z, 0, -0.010, 0, 0.030, 0.038, 0.014), 0.018);
-        // Polegar: sai lateralmente e com uma transição suave para a palma.
-        d = smoothMinimoMaoVR(d,
-            distanciaElipsoideMaoVR(x, y, z, palma.tx, palma.ty, palma.tz,
-                0.024, 0.030, 0.016), 0.022);
-        for (const osso of ossos) {
-            if (!osso.ativo) continue;
-            const raioMax = Math.max(osso.raioA, osso.raioB);
-            const dx = Math.max(osso.minX - x, 0, x - osso.maxX);
-            const dy = Math.max(osso.minY - y, 0, y - osso.maxY);
-            const dz = Math.max(osso.minZ - z, 0, z - osso.maxZ);
-            if (Math.sqrt(dx * dx + dy * dy + dz * dz) - raioMax > d + osso.suavidade) continue;
-            const abx = osso.b.x - osso.a.x, aby = osso.b.y - osso.a.y, abz = osso.b.z - osso.a.z;
-            const apx = x - osso.a.x, apy = y - osso.a.y, apz = z - osso.a.z;
-            const denominador = abx * abx + aby * aby + abz * abz;
-            const t = denominador > 1e-8
-                ? Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / denominador)) : 0;
-            const ex = apx - abx * t, ey = apy - aby * t, ez = apz - abz * t;
-            const raio = osso.raioA + (osso.raioB - osso.raioA) * t;
-            d = smoothMinimoMaoVR(d, Math.sqrt(ex * ex + ey * ey + ez * ez) - raio, osso.suavidade);
-        }
-        return d;
-    }
-
-    function garantirAtributos(vertices, indices) {
-        if (vertices > capacidadeVertices) {
-            capacidadeVertices = vertices;
-            atributoPosicao = new THREE.BufferAttribute(new Float32Array(vertices * 3), 3)
-                .setUsage(THREE.DynamicDrawUsage);
-            atributoNormal = new THREE.BufferAttribute(new Float32Array(vertices * 3), 3)
-                .setUsage(THREE.DynamicDrawUsage);
-            geometria.setAttribute("position", atributoPosicao);
-            geometria.setAttribute("normal", atributoNormal);
-        }
-        if (indices > capacidadeIndices) {
-            capacidadeIndices = indices;
-            atributoIndice = new THREE.BufferAttribute(new Uint32Array(indices), 1)
-                .setUsage(THREE.DynamicDrawUsage);
-            geometria.setIndex(atributoIndice);
-        }
-    }
-
-    function criarDeformacaoMaoVR(quantidadeVertices) {
-        const indices = new Float32Array(quantidadeVertices * 2);
-        const pesos = new Float32Array(quantidadeVertices * 2);
-        const bindPosicoes = new Float32Array(quantidadeVertices * 3);
-        const bindNormais = new Float32Array(quantidadeVertices * 3);
-        const posicoes = atributoPosicao.array;
-        const normais = atributoNormal.array;
-        for (const osso of ossos) {
-            osso.bindAx = osso.a.x; osso.bindAy = osso.a.y; osso.bindAz = osso.a.z;
-            osso.bindBx = osso.b.x; osso.bindBy = osso.b.y; osso.bindBz = osso.b.z;
-            osso.direcaoBind = new THREE.Vector3(
-                osso.bindBx - osso.bindAx, osso.bindBy - osso.bindAy,
-                osso.bindBz - osso.bindAz).normalize();
-            osso.matrizSkin = new THREE.Matrix4();
-        }
-        for (let i = 0; i < quantidadeVertices; i++) {
-            const pi = i * 3;
-            bindPosicoes[pi] = posicoes[pi];
-            bindPosicoes[pi + 1] = posicoes[pi + 1];
-            bindPosicoes[pi + 2] = posicoes[pi + 2];
-            bindNormais[pi] = normais[pi];
-            bindNormais[pi + 1] = normais[pi + 1];
-            bindNormais[pi + 2] = normais[pi + 2];
-
-            let primeiro = -1, segundo = -1, pesoPrimeiro = 0, pesoSegundo = 0;
-            for (let j = 0; j < ossos.length; j++) {
-                const osso = ossos[j];
-                if (!osso.ativo) continue;
-                const abx = osso.bindBx - osso.bindAx;
-                const aby = osso.bindBy - osso.bindAy;
-                const abz = osso.bindBz - osso.bindAz;
-                const apx = posicoes[pi] - osso.bindAx;
-                const apy = posicoes[pi + 1] - osso.bindAy;
-                const apz = posicoes[pi + 2] - osso.bindAz;
-                const comprimento = abx * abx + aby * aby + abz * abz;
-                const t = comprimento > 1e-8 ? Math.max(0, Math.min(1,
-                    (apx * abx + apy * aby + apz * abz) / comprimento)) : 0;
-                const dx = apx - abx * t, dy = apy - aby * t, dz = apz - abz * t;
-                const raio = osso.raioA + (osso.raioB - osso.raioA) * t;
-                const distancia = (dx * dx + dy * dy + dz * dz) / Math.max(1e-8, raio * raio);
-                const peso = distancia < 10 ? Math.exp(-distancia * 0.65) : 0;
-                if (peso > pesoPrimeiro) {
-                    segundo = primeiro; pesoSegundo = pesoPrimeiro;
-                    primeiro = j; pesoPrimeiro = peso;
-                } else if (peso > pesoSegundo) {
-                    segundo = j; pesoSegundo = peso;
-                }
-            }
-            if (primeiro < 0 || pesoPrimeiro + pesoSegundo < 0.03) continue;
-            const soma = pesoPrimeiro + pesoSegundo + 0.35;
-            indices[i * 2] = primeiro;
-            indices[i * 2 + 1] = segundo >= 0 ? segundo : primeiro;
-            pesos[i * 2] = 0.88 * pesoPrimeiro / soma;
-            pesos[i * 2 + 1] = 0.88 * pesoSegundo / soma;
-        }
-        deformacao = { indices, pesos, bindPosicoes, bindNormais, quantidadeVertices };
-        atualizarDeformacaoMaoVR();
-    }
-
-    function atualizarDeformacaoMaoVR() {
-        for (const osso of ossos) {
-            osso.matrizSkin.identity();
-            if (!osso.ativo) continue;
-            vetorRotacaoMao.set(osso.b.local.x - osso.a.local.x,
-                osso.b.local.y - osso.a.local.y, osso.b.local.z - osso.a.local.z).normalize();
-            quaternionDeformacaoMao.setFromUnitVectors(osso.direcaoBind, vetorRotacaoMao);
-            osso.matrizSkin.makeRotationFromQuaternion(quaternionDeformacaoMao);
-            posicaoBaseDeformacaoMao.set(osso.bindAx, osso.bindAy, osso.bindAz)
-                .applyMatrix4(osso.matrizSkin);
-            osso.matrizSkin.setPosition(
-                osso.a.local.x - posicaoBaseDeformacaoMao.x,
-                osso.a.local.y - posicaoBaseDeformacaoMao.y,
-                osso.a.local.z - posicaoBaseDeformacaoMao.z);
-        }
-        if (!deformacao) return;
-        const posicoes = atributoPosicao.array;
-        const normais = atributoNormal.array;
-        const { bindPosicoes, bindNormais, indices, pesos, quantidadeVertices } = deformacao;
-        for (let i = 0; i < quantidadeVertices; i++) {
-            const offset = i * 3;
-            const indiceUm = indices[i * 2], indiceDois = indices[i * 2 + 1];
-            const pesoUm = pesos[i * 2], pesoDois = pesos[i * 2 + 1];
-            const pesoPalma = 1 - pesoUm - pesoDois;
-            const matrizUm = indiceUm >= 0 && ossos[indiceUm]
-                ? ossos[indiceUm].matrizSkin.elements : identidadeSkinMao;
-            const matrizDois = indiceDois >= 0 && ossos[indiceDois]
-                ? ossos[indiceDois].matrizSkin.elements : identidadeSkinMao;
-            const x = bindPosicoes[offset], y = bindPosicoes[offset + 1], z = bindPosicoes[offset + 2];
-            const m1 = matrizUm, m2 = matrizDois;
-            posicoes[offset] = (m1[0] * x + m1[4] * y + m1[8] * z + m1[12]) * pesoUm
-                + (m2[0] * x + m2[4] * y + m2[8] * z + m2[12]) * pesoDois + x * pesoPalma;
-            posicoes[offset + 1] = (m1[1] * x + m1[5] * y + m1[9] * z + m1[13]) * pesoUm
-                + (m2[1] * x + m2[5] * y + m2[9] * z + m2[13]) * pesoDois + y * pesoPalma;
-            posicoes[offset + 2] = (m1[2] * x + m1[6] * y + m1[10] * z + m1[14]) * pesoUm
-                + (m2[2] * x + m2[6] * y + m2[10] * z + m2[14]) * pesoDois + z * pesoPalma;
-            const nx = bindNormais[offset], ny = bindNormais[offset + 1], nz = bindNormais[offset + 2];
-            let normalX = (m1[0] * nx + m1[4] * ny + m1[8] * nz) * pesoUm
-                + (m2[0] * nx + m2[4] * ny + m2[8] * nz) * pesoDois + nx * pesoPalma;
-            let normalY = (m1[1] * nx + m1[5] * ny + m1[9] * nz) * pesoUm
-                + (m2[1] * nx + m2[5] * ny + m2[9] * nz) * pesoDois + ny * pesoPalma;
-            let normalZ = (m1[2] * nx + m1[6] * ny + m1[10] * nz) * pesoUm
-                + (m2[2] * nx + m2[6] * ny + m2[10] * nz) * pesoDois + nz * pesoPalma;
-            const inversoNormal = 1 / Math.max(1e-8, Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ));
-            normalX *= inversoNormal; normalY *= inversoNormal; normalZ *= inversoNormal;
-            normais[offset] = normalX; normais[offset + 1] = normalY; normais[offset + 2] = normalZ;
-        }
-        atributoPosicao.needsUpdate = true;
-        atributoNormal.needsUpdate = true;
-    }
-
-    modelo.userData.atualizar = () => {
-        mao.updateMatrixWorld(true);
-        matrizMaoInversa.copy(mao.matrixWorld).invert();
-        if (!pulso || !polegar || raizes.some(p => !p)) { malha.visible = false; return; }
-        for (const ponto of pontos.values()) {
-            ponto.valido = !!(ponto.articulacao.visible && ponto.articulacao.parent);
-            if (ponto.valido) ponto.articulacao.getWorldPosition(ponto.local).applyMatrix4(matrizMaoInversa);
-        }
-        if (!pulso.valido || !polegar.valido || raizes.some(p => !p.valido)) { malha.visible = false; return; }
-        if (!deformacao && (pontos.size !== nomesJuntas.length
-            || Array.from(pontos.values()).some(ponto => !ponto.valido))) {
-            malha.visible = false;
-            return;
-        }
-
-        pulsoLocal.copy(pulso.local);
-        centroNos.set(0, 0, 0);
-        for (const raiz of raizes) centroNos.add(raiz.local);
-        centroNos.multiplyScalar(1 / raizes.length);
-        lateral.subVectors(raizes[3].local, raizes[0].local).normalize();
-        longitudinal.subVectors(centroNos, pulsoLocal);
-        if (longitudinal.lengthSq() < 1e-6 || lateral.lengthSq() < 1e-6) { malha.visible = false; return; }
-        longitudinal.addScaledVector(lateral, -longitudinal.dot(lateral)).normalize();
-        normal.crossVectors(longitudinal, lateral).normalize().multiplyScalar(modelo.userData.sentidoPalma || 1);
-        eixoX.copy(lateral); eixoY.copy(longitudinal); eixoZ.copy(normal);
-        centroPalmaLocal.copy(pulsoLocal).lerp(centroNos, 0.52);
-        normalPalmaLocal.copy(normal);
-        direcaoLongitudinalPalmaLocal.copy(longitudinal);
-
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        let minZ = Infinity, maxZ = -Infinity;
-        for (const ponto of pontos.values()) {
-            if (!ponto.valido) continue;
-            temporario.subVectors(ponto.local, pulsoLocal);
-            ponto.x = temporario.dot(eixoX); ponto.y = temporario.dot(eixoY); ponto.z = temporario.dot(eixoZ);
-            minX = Math.min(minX, ponto.x); maxX = Math.max(maxX, ponto.x);
-            minY = Math.min(minY, ponto.y); maxY = Math.max(maxY, ponto.y);
-            minZ = Math.min(minZ, ponto.z); maxZ = Math.max(maxZ, ponto.z);
-        }
-        for (const osso of ossos) {
-            osso.ativo = osso.a.valido && osso.b.valido;
-            if (!osso.ativo) continue;
-            const raio = Math.max(osso.raioA, osso.raioB) + osso.suavidade;
-            osso.minX = Math.min(osso.a.x, osso.b.x) - raio; osso.maxX = Math.max(osso.a.x, osso.b.x) + raio;
-            osso.minY = Math.min(osso.a.y, osso.b.y) - raio; osso.maxY = Math.max(osso.a.y, osso.b.y) + raio;
-            osso.minZ = Math.min(osso.a.z, osso.b.z) - raio; osso.maxZ = Math.max(osso.a.z, osso.b.z) + raio;
-        }
-        temporario.subVectors(centroNos, pulsoLocal);
-        const palma = {
-            cx: (raizes[0].x + raizes[3].x) * 0.5,
-            cy: temporario.dot(eixoY) * 0.50,
-            rx: Math.max(0.048, Math.abs(raizes[3].x - raizes[0].x) * 0.64 + 0.015),
-            ry: Math.max(0.050, temporario.length() * 0.73 + 0.012), rz: 0.017,
-            tx: polegar.x * 0.58, ty: Math.max(0.012, polegar.y * 0.62), tz: polegar.z * 0.35
-        };
-        if (deformacao) {
-            atualizarDeformacaoMaoVR();
-            return;
-        }
-        minX = Math.min(minX, palma.cx - palma.rx - 0.025, palma.tx - 0.045);
-        maxX = Math.max(maxX, palma.cx + palma.rx + 0.025, palma.tx + 0.045);
-        minY = Math.min(minY, -0.075, palma.cy - palma.ry - 0.025);
-        maxY = Math.max(maxY, palma.cy + palma.ry + 0.025);
-        minZ = Math.min(minZ, -0.055); maxZ = Math.max(maxZ, 0.055);
-
-        const passo = PASSO_MALHA_MAO_VR;
-        const x0 = Math.floor((minX - 0.018) / passo) * passo;
-        const y0 = Math.floor((minY - 0.018) / passo) * passo;
-        const z0 = Math.floor((minZ - 0.018) / passo) * passo;
-        const nx = Math.min(MAX_X_MALHA_MAO_VR, Math.ceil((maxX + 0.018 - x0) / passo) + 1);
-        const ny = Math.min(MAX_Y_MALHA_MAO_VR, Math.ceil((maxY + 0.018 - y0) / passo) + 1);
-        const nz = Math.min(MAX_Z_MALHA_MAO_VR, Math.ceil((maxZ + 0.018 - z0) / passo) + 1);
-        const sx = (maxX + 0.018 - x0) / (nx - 1);
-        const sy = (maxY + 0.018 - y0) / (ny - 1);
-        const sz = (maxZ + 0.018 - z0) / (nz - 1);
-        for (let z = 0; z < nz; z++) {
-            const pz = z0 + z * sz;
-            for (let y = 0; y < ny; y++) {
-                const py = y0 + y * sy;
-                let n = nx * (y + ny * z);
-                for (let x = 0; x < nx; x++, n++) valoresCampo[n] = avaliarCampo(x0 + x * sx, py, pz, palma);
-            }
-        }
-
-        const cx = nx - 1, cy = ny - 1, cz = nz - 1, totalCelulas = cx * cy * cz;
-        indiceCelula.fill(-1, 0, totalCelulas);
-        const maxArestas = cx * ny * nz + nx * cy * nz + nx * ny * cz;
-        garantirAtributos(totalCelulas, maxArestas * 6);
-        const posicoes = atributoPosicao.array, normais = atributoNormal.array;
-        let quantidadeVertices = 0;
-        for (let z = 0; z < cz; z++) {
-            for (let y = 0; y < cy; y++) {
-                const base = nx * (y + ny * z);
-                for (let x = 0; x < cx; x++) {
-                    const baseCelula = base + x;
-                    let dentro = false, fora = false;
-                    for (let c = 0; c < 8; c++) {
-                        const canto = CANTOS_CUBO_MAO_VR[c];
-                        const v = valoresCampo[baseCelula + canto[0] + nx * (canto[1] + ny * canto[2])];
-                        valoresCantos[c] = v;
-                        if (v < 0) dentro = true; else fora = true;
-                    }
-                    if (!dentro || !fora) continue;
-                    let ux = 0, uy = 0, uz = 0, intersecoes = 0;
-                    for (const [ia, ib] of ARESTAS_CUBO_MAO_VR) {
-                        const va = valoresCantos[ia], vb = valoresCantos[ib];
-                        if ((va < 0) === (vb < 0)) continue;
-                        const t = va / (va - vb), a = CANTOS_CUBO_MAO_VR[ia], b = CANTOS_CUBO_MAO_VR[ib];
-                        ux += a[0] + (b[0] - a[0]) * t;
-                        uy += a[1] + (b[1] - a[1]) * t;
-                        uz += a[2] + (b[2] - a[2]) * t; intersecoes++;
-                    }
-                    if (!intersecoes) continue;
-                    ux /= intersecoes; uy /= intersecoes; uz /= intersecoes;
-                    const f = valoresCantos;
-                    const gx = ((f[1] - f[0]) * (1 - uy) * (1 - uz) + (f[3] - f[2]) * uy * (1 - uz)
-                        + (f[5] - f[4]) * (1 - uy) * uz + (f[7] - f[6]) * uy * uz) / sx;
-                    const gy = ((f[2] - f[0]) * (1 - ux) * (1 - uz) + (f[3] - f[1]) * ux * (1 - uz)
-                        + (f[6] - f[4]) * (1 - ux) * uz + (f[7] - f[5]) * ux * uz) / sy;
-                    const gz = ((f[4] - f[0]) * (1 - ux) * (1 - uy) + (f[5] - f[1]) * ux * (1 - uy)
-                        + (f[6] - f[2]) * (1 - ux) * uy + (f[7] - f[3]) * ux * uy) / sz;
-                    const gxL = eixoX.x * gx + eixoY.x * gy + eixoZ.x * gz;
-                    const gyL = eixoX.y * gx + eixoY.y * gy + eixoZ.y * gz;
-                    const gzL = eixoX.z * gx + eixoY.z * gy + eixoZ.z * gz;
-                    const invN = 1 / Math.max(1e-8, Math.sqrt(gxL * gxL + gyL * gyL + gzL * gzL));
-                    const vi = quantidadeVertices++, pi = vi * 3;
-                    indiceCelula[x + cx * (y + cy * z)] = vi;
-                    const qx = x0 + (x + ux) * sx, qy = y0 + (y + uy) * sy, qz = z0 + (z + uz) * sz;
-                    posicoes[pi] = pulsoLocal.x + eixoX.x * qx + eixoY.x * qy + eixoZ.x * qz;
-                    posicoes[pi + 1] = pulsoLocal.y + eixoX.y * qx + eixoY.y * qy + eixoZ.y * qz;
-                    posicoes[pi + 2] = pulsoLocal.z + eixoX.z * qx + eixoY.z * qy + eixoZ.z * qz;
-                    normais[pi] = gxL * invN; normais[pi + 1] = gyL * invN; normais[pi + 2] = gzL * invN;
-                }
-            }
-        }
-
-        const indices = atributoIndice.array;
-        let quantidadeIndices = 0;
-        const celula = (x, y, z) => x + cx * (y + cy * z);
-        const quad = (a, b, c, d) => {
-            const ia = indiceCelula[a], ib = indiceCelula[b], ic = indiceCelula[c], id = indiceCelula[d];
-            if (ia < 0 || ib < 0 || ic < 0 || id < 0) return;
-            const pa = ia * 3, pb = ib * 3, pc = ic * 3;
-            const abx = posicoes[pb] - posicoes[pa], aby = posicoes[pb + 1] - posicoes[pa + 1], abz = posicoes[pb + 2] - posicoes[pa + 2];
-            const acx = posicoes[pc] - posicoes[pa], acy = posicoes[pc + 1] - posicoes[pa + 1], acz = posicoes[pc + 2] - posicoes[pa + 2];
-            const fx = aby * acz - abz * acy, fy = abz * acx - abx * acz, fz = abx * acy - aby * acx;
-            const orientacao = fx * (normais[pa] + normais[pb] + normais[pc])
-                + fy * (normais[pa + 1] + normais[pb + 1] + normais[pc + 1])
-                + fz * (normais[pa + 2] + normais[pb + 2] + normais[pc + 2]);
-            if (orientacao >= 0) {
-                indices[quantidadeIndices++] = ia; indices[quantidadeIndices++] = ib;
-                indices[quantidadeIndices++] = ic; indices[quantidadeIndices++] = ia;
-                indices[quantidadeIndices++] = ic; indices[quantidadeIndices++] = id;
-            } else {
-                indices[quantidadeIndices++] = ia; indices[quantidadeIndices++] = ic;
-                indices[quantidadeIndices++] = ib; indices[quantidadeIndices++] = ia;
-                indices[quantidadeIndices++] = id; indices[quantidadeIndices++] = ic;
-            }
-        };
-        for (let z = 1; z < nz; z++) for (let y = 1; y < ny; y++) for (let x = 0; x < cx; x++) {
-            const n = x + nx * (y + ny * z);
-            if ((valoresCampo[n] < 0) !== (valoresCampo[n + 1] < 0))
-                quad(celula(x, y - 1, z - 1), celula(x, y, z - 1), celula(x, y, z), celula(x, y - 1, z));
-        }
-        for (let z = 1; z < nz; z++) for (let y = 0; y < cy; y++) for (let x = 1; x < nx; x++) {
-            const n = x + nx * (y + ny * z);
-            if ((valoresCampo[n] < 0) !== (valoresCampo[n + nx] < 0))
-                quad(celula(x - 1, y, z - 1), celula(x, y, z - 1), celula(x, y, z), celula(x - 1, y, z));
-        }
-        for (let z = 0; z < cz; z++) for (let y = 1; y < ny; y++) for (let x = 1; x < nx; x++) {
-            const n = x + nx * (y + ny * z);
-            if ((valoresCampo[n] < 0) !== (valoresCampo[n + nx * ny] < 0))
-                quad(celula(x - 1, y - 1, z), celula(x, y - 1, z), celula(x, y, z), celula(x - 1, y, z));
-        }
-        atributoPosicao.needsUpdate = true;
-        atributoNormal.needsUpdate = true;
-        atributoIndice.needsUpdate = true;
-        geometria.setDrawRange(0, quantidadeIndices);
-        malha.visible = quantidadeIndices > 0;
-        if (quantidadeIndices > 0) criarDeformacaoMaoVR(quantidadeVertices);
-    };
     modelo.userData.juntas = juntasModelo;
-    modelo.userData.malhaPalma = malha;
-    modelo.userData.malhasDedos = [];
+    modelo.userData.malhaPalma = malhaPalma;
+    modelo.userData.malhasDedos = [segmentos, juntas];
     return modelo;
 }
 
