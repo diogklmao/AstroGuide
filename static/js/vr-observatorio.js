@@ -1511,6 +1511,7 @@ const LARGURA_REFERENCIA_MAO_VR = 0.090;
 let vrGeometriaPalmaMao = null;
 let vrGeometriaSegmentoMao = null;
 let vrGeometriaJuntaMao = null;
+let vrMaterialPalmaMao = null;
 
 function cadeiaDedoMaoVR(dedo) {
     return [`${dedo}-finger-metacarpal`, `${dedo}-finger-phalanx-proximal`,
@@ -1544,6 +1545,22 @@ function obterMaterialMaoVR() {
     };
     material.customProgramCacheKey = () => "astroguide-mao-vr-holograma";
     vrMaterialMao = material;
+    return material;
+}
+
+// A palma é o corpo sólido da mão, por isso usa uma variante do mesmo material
+// mais opaca e com escrita de profundidade: os dedos que passam por trás dela
+// deixam de se ver através da palma. Os dedos mantêm o material translúcido.
+function obterMaterialPalmaMaoVR() {
+    if (vrMaterialPalmaMao) return vrMaterialPalmaMao;
+    const base = obterMaterialMaoVR();
+    const material = base.clone();
+    material.transparent = false;
+    material.opacity = 1;
+    material.depthWrite = true;
+    material.onBeforeCompile = base.onBeforeCompile;
+    material.customProgramCacheKey = () => "astroguide-palma-vr-holograma";
+    vrMaterialPalmaMao = material;
     return material;
 }
 
@@ -1596,7 +1613,7 @@ function criarModeloArticuladoMaoVR(mao) {
     }
 
     const material = obterMaterialMaoVR();
-    const malhaPalma = new THREE.Mesh(obterGeometriaPalmaMaoVR(), material);
+    const malhaPalma = new THREE.Mesh(obterGeometriaPalmaMaoVR(), obterMaterialPalmaMaoVR());
     malhaPalma.name = "palma-mao-vr";
     malhaPalma.matrixAutoUpdate = false;
     malhaPalma.frustumCulled = false;
@@ -2319,9 +2336,20 @@ function disparaCliquePincaVR(info) {
     if (estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.MOVING_TO_HAND
         || estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.RETURNING) return;
     // Com o planeta já na palma, um NOVO pinch (não o que o selecionou) é o
-    // gesto de devolver. Vale mesmo que o raio não esteja sobre um astro: o
-    // planeta apresentado está fora dos alvos de raycast.
+    // gesto de devolver. Se a pinça apontar a OUTRO planeta, esse passa a ser
+    // o apresentado: o cartão anterior fecha e abre o novo. O planeta na palma
+    // está fora dos alvos de raycast, por isso uma pinça no vazio devolve-o.
     if (estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.ON_HAND) {
+        const alvoNovo = info.alvoPinch;
+        const astroNovo = alvoNovo && alvoNovo.parent === vrGrupoAstros
+            && alvoNovo.userData && alvoNovo.userData.astro;
+        const mesmoAstro = astroNovo && vrUltimaSelecao
+            && astroNovo.nome === vrUltimaSelecao.nome
+            && astroNovo.tipo === vrUltimaSelecao.tipo;
+        if (astroNovo && !mesmoAstro) {
+            selecionarAstroVR(astroNovo, { apresentarEmMao: true, infoMao: info });
+            return;
+        }
         if (vrApresentado) {
             limparSelecaoVR();
             // Defensivo: limparSelecaoVR pode não chegar ao astro apresentado
@@ -3360,10 +3388,20 @@ function executarAcaoVR(acao) {
 // ── Seleção de um astro ────────────────────────────────────────────────────
 function selecionarAstroVR(astro, opcoes = null) {
     if (!astro || !vrScene) return;
+    // Toggle do cartão: voltar a agir sobre o astro já selecionado fecha-o. O
+    // mesmo vale para o rato, o gatilho do comando e a pinça.
+    if (vrUltimaSelecao && vrPainelInfo3D
+        && vrUltimaSelecao.nome === astro.nome && vrUltimaSelecao.tipo === astro.tipo) {
+        limparSelecaoVR();
+        return;
+    }
     // A seleção por mão não pode abrir um segundo alvo a meio de MOVING_TO_HAND
-    // ou RETURNING; nesses estados o planeta atual é o único dono do gesto.
+    // ou RETURNING; nesses estados o planeta atual é o único dono do gesto. Com
+    // um planeta já na palma (ON_HAND) a troca é permitida: o anterior regressa
+    // e o novo ocupa o lugar dele.
     if (opcoes && opcoes.apresentarEmMao
-        && (estadoApresentacaoVR !== ESTADO_APRESENTACAO_VR.NORMAL || vrApresentado)) {
+        && (estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.MOVING_TO_HAND
+            || estadoApresentacaoVR === ESTADO_APRESENTACAO_VR.RETURNING)) {
         return;
     }
     const objetoSelecionado = objetoDeAstroVR(astro);
@@ -3787,9 +3825,26 @@ function atualizarMiradoresVR() {
         }
         info.rastreioPerdidoDesde = 0;
         if (info.laser) info.laser.visible = true;
-        if (info.objetoAgarrado) continue;
         vrRaycaster.camera = vrCamera;
         vrTempOrigem.setFromMatrixPosition(info.controlador.matrixWorld);
+        // Com um planeta na mão, o laser acaba na superfície desse planeta em
+        // vez de o atravessar. É só o comprimento visível do raio: o grabbing
+        // e a pose do objeto não mudam.
+        if (info.objetoAgarrado) {
+            const segurado = info.objetoAgarrado;
+            const elementos = segurado.matrixWorld.elements;
+            const dx = elementos[12] - vrTempOrigem.x;
+            const dy = elementos[13] - vrTempOrigem.y;
+            const dz = elementos[14] - vrTempOrigem.z;
+            const distanciaCentro = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            const raioSegurado = diametroAstroApresentacaoVR(segurado) * 0.5;
+            const comprimentoSegurado = Math.max(0.04, distanciaCentro - raioSegurado);
+            const verticesSegurado = info.laser.geometry.attributes.position;
+            verticesSegurado.setXYZ(1, 0, 0, -comprimentoSegurado);
+            verticesSegurado.needsUpdate = true;
+            info.laser.geometry.computeBoundingSphere();
+            continue;
+        }
         info.controlador.getWorldQuaternion(vrTempQuat);
         vrTempDirecao.set(0, 0, -1).applyQuaternion(vrTempQuat);
         vrRaycaster.ray.set(vrTempOrigem, vrTempDirecao);
