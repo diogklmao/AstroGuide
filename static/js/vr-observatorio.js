@@ -1568,8 +1568,8 @@ function criarModeloArticuladoMaoVR(mao) {
         ...["index", "middle", "ring", "pinky"].map((dedo, i) => ({
             nomes: [`${dedo}-finger-metacarpal`, `${dedo}-finger-phalanx-proximal`,
                 `${dedo}-finger-phalanx-intermediate`, `${dedo}-finger-phalanx-distal`, `${dedo}-finger-tip`],
-            raios: [0.0128 - i * 0.0006, 0.0118 - i * 0.0005,
-                0.0102 - i * 0.00045, 0.0086 - i * 0.0004, 0.0059 - i * 0.0003],
+            raios: [0.0112 - i * 0.0005, 0.0100 - i * 0.0004,
+                0.0086 - i * 0.0004, 0.0072 - i * 0.0003, 0.0052 - i * 0.0002],
             uniaoBase: 0.014
         }))
     ];
