@@ -1566,26 +1566,115 @@ function obterMaterialPalmaMaoVR() {
 
 // Palma: trapézio de cantos arredondados, largo nos nós dos dedos e estreito no
 // pulso. É simétrica de propósito — a orientação vem toda dos joints e a mão
-// esquerda usa o mesmo modelo — e a base do polegar é uma peça à parte.
+// esquerda usa o mesmo modelo — e o thenar (base do polegar) é uma peça à parte.
+//
+// A forma é uma "almofada" de anéis concêntricos: a face palmar côncava e o
+// dorso convexo encontram-se numa borda fina e arredondada. Isto evita a placa
+// plana que existia antes, dá profundidade real à palma e mantém a silhueta
+// estreita no pulso e larga sob os nós dos dedos.
 function obterGeometriaPalmaMaoVR() {
     if (vrGeometriaPalmaMao) return vrGeometriaPalmaMao;
-    const forma = new THREE.Shape();
-    const base = 0.30, topo = 0.465, meiaAltura = 0.5, canto = 0.20;
-    forma.moveTo(-base + canto, -meiaAltura);
-    forma.quadraticCurveTo(-base, -meiaAltura, -base, -meiaAltura + canto);
-    forma.lineTo(-topo, meiaAltura - canto);
-    forma.quadraticCurveTo(-topo, meiaAltura, -topo + canto, meiaAltura);
-    forma.lineTo(topo - canto, meiaAltura);
-    forma.quadraticCurveTo(topo, meiaAltura, topo, meiaAltura - canto);
-    forma.lineTo(base, -meiaAltura + canto);
-    forma.quadraticCurveTo(base, -meiaAltura, base - canto, -meiaAltura);
-    forma.closePath();
-    const geometria = new THREE.ExtrudeGeometry(forma, {
-        depth: 0.34, bevelEnabled: true, bevelThickness: 0.15,
-        bevelSize: 0.15, bevelSegments: 3, curveSegments: 6
-    });
-    geometria.translate(0, 0, -0.17);
+    const SEGMENTOS_PALMA = 32;
+    const ANEIS_PALMA = 4;
+    const potencia = 0.62; // superelipse: cantos suaves, topo largo
+    // Meia-largura do contorno ao longo do comprimento (v = -1 pulso, v = 1 dedos).
+    const larguraEm = v => {
+        const t = (v + 1) * 0.5;
+        const suave = t * t * (3 - 2 * t);
+        return 0.27 + (0.47 - 0.27) * suave;
+    };
+    // Espessura com raiz quadrada: a superfície chega à borda na vertical, o
+    // que dá um rebordo redondo em vez de uma aresta fina.
+    const rebordo = s => Math.pow(Math.max(0, 1 - s * s), 0.55);
+    // Face palmar (lado da normal): côncava, ~4 mm mais funda no centro.
+    const frenteEm = s => 0.0025 * rebordo(s) - 0.0050 * Math.pow(1 - s * s, 3);
+    // Dorso: convexo, para a mão ter volume e não parecer uma placa.
+    const costasEm = s => -0.0165 * rebordo(s);
+    const contorno = (angulo, raio) => {
+        const c = Math.cos(angulo), s = Math.sin(angulo);
+        const sx = c < 0 ? -1 : 1, sy = s < 0 ? -1 : 1;
+        return [
+            larguraEm(s) * sx * Math.pow(Math.abs(c), potencia) * raio,
+            0.5 * sy * Math.pow(Math.abs(s), potencia) * raio
+        ];
+    };
+
+    const posicoes = [];
+    const indices = [];
+    const empurrar = (x, y, z) => {
+        posicoes.push(x, y, z);
+        return posicoes.length / 3 - 1;
+    };
+
+    const centroFrente = empurrar(0, 0, frenteEm(0));
+    const aneisFrente = [];
+    for (let k = 1; k < ANEIS_PALMA; k++) {
+        const raio = k / ANEIS_PALMA;
+        const anel = [];
+        for (let i = 0; i < SEGMENTOS_PALMA; i++) {
+            const [x, y] = contorno(i / SEGMENTOS_PALMA * Math.PI * 2, raio);
+            anel.push(empurrar(x, y, frenteEm(raio)));
+        }
+        aneisFrente.push(anel);
+    }
+    const centroCostas = empurrar(0, 0, costasEm(0));
+    const aneisCostas = [];
+    for (let k = 1; k < ANEIS_PALMA; k++) {
+        const raio = k / ANEIS_PALMA;
+        const anel = [];
+        for (let i = 0; i < SEGMENTOS_PALMA; i++) {
+            const [x, y] = contorno(i / SEGMENTOS_PALMA * Math.PI * 2, raio);
+            anel.push(empurrar(x, y, costasEm(raio)));
+        }
+        aneisCostas.push(anel);
+    }
+    // Volta da borda, partilhada pelas duas faces: em vez de uma banda vertical
+    // entre elas, as normais suavizam-se num rebordo arredondado.
+    const anelBorda = [];
+    for (let i = 0; i < SEGMENTOS_PALMA; i++) {
+        const [x, y] = contorno(i / SEGMENTOS_PALMA * Math.PI * 2, 1);
+        anelBorda.push(empurrar(x, y, 0));
+    }
+
+    const leque = (centro, anel, inverter) => {
+        for (let i = 0; i < SEGMENTOS_PALMA; i++) {
+            const a = anel[i], b = anel[(i + 1) % SEGMENTOS_PALMA];
+            if (inverter) indices.push(centro, b, a);
+            else indices.push(centro, a, b);
+        }
+    };
+    const ponte = (interno, externo, inverter) => {
+        for (let i = 0; i < SEGMENTOS_PALMA; i++) {
+            const i2 = (i + 1) % SEGMENTOS_PALMA;
+            const a = interno[i], b = interno[i2];
+            const c = externo[i2], d = externo[i];
+            if (inverter) indices.push(a, d, c, a, c, b);
+            else indices.push(a, b, c, a, c, d);
+        }
+    };
+
+    leque(centroFrente, aneisFrente[0], false);
+    for (let k = 0; k + 1 < aneisFrente.length; k++) {
+        ponte(aneisFrente[k], aneisFrente[k + 1], false);
+    }
+    ponte(aneisFrente[aneisFrente.length - 1], anelBorda, false);
+    leque(centroCostas, aneisCostas[0], true);
+    for (let k = 0; k + 1 < aneisCostas.length; k++) {
+        ponte(aneisCostas[k], aneisCostas[k + 1], true);
+    }
+    ponte(aneisCostas[aneisCostas.length - 1], anelBorda, true);
+
+    const geometria = new THREE.BufferGeometry();
+    geometria.setAttribute("position", new THREE.Float32BufferAttribute(posicoes, 3));
+    geometria.setIndex(indices);
+    // Normaliza a largura: x passa a viver em [-0.5, 0.5] para a escala por frame
+    // ser exatamente a largura da palma em metros.
+    geometria.computeBoundingBox();
+    const caixa = geometria.boundingBox;
+    const meiaLargura = Math.max(Math.abs(caixa.min.x), Math.abs(caixa.max.x)) || 0.5;
+    geometria.scale(0.5 / meiaLargura, 1, 1);
     geometria.computeVertexNormals();
+    geometria.computeBoundingSphere();
     vrGeometriaPalmaMao = geometria;
     return geometria;
 }
@@ -1781,12 +1870,13 @@ function criarModeloArticuladoMaoVR(mao) {
             ? baseIndice.distanceTo(baseMindinho) : LARGURA_REFERENCIA_MAO_VR * 0.72;
         const larguraPalma = larguraDedos * 1.55;
         const escalaMao = THREE.MathUtils.clamp(larguraPalma / LARGURA_REFERENCIA_MAO_VR, 0.55, 1.7);
-        const espessuraPalma = 0.024 * escalaMao;
         const comprimentoVisual = comprimentoPalma * 1.05;
 
         centro.copy(pulso).addScaledVector(longitudinal, comprimentoVisual * 0.44);
         matrizTmp.makeBasis(eixoX, longitudinal, normal);
-        matrizTmp.scale(escalaTmp.set(larguraPalma / 0.93, comprimentoVisual, espessuraPalma / 0.66));
+        // A geometria da palma já tem a espessura em metros e a largura
+        // normalizada em [-0.5, 0.5]: a escala é diretamente o tamanho real.
+        matrizTmp.scale(escalaTmp.set(larguraPalma, comprimentoVisual, escalaMao));
         matrizTmp.setPosition(centro);
         malhaPalma.matrix.copy(matrizTmp);
         malhaPalma.matrixWorldNeedsUpdate = true;
@@ -1804,9 +1894,28 @@ function criarModeloArticuladoMaoVR(mao) {
         }
         atualizarCadeia(CADEIA_POLEGAR_MAO_VR, baseSegmento, baseJunta,
             RAIOS_POLEGAR_MAO_VR, 1.08, escalaMao);
-        // Última instância de junta: a base do polegar, que liga a palma ao
-        // primeiro troço do polegar sem deixar um degrau visível.
-        escreverJunta(TOTAL_JUNTAS_MAO_VR - 1, basePolegar, 0.0175 * escalaMao);
+        // Última instância: o thenar. Um elipsoide alongado na direção do
+        // polegar, meio dentro da palma, forma a transição palma → polegar em
+        // vez de um degrau ou de uma esfera solta.
+        const indiceThenar = TOTAL_JUNTAS_MAO_VR - 1;
+        if (basePolegar) {
+            direcao.subVectors(basePolegar, centro);
+            const comprimentoThenar = direcao.length();
+            if (comprimentoThenar > 1e-5) {
+                direcao.divideScalar(comprimentoThenar);
+                quaternionTmp.setFromUnitVectors(cimaMao, direcao);
+                // Fica na borda da palma, a envolver a base do polegar: se
+                // entrasse para o meio da face palmar criava um entalhe.
+                posicaoTmp.copy(basePolegar).lerp(centro, 0.08);
+                escalaTmp.set(0.017 * escalaMao, 0.022 * escalaMao, 0.011 * escalaMao);
+                matrizTmp.compose(posicaoTmp, quaternionTmp, escalaTmp);
+                juntas.setMatrixAt(indiceThenar, matrizTmp);
+            } else {
+                anularInstancia(juntas, indiceThenar);
+            }
+        } else {
+            anularInstancia(juntas, indiceThenar);
+        }
 
         segmentos.instanceMatrix.needsUpdate = true;
         juntas.instanceMatrix.needsUpdate = true;
